@@ -1,13 +1,36 @@
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Hedgehog.Example where
 
 import           Control.Monad (guard)
 
 import           Hedgehog.Gen (Gen)
 import qualified Hedgehog.Gen as Gen
-import qualified Hedgehog.Range as Range
 import           Hedgehog.Property
+import qualified Hedgehog.Range as Range
+import           Hedgehog.TH
+
+------------------------------------------------------------------------
+-- Example 0
+
+prop_success :: Monad m => Property m ()
+prop_success =
+  success
+
+prop_discard :: Monad m => Property m ()
+prop_discard =
+  discard
+
+prop_failure :: Monad m => Property m ()
+prop_failure =
+  failure
+
+{-
+prop_commented_out_properties_do_not_run :: Monad m => Property m ()
+prop_commented_out_properties_do_not_run =
+  pure ()
+-}
 
 ------------------------------------------------------------------------
 -- Example 1
@@ -15,12 +38,17 @@ import           Hedgehog.Property
 -- Try 'check prop_foo' to see what happens
 prop_foo :: Monad m => Property m ()
 prop_foo = do
-  x <- forAll "x" $ Gen.enum 'a' 'z'
-  y <- forAll "y" $ Gen.integral (Range.linear 0 1000)
+  x <- forAll $ Gen.enum 'a' 'z'
+  y <- forAll $
+    Gen.choice [
+        Gen.integral (Range.linear 0 1000)
+      , Gen.integral (Range.linear 0 1000)
+      ]
 
   guard (y `mod` 2 == (1 :: Int))
 
-  assert $ y < 87 && x <= 'r'
+  ensure $
+    y < 87 && x <= 'r'
 
 ------------------------------------------------------------------------
 -- Example 2
@@ -44,8 +72,9 @@ newtype Order =
 merge :: Order -> Order -> Order
 merge (Order xs) (Order ys) =
   Order $ xs ++ ys ++
-    if any ((> 50) . price) xs ||
-       any ((> 50) . price) ys then
+    if any ((< 50) . price) xs &&
+       any ((> 50) . price) xs &&
+       any ((> 1050) . price) ys then
       [Item (Product "processing") (USD 1)]
     else
       []
@@ -94,6 +123,11 @@ order gen =
 --
 prop_total :: Monad m => Property m ()
 prop_total = do
-  x <- forAll "cheap" (order cheap)
-  y <- forAll "expensive" (order expensive)
+  x <- forAll (order $ Gen.choice [cheap, expensive])
+  y <- forAll (order expensive)
   total (merge x y) === total x + total y
+
+
+tests :: IO Bool
+tests =
+  $$(checkAll)
