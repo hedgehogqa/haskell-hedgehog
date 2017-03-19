@@ -392,7 +392,7 @@ ppFailureLocation sloc =
       doc =
         WL.indent startCol $
           markup FailureArrows (WL.text (replicate (endCol - startCol) '^')) <+>
-          markup FailureMessage (WL.text "proposition was falsifiable!")
+          markup FailureMessage (WL.text "falsifiable!")
 
       startLine =
         spanStartLine sloc
