@@ -14,15 +14,13 @@ module Hedgehog.Runner (
 
 import           Control.Monad.IO.Class (MonadIO(..))
 
-import           GHC.Stack (SrcLoc(..))
-
 import           Hedgehog.Gen (runGen)
 import qualified Hedgehog.Gen as Gen
 import           Hedgehog.Internal.Report
 import           Hedgehog.Internal.Seed (Seed)
 import qualified Hedgehog.Internal.Seed as Seed
 import           Hedgehog.Internal.Tree (Tree(..), Node(..))
-import           Hedgehog.Property (Property, Log(..), runProperty)
+import           Hedgehog.Property (Property, Log(..), Failure(..), runProperty)
 import           Hedgehog.Range (Size)
 
 ------------------------------------------------------------------------
@@ -52,14 +50,14 @@ takeSmallest ::
   Size ->
   Seed ->
   ShrinkCount ->
-  Node m (Maybe (Either SrcLoc (), [Log])) -> m Status
+  Node m (Maybe (Either Failure (), [Log])) -> m Status
 takeSmallest size seed shrinks = \case
   Node Nothing _ ->
     pure GaveUp
 
   Node (Just (x, w)) xs ->
     case x of
-      Left loc -> do
+      Left (Failure loc) -> do
         --liftIO $ putStrLn "*** Shrinking"
         --liftIO . putStr . unlines $ fmap ppLog w
         findM xs (Failed $ mkFailure size seed shrinks loc w) $ \m -> do
