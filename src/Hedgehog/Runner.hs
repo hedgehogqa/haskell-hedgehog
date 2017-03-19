@@ -59,7 +59,7 @@ takeSmallest size seed shrinks = \case
     case x of
       Left (Failure loc) -> do
         --liftIO $ putStrLn "*** Shrinking"
-        --liftIO . putStr . unlines $ fmap ppLog w
+        --liftIO . putStrLn $ ppShow w
         findM xs (Failed $ mkFailure size seed shrinks loc w) $ \m -> do
           o <- runTree m
           if isFailure o then

@@ -1,4 +1,5 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 module Hedgehog.Example where
@@ -127,6 +128,47 @@ prop_total = do
   y <- forAll (order expensive)
   total (merge x y) === total x + total y
 
+------------------------------------------------------------------------
+-- Example 2 - Hutton's Razor
+
+data Exp =
+    Lit !Int
+  | Add !Exp !Exp
+    deriving (Eq, Ord, Show)
+
+evalExp :: Exp -> Int
+evalExp = \case
+  Lit x ->
+    x
+  Add x y ->
+    evalExp x + evalExp y
+
+shrinkExp :: Exp -> [Exp]
+shrinkExp = \case
+  Lit _ ->
+    []
+  Add x y ->
+    [x, y]
+
+genExp :: Monad m => Gen m Exp
+genExp =
+  Gen.shrink shrinkExp $
+  Gen.recursive Gen.choice [
+      Lit <$> Gen.int (Range.linear 0 10000)
+    ] [
+      Add <$> genExp <*> genExp
+    ]
+
+prop_hutton :: Monad m => Property m ()
+prop_hutton = do
+  x <- forAll genExp
+  case x of
+    Add (Add _ _) _ ->
+      ensure (evalExp x < 100)
+    _ ->
+      success
+
+------------------------------------------------------------------------
 
 tests :: IO Bool
 tests =
