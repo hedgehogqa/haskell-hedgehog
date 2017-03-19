@@ -27,12 +27,12 @@ import GHC.Exts (Constraint)
 newtype LineNo =
   LineNo {
       unLineNo :: Int
-    } deriving (Eq, Ord, Show, Num, Enum, Real, Integral)
+    } deriving (Eq, Ord, Num, Enum, Real, Integral)
 
 newtype ColumnNo =
   ColumnNo {
       unColumnNo :: Int
-    } deriving (Eq, Ord, Show, Num, Enum, Real, Integral)
+    } deriving (Eq, Ord, Num, Enum, Real, Integral)
 
 data Span =
   Span {
@@ -41,7 +41,7 @@ data Span =
     , spanStartColumn :: !ColumnNo
     , spanEndLine :: !LineNo
     , spanEndColumn :: !ColumnNo
-    } deriving (Eq, Ord, Show)
+    } deriving (Eq, Ord)
 
 #if !MIN_VERSION_base(4,9,0)
 type family HasCallStack :: Constraint where
@@ -77,3 +77,32 @@ getCaller stack =
 getCaller _ =
   Nothing
 #endif
+
+------------------------------------------------------------------------
+-- Show instances
+
+instance Show Span where
+  showsPrec p (Span file sl sc el ec) =
+    showParen (p > 10) $
+      showString "Span " .
+      showsPrec 11 file .
+      showChar ' ' .
+      showsPrec 11 sl .
+      showChar ' ' .
+      showsPrec 11 sc .
+      showChar ' ' .
+      showsPrec 11 el .
+      showChar ' ' .
+      showsPrec 11 ec
+
+instance Show LineNo where
+  showsPrec p (LineNo x) =
+    showParen (p > 10) $
+      showString "LineNo " .
+      showsPrec 11 x
+
+instance Show ColumnNo where
+  showsPrec p (ColumnNo x) =
+    showParen (p > 10) $
+      showString "ColumnNo " .
+      showsPrec 11 x
