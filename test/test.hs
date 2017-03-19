@@ -9,8 +9,9 @@ main = do
   hSetBuffering stdout LineBuffering
   hSetBuffering stderr LineBuffering
 
+  _expect_fail <- Hedgehog.Example.tests
+
   results <- sequence [
-      Hedgehog.Example.tests
     ]
 
   unless (and results) $

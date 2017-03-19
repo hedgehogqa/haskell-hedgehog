@@ -26,6 +26,11 @@ cabal-version:
   >= 1.8
 build-type:
   Simple
+tested-with:
+    GHC == 7.10.2
+  , GHC == 7.10.3
+  , GHC == 8.0.1
+  , GHC == 8.0.2
 
 source-repository head
   type: git
