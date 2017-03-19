@@ -73,6 +73,7 @@ library
     Hedgehog.Internal.Report
     Hedgehog.Internal.Seed
     Hedgehog.Internal.Shrink
+    Hedgehog.Internal.Source
     Hedgehog.Internal.Tree
 
 test-suite test

@@ -8,7 +8,7 @@ module Hedgehog.Internal.Report (
   -- * Report
     Report(..)
   , Status(..)
-  , Failure(..)
+  , FailureReport(..)
   , FailedInput(..)
 
   , ShrinkCount
@@ -24,11 +24,13 @@ module Hedgehog.Internal.Report (
   , mkFailure
   ) where
 
+import           Control.Monad (zipWithM)
 import           Control.Monad.IO.Class (MonadIO(..))
 import           Control.Monad.Trans.Maybe (MaybeT(..))
 
 import           Data.Bifunctor (bimap, first, second)
 import qualified Data.Char as Char
+import           Data.Either (partitionEithers)
 import qualified Data.List as List
 import           Data.Map (Map)
 import qualified Data.Map as Map
@@ -36,11 +38,10 @@ import           Data.Maybe (mapMaybe, catMaybes)
 import           Data.Semigroup (Semigroup(..))
 import           Data.Typeable (TypeRep)
 
-import           GHC.Stack (SrcLoc(..))
-
 import           Hedgehog.Internal.Discovery (Pos(..), Position(..))
 import qualified Hedgehog.Internal.Discovery as Discovery
 import           Hedgehog.Internal.Seed (Seed)
+import           Hedgehog.Internal.Source
 import           Hedgehog.Property (Log(..))
 import           Hedgehog.Range (Size)
 
@@ -77,19 +78,19 @@ newtype DiscardCount =
 
 data FailedInput =
   FailedInput {
-      failedSrcLoc :: !SrcLoc
+      failedSpan :: !(Maybe Span)
     , failedType :: !TypeRep
     , failedValue :: !String
     } deriving (Eq, Show)
 
-data Failure =
-  Failure {
+data FailureReport =
+  FailureReport {
       failureSize :: !Size
     , failureSeed :: !Seed
     , failureShrinks :: !ShrinkCount
     , failureInputs :: ![FailedInput]
-    , failureLocation :: !SrcLoc
-    , failureInfo :: ![String]
+    , failureLocation :: !(Maybe Span)
+    , failureMessages :: ![String]
     } deriving (Eq, Show)
 
 -- | The status of a property test run.
@@ -98,7 +99,7 @@ data Failure =
 --   number of shrinks, and the execution log.
 --
 data Status =
-    Failed !Failure
+    Failed !FailureReport
   | GaveUp
   | OK
     deriving (Eq, Show)
@@ -114,16 +115,6 @@ data Report =
 
 ------------------------------------------------------------------------
 -- Pretty Printing Helpers
-
-newtype LineNo =
-  LineNo {
-      unLineNo :: Int
-    } deriving (Eq, Ord, Show, Num, Enum, Real, Integral)
-
-newtype ColumnNo =
-  ColumnNo {
-      _unColumnNo :: Int
-    } deriving (Eq, Ord, Show, Num, Enum, Real, Integral)
 
 data Line a =
   Line {
@@ -195,7 +186,7 @@ takeInfo = \case
   _ ->
     Nothing
 
-mkFailure :: Size -> Seed -> ShrinkCount -> SrcLoc -> [Log] -> Failure
+mkFailure :: Size -> Seed -> ShrinkCount -> Maybe Span -> [Log] -> FailureReport
 mkFailure size seed shrinks location logs =
   let
     inputs =
@@ -204,7 +195,7 @@ mkFailure size seed shrinks location logs =
     info =
       mapMaybe takeInfo logs
   in
-    Failure size seed shrinks inputs location info
+    FailureReport size seed shrinks inputs location info
 
 ------------------------------------------------------------------------
 -- Pretty Printing
@@ -286,21 +277,21 @@ lineSpan (Line _ _ x0) =
   in
     (fromIntegral start, fromIntegral end)
 
-takeLines :: SrcLoc -> Declaration a -> Map LineNo (Line a)
+takeLines :: Span -> Declaration a -> Map LineNo (Line a)
 takeLines sloc =
-  fst . Map.split (fromIntegral $ srcLocEndLine sloc + 1) .
-  snd . Map.split (fromIntegral $ srcLocStartLine sloc - 1) .
+  fst . Map.split (spanEndLine sloc + 1) .
+  snd . Map.split (spanStartLine sloc - 1) .
   declarationSource
 
-readDeclaration :: MonadIO m => SrcLoc -> m (Maybe (Declaration ()))
+readDeclaration :: MonadIO m => Span -> m (Maybe (Declaration ()))
 readDeclaration sloc =
   runMaybeT $ do
     (name, Pos (Position _ line0 _) src) <- MaybeT $
-      Discovery.readDeclaration (srcLocFile sloc) (srcLocEndLine sloc)
+      Discovery.readDeclaration (spanFile sloc) (spanEndLine sloc)
 
     let
       path =
-        srcLocFile sloc
+        spanFile sloc
 
       line =
         fromIntegral line0
@@ -316,7 +307,7 @@ defaultStyle :: Declaration a -> Declaration (Style, [(Style, Doc Markup)])
 defaultStyle =
   fmap $ const (StyleInfo, [])
 
-lastLineSpan :: Monad m => SrcLoc -> Declaration a -> MaybeT m (ColumnNo, ColumnNo)
+lastLineSpan :: Monad m => Span -> Declaration a -> MaybeT m (ColumnNo, ColumnNo)
 lastLineSpan sloc decl =
   case reverse . Map.elems $ takeLines sloc decl of
     [] ->
@@ -325,12 +316,21 @@ lastLineSpan sloc decl =
       pure $
         lineSpan x
 
-ppFailedInput ::
+ppFailedInputTypedArgument :: Int -> FailedInput -> Doc Markup
+ppFailedInputTypedArgument ix (FailedInput _ typ val) =
+  WL.vsep [
+      WL.text "forAll" <> ppShow ix <+> "::" <+> ppShow typ
+    , WL.text "forAll" <> ppShow ix <+> "="
+    , WL.indent 2 . WL.vsep . fmap (markup InputValue . WL.text) $ lines val
+    ]
+
+ppFailedInputDeclaration ::
   MonadIO m =>
   FailedInput ->
   m (Maybe (Declaration (Style, [(Style, Doc Markup)])))
-ppFailedInput (FailedInput sloc _ val) =
+ppFailedInputDeclaration (FailedInput msloc _ val) =
   runMaybeT $ do
+    sloc <- MaybeT $ pure msloc
     decl <- fmap defaultStyle . MaybeT $ readDeclaration sloc
     startCol <- fromIntegral . fst <$> lastLineSpan sloc decl
 
@@ -346,7 +346,7 @@ ppFailedInput (FailedInput sloc _ val) =
         List.lines val
 
       endLine =
-        fromIntegral $ srcLocEndLine sloc
+        fromIntegral $ spanEndLine sloc
 
       --TODO do we even want this?
       --padding =
@@ -366,9 +366,22 @@ ppFailedInput (FailedInput sloc _ val) =
     pure $
       mapSource insertDoc decl
 
+ppFailedInput ::
+  MonadIO m =>
+  Int ->
+  FailedInput ->
+  m (Either (Doc Markup) (Declaration (Style, [(Style, Doc Markup)])))
+ppFailedInput ix input = do
+  mdecl <- ppFailedInputDeclaration input
+  case mdecl of
+    Nothing ->
+      pure . Left $ ppFailedInputTypedArgument ix input
+    Just decl ->
+      pure $ Right decl
+
 ppFailureLocation ::
   MonadIO m =>
-  SrcLoc ->
+  Span ->
   m (Maybe (Declaration (Style, [(Style, Doc Markup)])))
 ppFailureLocation sloc =
   runMaybeT $ do
@@ -382,10 +395,10 @@ ppFailureLocation sloc =
           markup FailureMessage (WL.text "proposition was falsifiable!")
 
       startLine =
-        fromIntegral $ srcLocStartLine sloc
+        spanStartLine sloc
 
       endLine =
-        fromIntegral $ srcLocEndLine sloc
+        spanEndLine sloc
 
       styleFailure kvs =
         foldr (Map.adjust . fmap . first $ const StyleFailure) kvs [startLine..endLine]
@@ -461,21 +474,31 @@ mergeDeclarations =
   Map.fromListWith mergeDeclaration .
   fmap (\d -> ((declarationFile d, declarationLine d), d))
 
-ppFailure :: MonadIO m => Maybe String -> Failure -> m (Doc Markup)
-ppFailure name (Failure size seed _ inputs0 location0 msgs) = do
-  mlocation <- ppFailureLocation location0
-  minputs <- traverse ppFailedInput inputs0
+ppFailureReport :: MonadIO m => Maybe String -> FailureReport -> m (Doc Markup)
+ppFailureReport name (FailureReport size seed _ inputs0 location0 msgs) = do
+  mlocation <- maybe (pure Nothing) ppFailureLocation location0
+  (args, idecls) <- partitionEithers <$> zipWithM ppFailedInput [0..] inputs0
 
   let
     decls =
       mergeDeclarations .
       catMaybes $
-        mlocation : minputs
+        mlocation : fmap pure idecls
 
-  pure . WL.indent 2 . WL.vsep . WL.punctuate WL.line $ [
-      WL.vsep . WL.punctuate WL.line $ fmap ppDeclaration decls
-    ] <> (if null msgs then [] else [WL.vsep $ fmap WL.text msgs]) <> [
-      ppReproduce name size seed
+    with xs f =
+      if null xs then
+        []
+      else
+        [f xs]
+
+  pure . WL.indent 2 . WL.vsep . WL.punctuate WL.line $ concat [
+      with args $
+        WL.vsep . WL.punctuate WL.line
+    , with decls $
+        WL.vsep . WL.punctuate WL.line . fmap ppDeclaration
+    , with msgs $
+        WL.vsep . fmap WL.text
+    , [ppReproduce name size seed]
     ]
 
 ppName :: Maybe String -> Doc a
@@ -489,7 +512,7 @@ ppReport :: MonadIO m => Maybe String -> Report -> m (Doc Markup)
 ppReport name (Report successes discards status) =
   case status of
     Failed failure -> do
-      pfailure <- ppFailure name failure
+      pfailure <- ppFailureReport name failure
       pure . WL.vsep $ [
           icon FailedIcon '✗' . WL.annotate FailedHeader $
             ppName name <+>

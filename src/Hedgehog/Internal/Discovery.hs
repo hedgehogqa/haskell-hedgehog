@@ -20,6 +20,8 @@ import qualified Data.Map as Map
 import qualified Data.Ord as Ord
 import           Data.Semigroup (Semigroup(..))
 
+import           Hedgehog.Internal.Source (LineNo(..), ColumnNo(..))
+
 ------------------------------------------------------------------------
 -- Property Extraction
 
@@ -37,7 +39,7 @@ readProperties :: MonadIO m => FilePath -> m (Map PropertyName PropertySource)
 readProperties path = do
   findProperties path <$> liftIO (readFile path)
 
-readDeclaration :: MonadIO m => FilePath -> Int -> m (Maybe (String, Pos String))
+readDeclaration :: MonadIO m => FilePath -> LineNo -> m (Maybe (String, Pos String))
 readDeclaration path line = do
   decls <- findDeclarations path <$> liftIO (readFile path)
   pure .
@@ -196,8 +198,8 @@ classified =
 data Position =
   Position {
       _posPath :: !FilePath
-    , posLine :: !Int
-    , posColumn :: !Int
+    , posLine :: !LineNo
+    , posColumn :: !ColumnNo
     } deriving (Eq, Ord, Show)
 
 data Pos a =

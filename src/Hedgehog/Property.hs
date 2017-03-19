@@ -7,7 +7,7 @@ module Hedgehog.Property (
   -- * Property
     Property(..)
   , Log(..)
-  , Name(..)
+  , Failure(..)
   , forAll
   , info
   , discard
@@ -29,13 +29,11 @@ import           Control.Monad.Trans.Class (MonadTrans(..))
 import           Control.Monad.Trans.Except (ExceptT(..), runExceptT)
 import           Control.Monad.Trans.Writer.Lazy (WriterT(..), tell)
 
-import           Data.String (IsString(..))
 import           Data.Typeable (Typeable, TypeRep, typeOf)
-
-import           GHC.Stack
 
 import           Hedgehog.Gen (Gen)
 import qualified Hedgehog.Gen as Gen
+import           Hedgehog.Internal.Source
 
 import           Text.Show.Pretty (ppShow)
 
@@ -43,16 +41,16 @@ import           Text.Show.Pretty (ppShow)
 
 newtype Property m a =
   Property {
-      unProperty :: ExceptT SrcLoc (WriterT [Log] (Gen m)) a
+      unProperty :: ExceptT Failure (WriterT [Log] (Gen m)) a
     } deriving (Functor, Applicative, Monad)
 
 data Log =
     Info String
-  | Input SrcLoc TypeRep String
+  | Input (Maybe Span) TypeRep String
     deriving (Eq, Show)
 
-newtype Name =
-  Name String
+data Failure =
+  Failure (Maybe Span)
   deriving (Eq, Ord, Show)
 
 instance Monad m => MonadPlus (Property m) where
@@ -77,11 +75,7 @@ instance MonadIO m => MonadIO (Property m) where
   liftIO =
     Property . liftIO
 
-instance IsString Name where
-  fromString =
-    Name
-
-runProperty :: Property m a -> Gen m (Either SrcLoc a, [Log])
+runProperty :: Property m a -> Gen m (Either Failure a, [Log])
 runProperty =
   runWriterT . runExceptT . unProperty
 
@@ -89,18 +83,10 @@ writeLog :: Monad m => Log -> Property m ()
 writeLog =
   Property . lift . tell . pure
 
-takeSrcLoc :: CallStack -> SrcLoc
-takeSrcLoc stack =
-  case getCallStack stack of
-    [] ->
-      error "Hedgehog.Property.takeSrcLoc: unexpected empty call stack"
-    (_, x) : _ ->
-      x
-
 forAll :: (Monad m, Show a, Typeable a, HasCallStack) => Gen m a -> Property m a
 forAll gen = do
   x <- Property . lift $ lift gen
-  writeLog $ Input (takeSrcLoc callStack) (typeOf x) (ppShow x)
+  writeLog $ Input (getCaller callStack) (typeOf x) (ppShow x)
   return x
 
 info :: Monad m => String -> Property m ()
@@ -113,7 +99,7 @@ discard =
 
 failure :: (Monad m, HasCallStack) => Property m a
 failure =
-  Property . ExceptT . pure . Left $ takeSrcLoc callStack
+  Property . ExceptT . pure . Left . Failure $ getCaller callStack
 
 success :: Monad m => Property m ()
 success =
