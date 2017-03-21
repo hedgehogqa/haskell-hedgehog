@@ -62,7 +62,6 @@ library
     src
 
   exposed-modules:
-    Hedgehog.Example
     Hedgehog.Gen
     Hedgehog.Property
     Hedgehog.Range
