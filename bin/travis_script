@@ -1,0 +1,58 @@
+#!/bin/sh -eu
+
+: ${HC:=ghc}
+: ${BENCH:=--enable-benchmarks}
+: ${TEST:=--enable-tests}
+
+cabal --version
+echo "$(${HC} --version) [$(${HC} --print-project-git-commit-id 2> /dev/null || echo '?')]"
+
+PACKAGES=$(echo $PWD/*/*.cabal | xargs -n1 dirname)
+for PACKAGE in $PACKAGES; do
+    cd $PACKAGE
+
+    if [ -f configure.ac ]; then autoreconf -i; fi
+    rm -rf dist/
+    cabal sdist # test that a source-distribution can be generated
+
+    cd dist/
+    PKG_NAME=$(basename $PACKAGE)
+    SRC_BASENAME=$(echo ${PKG_NAME}-*.tar.gz | sed 's/.tar.gz$//g')
+    tar -xvf "./$SRC_BASENAME.tar.gz"
+    cd "$SRC_BASENAME/"
+
+    # from here on, CWD is inside the extracted source-tarball
+    rm -fv cabal.project.local
+    echo 'packages: .' > cabal.project
+
+    # this builds all libraries and executables (without tests/benchmarks)
+    rm -f cabal.project.freeze
+    cabal new-build -w ${HC} --disable-tests --disable-benchmarks
+
+    # this builds all libraries and executables (including tests/benchmarks)
+    # - rm -rf ./dist-newstyle
+    cabal new-build -w ${HC} ${TEST} ${BENCH}
+
+    # there's no 'cabal new-test' yet, so let's emulate for now
+    TESTS=$(awk 'tolower($0) ~ /^test-suite / { print $2 }' *.cabal)
+    if [ "$TEST" != "--enable-tests" ]; then
+        TESTS=
+    fi
+
+    RC=true
+    for T in $TESTS; do
+        echo "== $T =="
+        RUNNER=dist-newstyle/build/$SRC_BASENAME/build/$T/$T
+        if [ ! -f $RUNNER ]; then
+            RUNNER=dist-newstyle/build/*/*/$SRC_BASENAME/*/*/build/$T/$T
+        fi
+
+        if $RUNNER; then
+            echo "= $T OK ="
+        else
+            echo "= $T FAILED ="
+            RC=false
+        fi
+    done
+    $RC
+done
