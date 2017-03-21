@@ -26,8 +26,6 @@ module Hedgehog.Property (
   , runProperty
   ) where
 
-import           Control.Monad.Trans.Cont (ContT)
-
 import           Control.Applicative (Alternative(..))
 import           Control.Monad (MonadPlus(..))
 import           Control.Monad.Base (MonadBase(..))
@@ -90,6 +88,8 @@ instance MFunctor Property where
   hoist f =
     Property . hoist (hoist (hoist f)) . unProperty
 
+-- FIXME instance MMonad Property
+
 instance PrimMonad m => PrimMonad (Property m) where
   type PrimState (Property m) =
     PrimState m
@@ -129,7 +129,7 @@ instance MonadState s m => MonadState s (Property m) where
   state =
     lift . state
 
--- FIXME Implement MonadWriter
+-- FIXME instance MonadWriter Property
 
 instance MonadError e m => MonadError e (Property m) where
   throwError =

@@ -267,6 +267,8 @@ instance MFunctor Gen where
   hoist f =
     mapGen (hoist (hoist f))
 
+-- FIXME instance MMonad Gen
+
 instance PrimMonad m => PrimMonad (Gen m) where
   type PrimState (Gen m) =
     PrimState m
