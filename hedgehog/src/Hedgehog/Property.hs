@@ -25,6 +25,7 @@ module Hedgehog.Property (
 import           Control.Applicative (Alternative(..))
 import           Control.Monad (MonadPlus(..))
 import           Control.Monad.IO.Class (MonadIO(..))
+import           Control.Monad.Morph (MFunctor(..))
 import           Control.Monad.Trans.Class (MonadTrans(..))
 import           Control.Monad.Trans.Except (ExceptT(..), runExceptT)
 import           Control.Monad.Trans.Writer.Lazy (WriterT(..), tell)
@@ -70,6 +71,10 @@ instance Monad m => Alternative (Property m) where
 instance MonadTrans Property where
   lift =
     Property . lift . lift . lift
+
+instance MFunctor Property where
+  hoist f =
+    Property . hoist (hoist (hoist f)) . unProperty
 
 instance MonadIO m => MonadIO (Property m) where
   liftIO =
