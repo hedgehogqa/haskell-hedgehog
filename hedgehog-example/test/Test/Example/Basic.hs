@@ -2,7 +2,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
-module Hedgehog.Example where
+module Test.Example.Basic where
 
 import           Control.Monad (guard)
 

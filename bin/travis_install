@@ -1,25 +1,11 @@
 #!/bin/sh -eu
 
-: ${CI:=false}
-: ${HC:=ghc}
-: ${BENCH:=--enable-benchmarks}
-: ${TEST:=--enable-tests}
-
 cabal --version
-echo "$(${HC} --version) [$(${HC} --print-project-git-commit-id 2> /dev/null || echo '?')]"
+echo "$(ghc --version) [$(ghc --print-project-git-commit-id 2> /dev/null || echo '?')]"
 
-if [ "$CI" = "true" ]; then
-    sed -i 's/^jobs:/-- jobs:/' ${HOME}/.cabal/config
-fi
-
+ROOT=$PWD
 PACKAGES=$(echo $PWD/*/*.cabal | xargs -n1 dirname)
 for PACKAGE in $PACKAGES; do
-  cd $PACKAGE
-
-  rm -fv cabal.project.local
-  echo 'packages: .' > cabal.project
-
-  rm -f cabal.project.freeze
-  cabal new-build -w ${HC} ${TEST} ${BENCH} --only-dependencies -j2
-  cabal new-build -w ${HC} --disable-tests --disable-benchmarks --only-dependencies -j2
+    cd $PACKAGE
+    $ROOT/bin/mafia lock # FIXME mafia really needs 'mafia setup'
 done
