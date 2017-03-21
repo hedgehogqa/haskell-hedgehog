@@ -7,6 +7,8 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-} -- MonadBase
 module Hedgehog.Gen (
   -- * Transformer
     Gen(..)
@@ -108,10 +110,18 @@ module Hedgehog.Gen (
 
 import           Control.Applicative (Alternative(..))
 import           Control.Monad (MonadPlus(..), mfilter, filterM, replicateM, ap)
+import           Control.Monad.Base (MonadBase(..))
+import           Control.Monad.Catch (MonadThrow(..), MonadCatch(..))
+import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Monad.IO.Class (MonadIO(..))
 import           Control.Monad.Morph (MFunctor(..))
+import           Control.Monad.Primitive (PrimMonad(..))
+import           Control.Monad.Reader.Class (MonadReader(..))
+import           Control.Monad.State.Class (MonadState(..))
 import           Control.Monad.Trans.Class (MonadTrans(..))
 import           Control.Monad.Trans.Maybe (MaybeT(..))
+import           Control.Monad.Trans.Resource (MonadResource(..))
+import           Control.Monad.Writer.Class (MonadWriter(..))
 
 import           Data.Bifunctor (first)
 import           Data.ByteString (ByteString)
@@ -257,9 +267,71 @@ instance MFunctor Gen where
   hoist f =
     mapGen (hoist (hoist f))
 
+-- FIXME instance MMonad Gen
+
+instance PrimMonad m => PrimMonad (Gen m) where
+  type PrimState (Gen m) =
+    PrimState m
+  primitive =
+    lift . primitive
+
 instance MonadIO m => MonadIO (Gen m) where
   liftIO =
     lift . liftIO
+
+instance MonadBase b m => MonadBase b (Gen m) where
+  liftBase =
+    lift . liftBase
+
+instance MonadThrow m => MonadThrow (Gen m) where
+  throwM =
+    lift . throwM
+
+instance MonadCatch m => MonadCatch (Gen m) where
+  catch m onErr =
+    Gen $ \size seed ->
+      case Seed.split seed of
+        (sm, se) ->
+          (runGen size sm m) `catch`
+          (runGen size se . onErr)
+
+instance MonadReader r m => MonadReader r (Gen m) where
+  ask =
+    lift ask
+  local f m =
+    mapGen (local f) m
+
+instance MonadState s m => MonadState s (Gen m) where
+  get =
+    lift get
+  put =
+    lift . put
+  state =
+    lift . state
+
+instance MonadWriter w m => MonadWriter w (Gen m) where
+  writer =
+    lift . writer
+  tell =
+    lift . tell
+  listen =
+    mapGen listen
+  pass =
+    mapGen pass
+
+instance MonadError e m => MonadError e (Gen m) where
+  throwError =
+    lift . throwError
+  catchError m onErr =
+    Gen $ \size seed ->
+      case Seed.split seed of
+        (sm, se) ->
+          (runGen size sm m) `catchError`
+          (runGen size se . onErr)
+
+instance MonadResource m => MonadResource (Gen m) where
+  liftResourceT =
+    lift . liftResourceT
 
 ------------------------------------------------------------------------
 -- Shrinking

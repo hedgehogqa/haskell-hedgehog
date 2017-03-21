@@ -42,13 +42,18 @@ library
     , ansi-terminal                   >= 0.6        && < 0.7
     , bytestring                      >= 0.10       && < 0.11
     , containers                      >= 0.4        && < 0.6
+    , exceptions                      >= 0.7        && < 0.9
     , mmorph                          >= 1.0        && < 1.1
+    , mtl                             >= 2.1        && < 2.3
     , pretty-show                     >= 1.6        && < 1.7
+    , primitive                       >= 0.6        && < 0.7
     , random                          >= 1.1        && < 1.2
+    , resourcet                       >= 1.1        && < 1.2
     , template-haskell                >= 2.10       && < 2.12
     , text                            >= 1.1        && < 1.3
     , time                            >= 1.4        && < 1.9
     , transformers                    >= 0.3        && < 0.6
+    , transformers-base               >= 0.4        && < 0.5
     , wl-pprint-annotated             >= 0.0        && < 0.1
 
   if impl(ghc < 8.0)

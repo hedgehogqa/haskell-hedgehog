@@ -1,4 +1,9 @@
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-} -- MonadBase
 module Hedgehog.Internal.Tree (
     Tree(..)
   , Node(..)
@@ -14,9 +19,17 @@ module Hedgehog.Internal.Tree (
 
 import           Control.Applicative (Alternative(..))
 import           Control.Monad (MonadPlus(..), ap)
+import           Control.Monad.Base (MonadBase(..))
+import           Control.Monad.Catch (MonadThrow(..), MonadCatch(..), Exception)
+import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Monad.IO.Class (MonadIO(..))
-import           Control.Monad.Morph (MFunctor(..))
+import           Control.Monad.Morph (MFunctor(..), MMonad(..))
+import           Control.Monad.Primitive (PrimMonad(..))
+import           Control.Monad.Reader.Class (MonadReader(..))
+import           Control.Monad.State.Class (MonadState(..))
 import           Control.Monad.Trans.Class (MonadTrans(..))
+import           Control.Monad.Trans.Resource (MonadResource(..))
+import           Control.Monad.Writer.Class (MonadWriter(..))
 
 #if MIN_VERSION_base(4,9,0)
 import           Data.Functor.Classes (Show1(..), showsPrec1)
@@ -72,13 +85,23 @@ prune m =
     pure $ Node x []
 
 ------------------------------------------------------------------------
--- Node instances
+-- Node/Tree instances
 
 instance Functor m => Functor (Node m) where
   fmap f (Node x xs) =
     Node (f x) (fmap (fmap f) xs)
 
+instance Functor m => Functor (Tree m) where
+  fmap f =
+    Tree . fmap (fmap f) . runTree
+
 instance Monad m => Applicative (Node m) where
+  pure =
+    return
+  (<*>) =
+    ap
+
+instance Monad m => Applicative (Tree m) where
   pure =
     return
   (<*>) =
@@ -93,19 +116,6 @@ instance Monad m => Monad (Node m) where
       Node y ys ->
         Node y $
           fmap (Tree . fmap (>>= k) . runTree) xs ++ ys
-
-------------------------------------------------------------------------
--- Tree instances
-
-instance Functor m => Functor (Tree m) where
-  fmap f =
-    Tree . fmap (fmap f) . runTree
-
-instance Monad m => Applicative (Tree m) where
-  pure =
-    return
-  (<*>) =
-    ap
 
 instance Monad m => Monad (Tree m) where
   return x =
@@ -136,17 +146,133 @@ instance MonadTrans Tree where
       x <- m
       pure (Node x [])
 
+instance MFunctor Node where
+  hoist f (Node x xs) =
+    Node x (fmap (hoist f) xs)
+
 instance MFunctor Tree where
   hoist f (Tree m) =
-    let
-      hoistOutcome (Node x xs) =
-        Node x (fmap (hoist f) xs)
-    in
-      Tree . f $ fmap hoistOutcome m
+    Tree . f $ fmap (hoist f) m
+
+embedNode :: Monad m => (t (Node t b) -> Tree m (Node t b)) -> Node t b -> Node m b
+embedNode f (Node x xs) =
+  Node x (fmap (embedTree f) xs)
+
+embedTree :: Monad m => (t (Node t b) -> Tree m (Node t b)) -> Tree t b -> Tree m b
+embedTree f (Tree m) =
+  Tree . pure . embedNode f =<< f m
+
+instance MMonad Tree where
+  embed =
+    embedTree
+
+instance PrimMonad m => PrimMonad (Tree m) where
+  type PrimState (Tree m) =
+    PrimState m
+  primitive =
+    lift . primitive
 
 instance MonadIO m => MonadIO (Tree m) where
   liftIO =
     lift . liftIO
+
+instance MonadBase b m => MonadBase b (Tree m) where
+  liftBase =
+    lift . liftBase
+
+instance MonadThrow m => MonadThrow (Tree m) where
+  throwM =
+    lift . throwM
+
+handleNode :: (Exception e, MonadCatch m) => (e -> Tree m a) -> Node m a -> Node m a
+handleNode onErr (Node x xs) =
+  Node x $
+    fmap (handleTree onErr) xs
+
+handleTree :: (Exception e, MonadCatch m) => (e -> Tree m a) -> Tree m a -> Tree m a
+handleTree onErr m =
+  Tree . fmap (handleNode onErr) $
+    catch (runTree m) (runTree . onErr)
+
+instance MonadCatch m => MonadCatch (Tree m) where
+  catch =
+    flip handleTree
+
+localNode :: MonadReader r m => (r -> r) -> Node m a -> Node m a
+localNode f (Node x xs) =
+  Node x $
+    fmap (localTree f) xs
+
+localTree :: MonadReader r m => (r -> r) -> Tree m a -> Tree m a
+localTree f (Tree m) =
+  Tree $
+    pure . localNode f =<< local f m
+
+instance MonadReader r m => MonadReader r (Tree m) where
+  ask =
+    lift ask
+  local =
+    localTree
+
+instance MonadState s m => MonadState s (Tree m) where
+  get =
+    lift get
+  put =
+    lift . put
+  state =
+    lift . state
+
+listenNode :: MonadWriter w m => w -> Node m a -> Node m (a, w)
+listenNode w (Node x xs) =
+  Node (x, w) $
+    fmap (listenTree w) xs
+
+listenTree :: MonadWriter w m => w -> Tree m a -> Tree m (a, w)
+listenTree w0 (Tree m) =
+  Tree $ do
+    (x, w) <- listen m
+    pure $ listenNode (mappend w0 w) x
+
+-- FIXME This just throws away the writer modification function.
+passNode :: MonadWriter w m => Node m (a, w -> w) -> Node m a
+passNode (Node (x, _) xs) =
+  Node x $
+    fmap passTree xs
+
+passTree :: MonadWriter w m => Tree m (a, w -> w) -> Tree m a
+passTree (Tree m) =
+  Tree $ do
+    pure . passNode =<< m
+
+instance MonadWriter w m => MonadWriter w (Tree m) where
+  writer =
+    lift . writer
+  tell =
+    lift . tell
+  listen =
+    listenTree mempty
+  pass =
+    passTree
+
+handleErrorNode :: MonadError e m => (e -> Tree m a) -> Node m a -> Node m a
+handleErrorNode onErr (Node x xs) =
+  Node x $
+    fmap (handleErrorTree onErr) xs
+
+handleErrorTree :: MonadError e m => (e -> Tree m a) -> Tree m a -> Tree m a
+handleErrorTree onErr m =
+  Tree . fmap (handleErrorNode onErr) $
+    catchError (runTree m) (runTree . onErr)
+
+instance MonadError e m => MonadError e (Tree m) where
+  throwError =
+    lift . throwError
+  catchError =
+    flip handleErrorTree
+
+instance MonadResource m => MonadResource (Tree m) where
+  liftResourceT =
+    lift . liftResourceT
 
 ------------------------------------------------------------------------
 -- Show/Show1 instances
