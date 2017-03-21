@@ -6,11 +6,9 @@ module Test.Example.Basic where
 
 import           Control.Monad (guard)
 
-import           Hedgehog.Gen (Gen)
+import           Hedgehog
 import qualified Hedgehog.Gen as Gen
-import           Hedgehog.Property
 import qualified Hedgehog.Range as Range
-import           Hedgehog.TH
 
 ------------------------------------------------------------------------
 -- Example 0
@@ -39,8 +37,8 @@ prop_commented_out_properties_do_not_run =
 -- Try 'check prop_foo' to see what happens
 prop_foo :: Monad m => Property m ()
 prop_foo = do
-  x <- forAll $ Gen.enum 'a' 'z'
-  y <- forAll $
+  x <- given $ Gen.enum 'a' 'z'
+  y <- given $
     Gen.choice [
         Gen.integral (Range.linear 0 1000)
       , Gen.integral (Range.linear 0 1000)
@@ -48,7 +46,7 @@ prop_foo = do
 
   guard (y `mod` 2 == (1 :: Int))
 
-  ensure $
+  assert $
     y < 87 && x <= 'r'
 
 ------------------------------------------------------------------------
@@ -124,8 +122,8 @@ order gen =
 --
 prop_total :: Monad m => Property m ()
 prop_total = do
-  x <- forAll (order $ Gen.choice [cheap, expensive])
-  y <- forAll (order expensive)
+  x <- given (order $ Gen.choice [cheap, expensive])
+  y <- given (order expensive)
   total (merge x y) === total x + total y
 
 ------------------------------------------------------------------------
@@ -161,10 +159,10 @@ genExp =
 
 prop_hutton :: Monad m => Property m ()
 prop_hutton = do
-  x <- forAll genExp
+  x <- given genExp
   case x of
     Add (Add _ _) _ ->
-      ensure (evalExp x < 100)
+      assert (evalExp x < 100)
     _ ->
       success
 
