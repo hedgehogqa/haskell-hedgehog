@@ -623,29 +623,28 @@ bool_ =
 ------------------------------------------------------------------------
 -- Combinators - Strings
 
--- | Generates a random string containing any unicode codepoint.
+-- | Generates a string using 'Range' to determine the length.
 --
-string :: Monad m => Range Int -> Gen m String
-string range =
-  choice [
-       list range (enum 'a' 'z')
-     , list range enumBounded
-     ]
-
--- | Generates a random string containing any unicode codepoint.
+--   /This is a specialization of 'list', offered for convenience./
 --
-text :: Monad m => Range Int -> Gen m Text
-text =
-  fmap Text.pack . string
+string :: Monad m => Range Int -> Gen m Char -> Gen m String
+string =
+  list
 
--- | Generates a random string containing any unicode codepoint, encoded as
---   UTF-8.
+-- | Generates a string using 'Range' to determine the length.
 --
-utf8 :: Monad m => Range Int -> Gen m ByteString
-utf8 =
-  fmap Text.encodeUtf8 . text
+text :: Monad m => Range Int -> Gen m Char -> Gen m Text
+text range =
+  fmap Text.pack . string range
 
--- | Generates a completely random bytes.
+-- | Generates a UTF-8 encoded string, using 'Range' to determine the length.
+--
+utf8 :: Monad m => Range Int -> Gen m Char -> Gen m ByteString
+utf8 range =
+  fmap Text.encodeUtf8 . text range
+
+-- | Generates a random 'ByteString', using 'Range' to determine the
+--   length.
 --
 bytes :: Monad m => Range Int -> Gen m ByteString
 bytes range =
