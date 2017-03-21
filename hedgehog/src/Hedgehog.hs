@@ -14,10 +14,11 @@
 --
 -- Once you have your imports set up, you can write a simple property:
 --
--- > prop_reverse :: Monad m => Property m ()
+-- > prop_reverse :: Property
 -- > prop_reverse =
--- >   xs <- given $ Gen.list (Range.linear 0 100) (Gen.enum 'a' 'z')
--- >   reverse (reverse xs) === xs
+-- >   property $ do
+-- >     xs <- forAll $ Gen.list (Range.linear 0 100) (Gen.enum 'a' 'z')
+-- >     reverse (reverse xs) === xs
 --
 -- And add the Template Haskell splice which will run your properies:
 --
@@ -33,12 +34,27 @@
 --
 module Hedgehog (
     Property
+  , Test
+  , TestLimit
+  , DiscardLimit
+  , ShrinkLimit
+
   , Gen
   , Range
-  , Seed(..)
   , Size(..)
+  , Seed(..)
 
-  -- * Construction
+  -- * Property
+  , property
+  , withTests
+  , withDiscards
+  , withShrinks
+
+  , check
+  , checkAll
+  , recheck
+
+  -- * Test
   , forAll
   , info
   , success
@@ -47,18 +63,22 @@ module Hedgehog (
   , assert
   , (===)
 
-  -- * Validation
-  , check
-  , checkAll
-  , recheck
+  , liftEither
+  , liftExceptT
+  , withResourceT
   ) where
 
 import           Hedgehog.Gen (Gen)
+import           Hedgehog.Internal.Property (assert, (===))
+import           Hedgehog.Internal.Property (discard, failure, success)
+import           Hedgehog.Internal.Property (DiscardLimit, withDiscards)
+import           Hedgehog.Internal.Property (forAll, info)
+import           Hedgehog.Internal.Property (liftEither, liftExceptT, withResourceT)
+import           Hedgehog.Internal.Property (Property)
+import           Hedgehog.Internal.Property (ShrinkLimit, withShrinks)
+import           Hedgehog.Internal.Property (Test, property)
+import           Hedgehog.Internal.Property (TestLimit, withTests)
+import           Hedgehog.Internal.Runner (check, recheck)
 import           Hedgehog.Internal.Seed (Seed(..))
-import           Hedgehog.Property (assert, (===))
-import           Hedgehog.Property (discard, failure, success)
-import           Hedgehog.Property (forAll, info)
-import           Hedgehog.Property (Property)
+import           Hedgehog.Internal.TH (checkAll)
 import           Hedgehog.Range (Range, Size(..))
-import           Hedgehog.Runner (check, recheck)
-import           Hedgehog.TH (checkAll)

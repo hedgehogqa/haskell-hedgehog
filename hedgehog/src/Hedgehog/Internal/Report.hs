@@ -12,7 +12,7 @@ module Hedgehog.Internal.Report (
   , FailedInput(..)
 
   , ShrinkCount
-  , SuccessCount
+  , TestCount
   , DiscardCount
 
   , Style(..)
@@ -40,9 +40,9 @@ import           Data.Typeable (TypeRep)
 
 import           Hedgehog.Internal.Discovery (Pos(..), Position(..))
 import qualified Hedgehog.Internal.Discovery as Discovery
+import           Hedgehog.Internal.Property (Log(..))
 import           Hedgehog.Internal.Seed (Seed)
 import           Hedgehog.Internal.Source
-import           Hedgehog.Property (Log(..))
 import           Hedgehog.Range (Size)
 
 import           System.Console.ANSI (ColorIntensity(..), Color(..))
@@ -66,8 +66,8 @@ newtype ShrinkCount =
 
 -- | The number of tests a property ran successfully.
 --
-newtype SuccessCount =
-  SuccessCount Int
+newtype TestCount =
+  TestCount Int
   deriving (Eq, Ord, Show, Num, Enum, Real, Integral)
 
 -- | The number of tests a property had to discard.
@@ -90,6 +90,7 @@ data FailureReport =
     , failureShrinks :: !ShrinkCount
     , failureInputs :: ![FailedInput]
     , failureLocation :: !(Maybe Span)
+    , failureMessage :: !String
     , failureMessages :: ![String]
     } deriving (Eq, Show)
 
@@ -108,7 +109,7 @@ data Status =
 --
 data Report =
   Report {
-      reportTests :: !SuccessCount
+      reportTests :: !TestCount
     , reportDiscards :: !DiscardCount
     , reportStatus :: !Status
     } deriving (Show)
@@ -186,8 +187,8 @@ takeInfo = \case
   _ ->
     Nothing
 
-mkFailure :: Size -> Seed -> ShrinkCount -> Maybe Span -> [Log] -> FailureReport
-mkFailure size seed shrinks location logs =
+mkFailure :: Size -> Seed -> ShrinkCount -> Maybe Span -> String -> [Log] -> FailureReport
+mkFailure size seed shrinks location message logs =
   let
     inputs =
       mapMaybe takeInput logs
@@ -195,7 +196,7 @@ mkFailure size seed shrinks location logs =
     info =
       mapMaybe takeInfo logs
   in
-    FailureReport size seed shrinks inputs location info
+    FailureReport size seed shrinks inputs location message info
 
 ------------------------------------------------------------------------
 -- Pretty Printing
@@ -216,11 +217,11 @@ icon :: Markup -> Char -> Doc Markup -> Doc Markup
 icon m i x =
   markup m (WL.char i) <+> x
 
-ppSuccessCount :: SuccessCount -> Doc a
-ppSuccessCount = \case
-  SuccessCount 1 ->
+ppTestCount :: TestCount -> Doc a
+ppTestCount = \case
+  TestCount 1 ->
     "1 test"
-  SuccessCount n ->
+  TestCount n ->
     ppShow n <+> "tests"
 
 ppDiscardCount :: DiscardCount -> Doc a
@@ -335,36 +336,30 @@ ppFailedInputDeclaration (FailedInput msloc _ val) =
     startCol <- fromIntegral . fst <$> lastLineSpan sloc decl
 
     let
-      code =
+      ppValLine =
         WL.indent startCol .
-        markup InputValue .
-        (WL.text "│ " <>) .
-        WL.text
+          markup InputValue .
+          (WL.text "│ " <>) .
+          WL.text
 
-      docs =
-        fmap ((StyleInput, ) . code) $
+      valDocs =
+        fmap ((StyleInput, ) . ppValLine) $
         List.lines val
+
+      startLine =
+        fromIntegral $ spanStartLine sloc
 
       endLine =
         fromIntegral $ spanEndLine sloc
 
-      --TODO do we even want this?
-      --padding =
-      -- -- We only add padding after inputs if the next line contains code
-      -- case Map.lookup (endLine + 1) (declarationSource decl) of
-      --   Nothing ->
-      --     []
-      --   Just line ->
-      --     if all Char.isSpace (lineSource line) then
-      --       []
-      --     else
-      --       [(StyleInput, mempty)]
+      styleInput kvs =
+        foldr (Map.adjust . fmap . first $ const StyleInput) kvs [startLine..endLine]
 
       insertDoc =
-        Map.adjust (fmap . second $ const docs) endLine
+        Map.adjust (fmap . second $ const valDocs) endLine
 
     pure $
-      mapSource insertDoc decl
+      mapSource (styleInput . insertDoc) decl
 
 ppFailedInput ::
   MonadIO m =>
@@ -381,18 +376,28 @@ ppFailedInput ix input = do
 
 ppFailureLocation ::
   MonadIO m =>
+  String ->
   Span ->
   m (Maybe (Declaration (Style, [(Style, Doc Markup)])))
-ppFailureLocation sloc =
+ppFailureLocation msg sloc =
   runMaybeT $ do
     decl <- fmap defaultStyle . MaybeT $ readDeclaration sloc
     (startCol, endCol) <- bimap fromIntegral fromIntegral <$> lastLineSpan sloc decl
 
     let
-      doc =
+      arrowDoc =
         WL.indent startCol $
-          markup FailureArrows (WL.text (replicate (endCol - startCol) '^')) <+>
-          markup FailureMessage (WL.text "falsifiable!")
+          markup FailureArrows (WL.text (replicate (endCol - startCol) '^'))
+
+      ppMsgLine =
+        WL.indent startCol .
+          markup FailureMessage .
+          (WL.text "│ " <>) .
+          WL.text
+
+      docs =
+        (StyleFailure, arrowDoc) :
+        fmap ((StyleFailure, ) . ppMsgLine) (List.lines msg)
 
       startLine =
         spanStartLine sloc
@@ -404,7 +409,7 @@ ppFailureLocation sloc =
         foldr (Map.adjust . fmap . first $ const StyleFailure) kvs [startLine..endLine]
 
       insertDoc =
-        Map.adjust (fmap . second $ const [(StyleFailure, doc)]) endLine
+        Map.adjust (fmap . second $ const docs) endLine
 
     pure $
       mapSource (styleFailure . insertDoc) decl
@@ -475,8 +480,16 @@ mergeDeclarations =
   fmap (\d -> ((declarationFile d, declarationLine d), d))
 
 ppFailureReport :: MonadIO m => Maybe String -> FailureReport -> m (Doc Markup)
-ppFailureReport name (FailureReport size seed _ inputs0 location0 msgs) = do
-  mlocation <- maybe (pure Nothing) ppFailureLocation location0
+ppFailureReport name (FailureReport size seed _ inputs0 mlocation0 msg msgs0) = do
+  (msgs, mlocation) <-
+    case mlocation0 of
+      Nothing ->
+        -- Move the failure message to the end section if we have
+        -- no source location.
+        pure (msgs0 ++ if null msg then [] else [msg], Nothing)
+      Just location0 ->
+        (msgs0,) <$> ppFailureLocation msg location0
+
   (args, idecls) <- partitionEithers <$> zipWithM ppFailedInput [0..] inputs0
 
   let
@@ -497,7 +510,7 @@ ppFailureReport name (FailureReport size seed _ inputs0 location0 msgs) = do
     , with decls $
         WL.vsep . WL.punctuate WL.line . fmap ppDeclaration
     , with msgs $
-        WL.vsep . fmap WL.text
+        WL.vsep . fmap WL.text . concatMap List.lines
     , [ppReproduce name size seed]
     ]
 
@@ -509,7 +522,7 @@ ppName = \case
     WL.text name
 
 ppReport :: MonadIO m => Maybe String -> Report -> m (Doc Markup)
-ppReport name (Report successes discards status) =
+ppReport name (Report tests discards status) =
   case status of
     Failed failure -> do
       pfailure <- ppFailureReport name failure
@@ -517,7 +530,7 @@ ppReport name (Report successes discards status) =
           icon FailedIcon '✗' . WL.annotate FailedHeader $
             ppName name <+>
             "failed after" <+>
-            ppSuccessCount successes <>
+            ppTestCount tests <>
             ppShrinkDiscard (failureShrinks failure) discards <>
             "."
         , mempty
@@ -530,13 +543,13 @@ ppReport name (Report successes discards status) =
         "gave up after" <+>
         ppDiscardCount discards <>
         ", passed" <+>
-        ppSuccessCount successes <>
+        ppTestCount tests <>
         "."
     OK ->
       pure . icon SuccessIcon '✓' . WL.annotate SuccessHeader $
         ppName name <+>
         "passed" <+>
-        ppSuccessCount successes <>
+        ppTestCount tests <>
         "."
 
 useColor :: MonadIO m => m Bool
@@ -592,7 +605,7 @@ printReport name x = do
         setSGRCode []
 
       StyledLineNo StyleInput ->
-        setSGRCode [dull Magenta]
+        setSGRCode []
       StyledSource StyleInput ->
         setSGRCode []
       StyledBorder StyleInput ->

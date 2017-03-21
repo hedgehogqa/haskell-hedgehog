@@ -11,16 +11,16 @@ import           Control.Monad.Reader
 
 import           Data.Either
 import           Data.Map.Strict (Map)
-import qualified Data.Map.Strict as M
+import qualified Data.Map.Strict as Map
 import           Data.Maybe
 import           Data.Monoid
 import           Data.Set (Set)
-import qualified Data.Set as S
+import qualified Data.Set as Set
 import           Data.Text (Text)
 
 import           Hedgehog
-import qualified Hedgehog.Gen as HG
-import qualified Hedgehog.Range as HR
+import qualified Hedgehog.Gen as Gen
+import qualified Hedgehog.Range as Range
 
 import           Prelude
 
@@ -77,11 +77,15 @@ subst x y expr =
     EString _ ->
       expr
     EVar z ->
-      if x == z then y else expr
-    ELam f t g ->
-      -- so incredibly wrong
-      ELam f t (subst x y g)
-      -- if f == x then ELam undefined t (subst f undefined g) else ELam f t (subst x y g)
+      if x == z then
+        y
+      else
+        expr
+    ELam n t g ->
+      if n == x then
+        ELam n t g
+      else
+        ELam n t (subst x y g)
     EApp f g ->
       EApp (subst x y f) (subst x y g)
 
@@ -100,9 +104,12 @@ free' binds frees expr =
     EString _ ->
       frees
     EVar x ->
-      if S.member x binds then frees else S.insert x frees
+      if Set.member x binds then
+        frees
+      else
+        Set.insert x frees
     ELam x _t y ->
-      free' (S.insert x binds) frees y
+      free' (Set.insert x binds) frees y
     EApp f g ->
       free' binds frees f <> free' binds frees g
 
@@ -132,20 +139,21 @@ typecheck' env expr =
       pure TString
 
     EVar x ->
-      maybe (Left (FreeVariable x)) pure (M.lookup x env)
+      maybe (Left (FreeVariable x)) pure (Map.lookup x env)
 
     ELam x t y ->
-      TArrow t <$> typecheck' (M.insert x t env) y
+      TArrow t <$> typecheck' (Map.insert x t env) y
 
     EApp f g -> do
       tf <- typecheck' env f
       tg <- typecheck' env g
       case tf of
         TArrow ta tb ->
-          if ta == tg
-            then pure tb
---            then pure ta {- uncomment for bugs -}
-            else Left (Mismatch ta tg)
+          if ta == tg then
+            pure tb
+--          pure ta {- uncomment for bugs -}
+          else
+            Left (Mismatch ta tg)
         _ ->
           Left (ExpectedArrow tf)
 
@@ -153,7 +161,7 @@ typecheck' env expr =
 
 genType :: Monad m => Gen m Type
 genType =
-  HG.recursive HG.choice [
+  Gen.recursive Gen.choice [
       pure TBool
     , pure TInt
     , pure TString
@@ -169,25 +177,43 @@ genWellTypedExpr want =
 
 genWellTypedExpr' :: Type -> Gen (Reader (Map Type [Expr])) Expr
 genWellTypedExpr' want =
-  HG.recursive HG.choice [
+  Gen.shrink shrinkExpr $
+  Gen.recursive Gen.choice [
       genWellTypedExpr'' want
     ] [
       genWellTypedPath want <|> genWellTypedApp want
     , genWellTypedApp want
     ]
 
+shrinkExpr :: Expr -> [Expr]
+shrinkExpr expr =
+  case expr of
+    EApp f g ->
+      case eval f of
+        ELam x _ e ->
+          [eval (subst x g e)]
+        _ ->
+          []
+    _ ->
+      []
+
 genWellTypedExpr'' :: Type -> Gen (Reader (Map Type [Expr])) Expr
 genWellTypedExpr'' want =
   case want of
     TBool ->
-      EBool <$> HG.element [True, False]
+      EBool <$> Gen.element [True, False]
     TInt ->
-      EInt <$> HG.int (HR.linear 0 10000)
+      EInt <$> Gen.int (Range.linear 0 10000)
     TString ->
-      EString <$> HG.text (HR.linear 0 25) (HG.enum 'a' 'z')
+      EString <$> Gen.text (Range.linear 0 25) Gen.lower
     TArrow t1 t2 -> do
-      x <- HG.text (HR.linear 1 25) (HG.enum 'a' 'z')
-      ELam x t1 <$> local (M.insertWith (<>) t1 [EVar x]) (genWellTypedExpr' t2)
+      x <- Gen.text (Range.linear 1 25) Gen.lower
+      ELam x t1 <$> local (insertVar x t1) (genWellTypedExpr' t2)
+
+insertVar :: Text -> Type -> Map Type [Expr] -> Map Type [Expr]
+insertVar n typ =
+  Map.insertWith (<>) typ [EVar n] .
+  fmap (filter (/= EVar n))
 
 genWellTypedApp :: Type -> Gen (Reader (Map Type [Expr])) Expr
 genWellTypedApp want = do
@@ -201,22 +227,23 @@ genWellTypedApp want = do
 -- It does not always succeed, throwing `empty` when unavailable.
 genWellTypedPath :: Type -> Gen (Reader (Map Type [Expr])) Expr
 genWellTypedPath want = do
-  paths <- lift ask
-  case M.lookup want paths of
-    Just es ->
-      HG.element es
-    Nothing ->
+  paths <- ask
+  case fromMaybe [] (Map.lookup want paths) of
+    [] ->
       empty
+    es ->
+      Gen.element es
 
 genKnownTypeMaybe :: Gen (Reader (Map Type [Expr])) Type
 genKnownTypeMaybe = do
-  known <- asks M.keys
-  if known == mempty
-    then genType
-    else  HG.frequency [
-              (2, HG.element known)
-            , (1, genType)
-            ]
+  known <- ask
+  if Map.null known then
+    genType
+  else
+    Gen.frequency [
+        (2, Gen.element $ Map.keys known)
+      , (1, genType)
+      ]
 
 -- -----------------------------------------------------------------------------
 
@@ -224,7 +251,7 @@ genKnownTypeMaybe = do
 genIllTypedExpr :: Monad m => Gen m Expr
 genIllTypedExpr = do
   be <- genIllTypedApp
-  HG.recursive HG.choice [
+  Gen.recursive Gen.choice [
       -- Don't grow - just dish up the broken expr
       pure be
     ] [
@@ -245,34 +272,38 @@ genIllTypedApp = do
   guard (t1 /= t2)
   f <- genWellTypedExpr t3
   g <- genWellTypedExpr t2
-  x <- HG.text (HR.linear 1 25) (HG.enum 'a' 'z')
+  x <- Gen.text (Range.linear 1 25) Gen.lower
   pure $ EApp (ELam x t1 f) g
 
 -- -----------------------------------------------------------------------------
 
-prop_welltyped :: Monad m => Property m ()
-prop_welltyped = do
-  ty <- forAll genType
-  ex <- forAll (genWellTypedExpr ty)
-  typecheck ex === pure ty
+prop_welltyped :: Property
+prop_welltyped =
+  property $ do
+    ty <- forAll genType
+    ex <- forAll (genWellTypedExpr ty)
+    typecheck ex === pure ty
 
-prop_illtyped :: Monad m => Property m ()
-prop_illtyped = do
-  ex <- forAll genIllTypedExpr
-  -- fix counterexample here
-  assert $ isLeft (typecheck ex)
+prop_illtyped :: Property
+prop_illtyped =
+  property $ do
+    ex <- forAll genIllTypedExpr
+    _t <- liftEither (typecheck ex)
+    success
 
-prop_consistent :: Monad m => Property m ()
-prop_consistent = do
-  ty <- forAll genType
-  ex <- forAll (genWellTypedExpr ty)
-  typecheck (eval ex) === pure ty
+prop_consistent :: Property
+prop_consistent =
+  property $ do
+    ty <- forAll genType
+    ex <- forAll (genWellTypedExpr ty)
+    typecheck (eval ex) === pure ty
 
-prop_idempotent :: Monad m => Property m ()
-prop_idempotent = do
-  ty <- forAll genType
-  ex <- forAll (genWellTypedExpr ty)
-  eval (eval ex) === eval ex
+prop_idempotent :: Property
+prop_idempotent =
+  property $ do
+    ty <- forAll genType
+    ex <- forAll (genWellTypedExpr ty)
+    eval (eval ex) === eval ex
 
 -- -----------------------------------------------------------------------------
 

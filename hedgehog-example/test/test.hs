@@ -1,6 +1,7 @@
 import           System.IO (BufferMode(..), hSetBuffering, stdout, stderr)
 
 import qualified Test.Example.Basic as Test.Example.Basic
+import qualified Test.Example.Resource as Test.Example.Resource
 
 main :: IO ()
 main = do
@@ -9,6 +10,7 @@ main = do
 
   _results <- sequence [
       Test.Example.Basic.tests
+    , Test.Example.Resource.tests
     ]
 
   --
