@@ -37,8 +37,8 @@ prop_commented_out_properties_do_not_run =
 -- Try 'check prop_foo' to see what happens
 prop_foo :: Monad m => Property m ()
 prop_foo = do
-  x <- given $ Gen.enum 'a' 'z'
-  y <- given $
+  x <- forAll $ Gen.enum 'a' 'z'
+  y <- forAll $
     Gen.choice [
         Gen.integral (Range.linear 0 1000)
       , Gen.integral (Range.linear 0 1000)
@@ -122,8 +122,8 @@ order gen =
 --
 prop_total :: Monad m => Property m ()
 prop_total = do
-  x <- given (order $ Gen.choice [cheap, expensive])
-  y <- given (order expensive)
+  x <- forAll (order $ Gen.choice [cheap, expensive])
+  y <- forAll (order expensive)
   total (merge x y) === total x + total y
 
 ------------------------------------------------------------------------
@@ -159,7 +159,7 @@ genExp =
 
 prop_hutton :: Monad m => Property m ()
 prop_hutton = do
-  x <- given genExp
+  x <- forAll genExp
   case x of
     Add (Add _ _) _ ->
       assert (evalExp x < 100)

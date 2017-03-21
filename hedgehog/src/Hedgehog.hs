@@ -39,7 +39,7 @@ module Hedgehog (
   , Size(..)
 
   -- * Construction
-  , given
+  , forAll
   , info
   , success
   , discard
@@ -57,7 +57,7 @@ import           Hedgehog.Gen (Gen)
 import           Hedgehog.Internal.Seed (Seed(..))
 import           Hedgehog.Property (assert, (===))
 import           Hedgehog.Property (discard, failure, success)
-import           Hedgehog.Property (given, info)
+import           Hedgehog.Property (forAll, info)
 import           Hedgehog.Property (Property)
 import           Hedgehog.Range (Range, Size(..))
 import           Hedgehog.Runner (check, recheck)

@@ -12,7 +12,7 @@ module Hedgehog.Property (
     Property(..)
   , Log(..)
   , Failure(..)
-  , given
+  , forAll
   , info
   , discard
   , failure
@@ -153,8 +153,8 @@ writeLog :: Monad m => Log -> Property m ()
 writeLog =
   Property . lift . tell . pure
 
-given :: (Monad m, Show a, Typeable a, HasCallStack) => Gen m a -> Property m a
-given gen = do
+forAll :: (Monad m, Show a, Typeable a, HasCallStack) => Gen m a -> Property m a
+forAll gen = do
   x <- Property . lift $ lift gen
   writeLog $ Input (getCaller callStack) (typeOf x) (ppShow x)
   return x
