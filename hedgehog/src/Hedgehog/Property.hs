@@ -8,12 +8,12 @@ module Hedgehog.Property (
     Property(..)
   , Log(..)
   , Failure(..)
-  , forAll
+  , given
   , info
   , discard
   , failure
   , success
-  , ensure
+  , assert
   , (===)
 
   -- * Internal
@@ -88,8 +88,8 @@ writeLog :: Monad m => Log -> Property m ()
 writeLog =
   Property . lift . tell . pure
 
-forAll :: (Monad m, Show a, Typeable a, HasCallStack) => Gen m a -> Property m a
-forAll gen = do
+given :: (Monad m, Show a, Typeable a, HasCallStack) => Gen m a -> Property m a
+given gen = do
   x <- Property . lift $ lift gen
   writeLog $ Input (getCaller callStack) (typeOf x) (ppShow x)
   return x
@@ -110,8 +110,8 @@ success :: Monad m => Property m ()
 success =
   Property $ pure ()
 
-ensure :: (Monad m, HasCallStack) => Bool -> Property m ()
-ensure b =
+assert :: (Monad m, HasCallStack) => Bool -> Property m ()
+assert b =
   if b then
     success
   else do
