@@ -144,7 +144,7 @@ typecheck' env expr =
         TArrow ta tb ->
           if ta == tg
             then pure tb
---            then pure ta
+--            then pure ta {- uncomment for bugs -}
             else Left (Mismatch ta tg)
         _ ->
           Left (ExpectedArrow tf)
@@ -191,7 +191,7 @@ genWellTypedExpr'' want =
 
 genWellTypedApp :: Type -> Gen (Reader (Map Type [Expr])) Expr
 genWellTypedApp want = do
-  tg <- genType
+  tg <- genKnownTypeMaybe
   eg <- genWellTypedExpr' tg
   let tf = TArrow tg want
   ef <- genWellTypedExpr' tf
@@ -208,12 +208,35 @@ genWellTypedPath want = do
     Nothing ->
       empty
 
+genKnownTypeMaybe :: Gen (Reader (Map Type [Expr])) Type
+genKnownTypeMaybe = do
+  known <- asks M.keys
+  if known == mempty
+    then genType
+    else  HG.frequency [
+              (2, HG.element known)
+            , (1, genType)
+            ]
+
 -- -----------------------------------------------------------------------------
 
+-- Generates a term that is ill-typed at some point.
 genIllTypedExpr :: Monad m => Gen m Expr
-genIllTypedExpr =
-  genIllTypedApp
+genIllTypedExpr = do
+  be <- genIllTypedApp
+  HG.recursive HG.choice [
+      -- Don't grow - just dish up the broken expr
+      pure be
+    ] [
+      -- Grow a reasonable app expression around the error
+      do tg <- genType
+         tf <- genType
+         let ta = TArrow tg tf
+         ea <- genWellTypedExpr ta
+         pure (EApp ea be)
+    ]
 
+-- Generates a term that is ill-typed at the very top.
 genIllTypedApp :: Monad m => Gen m Expr
 genIllTypedApp = do
   t1 <- genType
