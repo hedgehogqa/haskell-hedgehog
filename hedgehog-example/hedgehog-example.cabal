@@ -25,6 +25,8 @@ cabal-version:
 build-type:
   Simple
 
+library
+
 test-suite test
   type:
     exitcode-stdio-1.0
