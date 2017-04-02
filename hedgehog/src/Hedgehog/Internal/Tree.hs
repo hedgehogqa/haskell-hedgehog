@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-} -- MonadBase
 module Hedgehog.Internal.Tree (
@@ -163,8 +164,8 @@ embedTree f (Tree m) =
   Tree . pure . embedNode f =<< f m
 
 instance MMonad Tree where
-  embed =
-    embedTree
+  embed f m =
+    embedTree f m
 
 instance PrimMonad m => PrimMonad (Tree m) where
   type PrimState (Tree m) =

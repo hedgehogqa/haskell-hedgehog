@@ -1,5 +1,10 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -52,6 +57,16 @@ module Hedgehog.Gen (
   , bool
   , bool_
 
+  -- ** Characters
+  , binit
+  , octit
+  , digit
+  , hexit
+  , lower
+  , upper
+  , alpha
+  , alphaNum
+
   -- ** Strings
   , string
   , text
@@ -76,6 +91,14 @@ module Hedgehog.Gen (
   , set
   , map
 
+  -- ** Subterms
+  , subterm
+  , subtermM
+  , subterm2
+  , subtermM2
+  , subterm3
+  , subtermM3
+
   -- ** Combinations & Permutations
   , subsequence
   , shuffle
@@ -94,7 +117,6 @@ module Hedgehog.Gen (
   , runGen
   , mapGen
   , generate
-  , freeze
   , liftTree
   , runDiscardEffect
 
@@ -103,6 +125,12 @@ module Hedgehog.Gen (
 
   -- ** Shrinking
   , atLeast
+
+  -- ** Subterms
+  , Vec(..)
+  , Nat(..)
+  , subtermMVec
+  , freeze
 
   -- ** Sampling
   , renderNodes
@@ -114,7 +142,7 @@ import           Control.Monad.Base (MonadBase(..))
 import           Control.Monad.Catch (MonadThrow(..), MonadCatch(..))
 import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Monad.IO.Class (MonadIO(..))
-import           Control.Monad.Morph (MFunctor(..))
+import           Control.Monad.Morph (MFunctor(..), MMonad(..))
 import           Control.Monad.Primitive (PrimMonad(..))
 import           Control.Monad.Reader.Class (MonadReader(..))
 import           Control.Monad.State.Class (MonadState(..))
@@ -127,7 +155,7 @@ import           Data.Bifunctor (first)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString
 import qualified Data.Char as Char
-import           Data.Foldable (for_)
+import           Data.Foldable (for_, toList)
 import           Data.Int (Int8, Int16, Int32, Int64)
 import           Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
@@ -184,7 +212,7 @@ generate f =
 -- | Freeze the size and seed used by a generator, so we can inspect the value
 --   which it will produce.
 --
---   This is used as an optimisation for implementing `list`. It allows us to
+--   This is used for implementing `list` and `subtermMVec`. It allows us to
 --   shrink the list itself before trying to shrink the values inside the list.
 --
 freeze :: Monad m => Gen m a -> Gen m (a, Gen m a)
@@ -267,7 +295,31 @@ instance MFunctor Gen where
   hoist f =
     mapGen (hoist (hoist f))
 
--- FIXME instance MMonad Gen
+embedMaybe ::
+  MonadTrans t =>
+  Monad n =>
+  Monad (t (MaybeT n)) =>
+  (forall a. m a -> t (MaybeT n) a) ->
+  MaybeT m b ->
+  t (MaybeT n) b
+embedMaybe f m =
+  lift . MaybeT . pure =<< f (runMaybeT m)
+
+embedTree :: Monad n => (forall a. m a -> Tree (MaybeT n) a) -> Tree (MaybeT m) b -> Tree (MaybeT n) b
+embedTree f tree =
+  embed (embedMaybe f) tree
+
+embedGen :: Monad n => (forall a. m a -> Gen n a) -> Gen m b -> Gen n b
+embedGen f gen =
+  Gen $ \size seed ->
+    case Seed.split seed of
+      (sf, sg) ->
+        (runGen size sf . f) `embedTree`
+        (runGen size sg gen)
+
+instance MMonad Gen where
+  embed =
+    embedGen
 
 instance PrimMonad m => PrimMonad (Gen m) where
   type PrimState (Gen m) =
@@ -621,6 +673,60 @@ bool_ =
     (/= 0) . fst $ Seed.nextInteger 0 1 seed
 
 ------------------------------------------------------------------------
+-- Combinators - Characters
+
+-- | Generates an ASCII binit: @'0'..'1'@
+--
+binit :: Monad m => Gen m Char
+binit =
+  enum '0' '1'
+
+-- | Generates an ASCII octit: @'0'..'7'@
+--
+octit :: Monad m => Gen m Char
+octit =
+  enum '0' '7'
+
+-- | Generates an ASCII digit: @'0'..'9'@
+--
+digit :: Monad m => Gen m Char
+digit =
+  enum '0' '9'
+
+-- | Generates an ASCII hexit: @'0'..'9', \'a\'..\'f\', \'A\'..\'F\'@
+--
+hexit :: Monad m => Gen m Char
+hexit =
+  -- FIXME optimize lookup, use a SmallArray or something.
+  element "0123456789aAbBcCdDeEfF"
+
+-- | Generates an ASCII lowercase letter: @\'a\'..\'z\'@
+--
+lower :: Monad m => Gen m Char
+lower =
+  enum 'a' 'z'
+
+-- | Generates an ASCII uppercase letter: @\'A\'..\'Z\'@
+--
+upper :: Monad m => Gen m Char
+upper =
+  enum 'A' 'Z'
+
+-- | Generates an ASCII letter: @\'a\'..\'z\', \'A\'..\'Z\'@
+--
+alpha :: Monad m => Gen m Char
+alpha =
+  -- FIXME optimize lookup, use a SmallArray or something.
+  element "abcdefghiklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
+
+-- | Generates an ASCII letter or digit: @\'a\'..\'z\', \'A\'..\'Z\', \'0\'..\'9\'@
+--
+alphaNum :: Monad m => Gen m Char
+alphaNum =
+  -- FIXME optimize lookup, use a SmallArray or something.
+  element "abcdefghiklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+------------------------------------------------------------------------
 -- Combinators - Strings
 
 -- | Generates a string using 'Range' to determine the length.
@@ -736,18 +842,18 @@ frequency = \case
 --   | App Expr Expr
 --
 -- -- Assuming we have a name generator
--- genName :: 'Gen' String
+-- genName :: 'Monad' m => 'Gen' m String
 --
 -- -- We can write a generator for expressions
--- genExpr :: 'Gen' Expr
+-- genExpr :: 'Monad' m => 'Gen' m Expr
 -- genExpr =
 --   Gen.'recursive' Gen.'choice' [
 --       -- non-recursive generators
 --       Var '<$>' genName
 --     ] [
 --       -- recursive generators
---       Lam '<$>' genName '<*>' genExpr
---     , App '<$>' genExpr '<$>' genExpr
+--       Gen.'subtermM' genExpr (\x -> Lam '<$>' genName '<*>' pure x)
+--     , Gen.'subterm2' genExpr genExpr App
 --     ]
 -- @
 --
@@ -782,7 +888,7 @@ discard =
 -- filter p gen = 'mfilter' p gen '<|>' filter p gen
 -- @
 --
---   It differs from the above in that we keep some state to void looping
+--   It differs from the above in that we keep some state to avoid looping
 --   forever. If we trigger these limits then the whole whole generator is
 --   discarded.
 --
@@ -910,6 +1016,111 @@ atLeast n =
     not . null . drop (n - 1)
 
 ------------------------------------------------------------------------
+-- Combinators - Subterms
+
+data Subterms n a =
+    One a
+  | All (Vec n a)
+    deriving (Functor, Foldable, Traversable)
+
+data Nat =
+    Z
+  | S Nat
+
+data Vec n a where
+  Nil :: Vec 'Z a
+  (:.) :: a -> Vec n a -> Vec ('S n) a
+
+infixr 5 :.
+
+deriving instance Functor (Vec n)
+deriving instance Foldable (Vec n)
+deriving instance Traversable (Vec n)
+
+shrinkSubterms :: Subterms n a -> [Subterms n a]
+shrinkSubterms = \case
+  One _ ->
+    []
+  All xs ->
+    fmap One $ toList xs
+
+genSubterms :: Monad m => Vec n (Gen m a) -> Gen m (Subterms n a)
+genSubterms =
+  (sequence =<<) .
+  shrink shrinkSubterms .
+  fmap All .
+  mapM (fmap snd . freeze)
+
+fromSubterms :: Applicative m => (Vec n a -> m a) -> Subterms n a -> m a
+fromSubterms f = \case
+  One x ->
+    pure x
+  All xs ->
+    f xs
+
+-- | Constructs a generator from a number of sub-term generators.
+--
+--   /Shrinks to one of the sub-terms if possible./
+--
+subtermMVec :: Monad m => Vec n (Gen m a) -> (Vec n a -> Gen m a) -> Gen m a
+subtermMVec gs f =
+  fromSubterms f =<< genSubterms gs
+
+-- | Constructs a generator from a sub-term generator.
+--
+--   /Shrinks to the sub-term if possible./
+--
+subtermM :: Monad m => Gen m a -> (a -> Gen m a) -> Gen m a
+subtermM gx f =
+  subtermMVec (gx :. Nil) $ \(x :. Nil) ->
+    f x
+
+-- | Constructs a generator from a sub-term generator.
+--
+--   /Shrinks to the sub-term if possible./
+--
+subterm :: Monad m => Gen m a -> (a -> a) -> Gen m a
+subterm gx f =
+  subtermM gx $ \x ->
+    pure (f x)
+
+-- | Constructs a generator from two sub-term generators.
+--
+--   /Shrinks to one of the sub-terms if possible./
+--
+subtermM2 :: Monad m => Gen m a -> Gen m a -> (a -> a -> Gen m a) -> Gen m a
+subtermM2 gx gy f =
+  subtermMVec (gx :. gy :. Nil) $ \(x :. y :. Nil) ->
+    f x y
+
+-- | Constructs a generator from two sub-term generators.
+--
+--   /Shrinks to one of the sub-terms if possible./
+--
+subterm2 :: Monad m => Gen m a -> Gen m a -> (a -> a -> a) -> Gen m a
+subterm2 gx gy f =
+  subtermM2 gx gy $ \x y ->
+    pure (f x y)
+
+-- | Constructs a generator from three sub-term generators.
+--
+--   /Shrinks to one of the sub-terms if possible./
+--
+subtermM3 :: Monad m => Gen m a -> Gen m a -> Gen m a -> (a -> a -> a -> Gen m a) -> Gen m a
+subtermM3 gx gy gz f =
+  subtermMVec (gx :. gy :. gz :. Nil) $ \(x :. y :. z :. Nil) ->
+    f x y z
+
+-- | Constructs a generator from three sub-term generators.
+--
+--   /Shrinks to one of the sub-terms if possible./
+--
+subterm3 :: Monad m => Gen m a -> Gen m a -> Gen m a -> (a -> a -> a -> a) -> Gen m a
+subterm3 gx gy gz f =
+  subtermM3 gx gy gz $ \x y z ->
+    pure (f x y z)
+
+------------------------------------------------------------------------
 -- Combinators - Combinations & Permutations
 
 -- | Generates a random subsequence of a list.
@@ -976,7 +1187,7 @@ printTreeWith size seed gen = do
 --   level of shrinks.
 --
 -- @
--- print ('enum' \'a\' \'f\')
+-- Gen.print (Gen.'enum' \'a\' \'f\')
 -- @
 --
 --   > === Outcome ===
@@ -994,7 +1205,7 @@ print gen = do
 -- | Run a generator with a random seed and print the resulting shrink tree.
 --
 -- @
--- printTree ('enum' \'a\' \'f\')
+-- Gen.printTree (Gen.'enum' \'a\' \'f\')
 -- @
 --
 --   > 'd'

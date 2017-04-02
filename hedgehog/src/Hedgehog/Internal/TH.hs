@@ -1,6 +1,10 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TemplateHaskell #-}
-module Hedgehog.TH where
+module Hedgehog.Internal.TH (
+    TExpQ
+  , checkAll
+  , runCheckAll
+  ) where
 
 import qualified Data.List as List
 import qualified Data.Map as Map
@@ -8,8 +12,8 @@ import qualified Data.Ord as Ord
 import           Data.Traversable (for)
 
 import           Hedgehog.Internal.Discovery
-import           Hedgehog.Property
-import           Hedgehog.Runner
+import           Hedgehog.Internal.Property
+import           Hedgehog.Internal.Runner
 
 import           Language.Haskell.TH
 import           Language.Haskell.TH.Syntax
@@ -17,6 +21,12 @@ import           Language.Haskell.TH.Syntax
 type TExpQ a =
   Q (TExp a)
 
+-- | Check all the properties in a file.
+--
+-- > tests :: IO Bool
+-- > tests =
+-- >   $$(checkAll)
+--
 checkAll :: TExpQ (IO Bool)
 checkAll = do
   file <- getCurrentFile
@@ -36,11 +46,11 @@ checkAll = do
 
   [|| runCheckAll $$(moduleName) $$(listTE names) ||]
 
-mkNamedProperty :: PropertyName -> TExpQ (String, Property IO ())
+mkNamedProperty :: PropertyName -> TExpQ (String, Property)
 mkNamedProperty name@(PropertyName x) = do
   [|| (x, $$(unsafeProperty name)) ||]
 
-unsafeProperty :: PropertyName -> TExpQ (Property IO ())
+unsafeProperty :: PropertyName -> TExpQ Property
 unsafeProperty =
   unsafeTExpCoerce . pure . VarE . mkName . unPropertyName
 
@@ -57,7 +67,7 @@ getCurrentFile :: Q FilePath
 getCurrentFile =
   loc_filename <$> location
 
-runCheckAll :: String -> [(String, Property IO ())] -> IO Bool
+runCheckAll :: String -> [(String, Property)] -> IO Bool
 runCheckAll modName ps = do
   putStrLn $ "━━━ " ++ modName ++ " ━━━"
   fmap and . for ps $ \(name, p) -> do

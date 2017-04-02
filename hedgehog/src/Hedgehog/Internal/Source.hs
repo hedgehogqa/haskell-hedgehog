@@ -10,7 +10,7 @@ module Hedgehog.Internal.Source (
   , Span(..)
   , getCaller
 
-  -- * Re-exports from 'GHC.Stack'
+  -- * Re-exports from "GHC.Stack"
   , CallStack
   , HasCallStack
   , callStack

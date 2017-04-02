@@ -69,16 +69,16 @@ library
   exposed-modules:
     Hedgehog
     Hedgehog.Gen
-    Hedgehog.Property
     Hedgehog.Range
-    Hedgehog.Runner
-    Hedgehog.TH
 
     Hedgehog.Internal.Discovery
+    Hedgehog.Internal.Property
     Hedgehog.Internal.Report
+    Hedgehog.Internal.Runner
     Hedgehog.Internal.Seed
     Hedgehog.Internal.Shrink
     Hedgehog.Internal.Source
+    Hedgehog.Internal.TH
     Hedgehog.Internal.Tree
 
 test-suite test

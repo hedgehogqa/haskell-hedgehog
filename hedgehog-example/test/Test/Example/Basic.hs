@@ -13,20 +13,20 @@ import qualified Hedgehog.Range as Range
 ------------------------------------------------------------------------
 -- Example 0
 
-prop_success :: Monad m => Property m ()
+prop_success :: Property
 prop_success =
-  success
+  property success
 
-prop_discard :: Monad m => Property m ()
+prop_discard :: Property
 prop_discard =
-  discard
+  property discard
 
-prop_failure :: Monad m => Property m ()
+prop_failure :: Property
 prop_failure =
-  failure
+  property failure
 
 {-
-prop_commented_out_properties_do_not_run :: Monad m => Property m ()
+prop_commented_out_properties_do_not_run :: Property
 prop_commented_out_properties_do_not_run =
   pure ()
 -}
@@ -34,23 +34,44 @@ prop_commented_out_properties_do_not_run =
 ------------------------------------------------------------------------
 -- Example 1
 
--- Try 'check prop_foo' to see what happens
-prop_foo :: Monad m => Property m ()
-prop_foo = do
-  x <- forAll $ Gen.enum 'a' 'z'
-  y <- forAll $
-    Gen.choice [
-        Gen.integral (Range.linear 0 1000)
-      , Gen.integral (Range.linear 0 1000)
-      ]
+prop_test_limit :: Property
+prop_test_limit =
+  withTests 10000 . property $ do
+    success
 
-  guard (y `mod` 2 == (1 :: Int))
+prop_discard_limit :: Property
+prop_discard_limit =
+  withDiscards 5000 . property $ do
+    discard
 
-  assert $
-    y < 87 && x <= 'r'
+prop_shrink_limit :: Property
+prop_shrink_limit =
+  withShrinks 0 . property $ do
+    x <- forAll $ Gen.enum 'a' 'z'
+    assert $
+      x == 'z'
 
 ------------------------------------------------------------------------
 -- Example 2
+
+-- Try 'check prop_foo' to see what happens
+prop_foo :: Property
+prop_foo =
+  property $ do
+    x <- forAll $ Gen.enum 'a' 'z'
+    y <- forAll $
+      Gen.choice [
+          Gen.integral (Range.linear 0 1000)
+        , Gen.integral (Range.linear 0 1000)
+        ]
+
+    guard (y `mod` 2 == (1 :: Int))
+
+    assert $
+      y < 87 && x <= 'r'
+
+------------------------------------------------------------------------
+-- Example 3
 
 newtype Product =
   Product String
@@ -120,14 +141,15 @@ order gen =
 -- USD 1000
 -- @
 --
-prop_total :: Monad m => Property m ()
-prop_total = do
-  x <- forAll (order $ Gen.choice [cheap, expensive])
-  y <- forAll (order expensive)
-  total (merge x y) === total x + total y
+prop_total :: Property
+prop_total =
+  property $ do
+    x <- forAll (order $ Gen.choice [cheap, expensive])
+    y <- forAll (order expensive)
+    total (merge x y) === total x + total y
 
 ------------------------------------------------------------------------
--- Example 2 - Hutton's Razor
+-- Example 4 - Hutton's Razor
 
 data Exp =
     Lit !Int
@@ -141,30 +163,63 @@ evalExp = \case
   Add x y ->
     evalExp x + evalExp y
 
-shrinkExp :: Exp -> [Exp]
-shrinkExp = \case
-  Lit _ ->
-    []
-  Add x y ->
-    [x, y]
+--
+-- The subterm combinators (Gen.subterm, Gen.subtermM, Gen.subterm2,
+-- Gen.subterm2M, etc) allow a generator to shrink to one of its sub-terms.
+--
+-- In the example below, the Add expression can shrink to either of its
+-- sub-terms:
+--
 
-genExp :: Monad m => Gen m Exp
-genExp =
-  Gen.shrink shrinkExp $
+genExp1 :: Monad m => Gen m Exp
+genExp1 =
   Gen.recursive Gen.choice [
       Lit <$> Gen.int (Range.linear 0 10000)
     ] [
-      Add <$> genExp <*> genExp
+      Gen.subterm2 genExp1 genExp1 Add
     ]
 
-prop_hutton :: Monad m => Property m ()
-prop_hutton = do
-  x <- forAll genExp
-  case x of
-    Add (Add _ _) _ ->
-      assert (evalExp x < 100)
-    _ ->
-      success
+prop_hutton_1 :: Property
+prop_hutton_1 =
+  property $ do
+    x <- forAll genExp1
+    case x of
+      Add (Add _ _) _ ->
+        assert (evalExp x < 100)
+      _ ->
+        success
+
+--
+-- Gen.shrink is a more general way to add shrinks to a generator.
+--
+-- Here we use it to replace an expression with the literal it evaluates to:
+--
+
+shrinkExp2 :: Exp -> [Exp]
+shrinkExp2 = \case
+  Lit _ ->
+    []
+  Add x y ->
+    [Lit (evalExp (Add x y))]
+
+genExp2 :: Monad m => Gen m Exp
+genExp2 =
+  Gen.shrink shrinkExp2 $
+  Gen.recursive Gen.choice [
+      Lit <$> Gen.int (Range.linear 0 10000)
+    ] [
+      Gen.subterm2 genExp2 genExp2 Add
+    ]
+
+prop_hutton_2 :: Property
+prop_hutton_2 =
+  property $ do
+    x <- forAll genExp2
+    case x of
+      Add (Add _ _) _ ->
+        assert (evalExp x < 100)
+      _ ->
+        success
 
 ------------------------------------------------------------------------
 
