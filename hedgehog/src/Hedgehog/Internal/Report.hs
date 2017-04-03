@@ -40,8 +40,9 @@ import           Data.Typeable (TypeRep)
 
 import           Hedgehog.Internal.Discovery (Pos(..), Position(..))
 import qualified Hedgehog.Internal.Discovery as Discovery
-import           Hedgehog.Internal.Property (Log(..))
+import           Hedgehog.Internal.Property (Log(..), Diff(..))
 import           Hedgehog.Internal.Seed (Seed)
+import           Hedgehog.Internal.Show
 import           Hedgehog.Internal.Source
 import           Hedgehog.Range (Size)
 
@@ -91,6 +92,7 @@ data FailureReport =
     , failureInputs :: ![FailedInput]
     , failureLocation :: !(Maybe Span)
     , failureMessage :: !String
+    , failureDiff :: !(Maybe Diff)
     , failureMessages :: ![String]
     } deriving (Eq, Show)
 
@@ -149,9 +151,16 @@ data Markup =
   | StyledLineNo !Style
   | StyledBorder !Style
   | StyledSource !Style
+  | InputGutter
   | InputValue
   | FailureArrows
+  | FailureGutter
   | FailureMessage
+  | DiffHeader
+  | DiffOperator
+  | DiffSame
+  | DiffRemoved
+  | DiffAdded
   | ReproduceHeader
   | ReproduceGutter
   | ReproduceSource
@@ -187,8 +196,16 @@ takeInfo = \case
   _ ->
     Nothing
 
-mkFailure :: Size -> Seed -> ShrinkCount -> Maybe Span -> String -> [Log] -> FailureReport
-mkFailure size seed shrinks location message logs =
+mkFailure ::
+  Size ->
+  Seed ->
+  ShrinkCount ->
+  Maybe Span ->
+  String ->
+  Maybe Diff ->
+  [Log] ->
+  FailureReport
+mkFailure size seed shrinks location message diff logs =
   let
     inputs =
       mapMaybe takeInput logs
@@ -196,7 +213,7 @@ mkFailure size seed shrinks location message logs =
     info =
       mapMaybe takeInfo logs
   in
-    FailureReport size seed shrinks inputs location message info
+    FailureReport size seed shrinks inputs location message diff info
 
 ------------------------------------------------------------------------
 -- Pretty Printing
@@ -338,8 +355,8 @@ ppFailedInputDeclaration (FailedInput msloc _ val) =
     let
       ppValLine =
         WL.indent startCol .
+          (markup InputGutter (WL.text "│ ") <>) .
           markup InputValue .
-          (WL.text "│ " <>) .
           WL.text
 
       valDocs =
@@ -374,12 +391,36 @@ ppFailedInput ix input = do
     Just decl ->
       pure $ Right decl
 
+ppLineDiff :: LineDiff -> Doc Markup
+ppLineDiff = \case
+  LineSame x ->
+    markup DiffSame $
+      "  " <> WL.text x
+
+  LineRemoved x ->
+    markup DiffRemoved $
+      "- " <> WL.text x
+
+  LineAdded x ->
+    markup DiffAdded $
+      "+ " <> WL.text x
+
+ppDiff :: Diff -> [Doc Markup]
+ppDiff (Diff removed op added diff) = [
+    markup DiffHeader "──╢" <+>
+    markup DiffRemoved (WL.text removed) <+>
+    markup DiffOperator (WL.text op) <+>
+    markup DiffAdded (WL.text added) <+>
+    markup DiffHeader "╟──"
+  ] ++ fmap ppLineDiff (toLineDiff diff)
+
 ppFailureLocation ::
   MonadIO m =>
   String ->
+  Maybe Diff ->
   Span ->
   m (Maybe (Declaration (Style, [(Style, Doc Markup)])))
-ppFailureLocation msg sloc =
+ppFailureLocation msg mdiff sloc =
   runMaybeT $ do
     decl <- fmap defaultStyle . MaybeT $ readDeclaration sloc
     (startCol, endCol) <- bimap fromIntegral fromIntegral <$> lastLineSpan sloc decl
@@ -389,15 +430,22 @@ ppFailureLocation msg sloc =
         WL.indent startCol $
           markup FailureArrows (WL.text (replicate (endCol - startCol) '^'))
 
-      ppMsgLine =
-        WL.indent startCol .
-          markup FailureMessage .
-          (WL.text "│ " <>) .
-          WL.text
+      ppFailure x =
+        WL.indent startCol $
+          markup FailureGutter (WL.text "│ ") <> x
+
+      msgDocs =
+        fmap ((StyleFailure, ) . ppFailure . markup FailureMessage . WL.text) (List.lines msg)
+
+      diffDocs =
+        case mdiff of
+          Nothing ->
+            []
+          Just diff ->
+            fmap ((StyleFailure, ) . ppFailure) (ppDiff diff)
 
       docs =
-        (StyleFailure, arrowDoc) :
-        fmap ((StyleFailure, ) . ppMsgLine) (List.lines msg)
+        [(StyleFailure, arrowDoc)] ++ msgDocs ++ diffDocs
 
       startLine =
         spanStartLine sloc
@@ -479,16 +527,31 @@ mergeDeclarations =
   Map.fromListWith mergeDeclaration .
   fmap (\d -> ((declarationFile d, declarationLine d), d))
 
+ppTextLines :: String -> [Doc Markup]
+ppTextLines =
+  fmap WL.text . List.lines
+
 ppFailureReport :: MonadIO m => Maybe String -> FailureReport -> m (Doc Markup)
-ppFailureReport name (FailureReport size seed _ inputs0 mlocation0 msg msgs0) = do
+ppFailureReport name (FailureReport size seed _ inputs0 mlocation0 msg mdiff msgs0) = do
   (msgs, mlocation) <-
     case mlocation0 of
       Nothing ->
         -- Move the failure message to the end section if we have
         -- no source location.
-        pure (msgs0 ++ if null msg then [] else [msg], Nothing)
+        let
+          msgs1 =
+            msgs0 ++
+            (if null msg then [] else [msg])
+
+          docs =
+            concatMap ppTextLines msgs1 ++
+            maybe [] ppDiff mdiff
+        in
+          pure (docs, Nothing)
+
       Just location0 ->
-        (msgs0,) <$> ppFailureLocation msg location0
+        (concatMap ppTextLines msgs0,)
+          <$> ppFailureLocation msg mdiff location0
 
   (args, idecls) <- partitionEithers <$> zipWithM ppFailedInput [0..] inputs0
 
@@ -510,7 +573,7 @@ ppFailureReport name (FailureReport size seed _ inputs0 mlocation0 msg msgs0) = 
     , with decls $
         WL.vsep . WL.punctuate WL.line . fmap ppDeclaration
     , with msgs $
-        WL.vsep . fmap WL.text . concatMap List.lines
+        WL.vsep
     , [ppReproduce name size seed]
     ]
 
@@ -588,11 +651,11 @@ printReport name x = do
       GaveUpIcon ->
         setSGRCode [dull Yellow]
       GaveUpHeader ->
-        setSGRCode [vivid Yellow]
+        setSGRCode [dull Yellow]
       SuccessIcon ->
         setSGRCode [dull Green]
       SuccessHeader ->
-        setSGRCode [vivid Green]
+        setSGRCode [dull Green]
 
       DeclarationLocation ->
         setSGRCode []
@@ -605,11 +668,13 @@ printReport name x = do
         setSGRCode []
 
       StyledLineNo StyleInput ->
-        setSGRCode []
+        setSGRCode [dull Magenta]
       StyledSource StyleInput ->
         setSGRCode []
       StyledBorder StyleInput ->
         setSGRCode []
+      InputGutter ->
+        setSGRCode [dull Magenta]
       InputValue ->
         setSGRCode [dull Magenta]
 
@@ -618,11 +683,24 @@ printReport name x = do
       StyledSource StyleFailure ->
         setSGRCode [vivid Red, bold]
       StyledBorder StyleFailure ->
-        setSGRCode [vivid Red]
+        setSGRCode []
       FailureArrows ->
         setSGRCode [vivid Red]
       FailureMessage ->
-        setSGRCode [vivid Red]
+        setSGRCode []
+      FailureGutter ->
+        setSGRCode []
+
+      DiffHeader ->
+        setSGRCode []
+      DiffOperator ->
+        setSGRCode []
+      DiffSame ->
+        setSGRCode []
+      DiffRemoved ->
+        setSGRCode [dull Red]
+      DiffAdded ->
+        setSGRCode [dull Green]
 
       ReproduceHeader ->
         setSGRCode []

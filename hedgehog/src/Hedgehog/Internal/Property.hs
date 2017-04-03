@@ -27,6 +27,7 @@ module Hedgehog.Internal.Property (
   , Test(..)
   , Log(..)
   , Failure(..)
+  , Diff(..)
   , forAll
   , info
   , discard
@@ -69,9 +70,8 @@ import           Data.Typeable (Typeable, TypeRep, typeOf)
 
 import           Hedgehog.Gen (Gen)
 import qualified Hedgehog.Gen as Gen
+import           Hedgehog.Internal.Show
 import           Hedgehog.Internal.Source
-
-import           Text.Show.Pretty (ppShow)
 
 ------------------------------------------------------------------------
 
@@ -119,6 +119,12 @@ newtype DiscardLimit =
   DiscardLimit Int
   deriving (Eq, Ord, Show, Num, Enum, Real, Integral)
 
+--
+-- FIXME This whole Log/Failure thing could be a lot more structured to allow
+-- FIXME for richer user controlled error messages, think Doc. Ideally we'd
+-- FIXME allow user's to create their own diffs anywhere.
+--
+
 -- | Log messages which are recorded during a test run.
 --
 data Log =
@@ -129,8 +135,18 @@ data Log =
 -- | Details on where and why a test failed.
 --
 data Failure =
-  Failure (Maybe Span) String
-  deriving (Eq, Ord, Show)
+  Failure (Maybe Span) String (Maybe Diff)
+  deriving (Eq, Show)
+
+-- | The difference between some expected and actual value.
+--
+data Diff =
+  Diff {
+      diffRemoved :: String
+    , diffOperator :: String
+    , diffAdded :: String
+    , diffValue :: ValueDiff
+    } deriving (Eq, Show)
 
 instance Monad m => Monad (Test m) where
   return =
@@ -142,7 +158,7 @@ instance Monad m => Monad (Test m) where
       unTest . k
 
   fail err =
-    Test . ExceptT . pure . Left $ Failure Nothing err
+    Test . ExceptT . pure . Left $ Failure Nothing err Nothing
 
 instance Monad m => MonadPlus (Test m) where
   mzero =
@@ -284,7 +300,7 @@ writeLog =
 forAll :: (Monad m, Show a, Typeable a, HasCallStack) => Gen m a -> Test m a
 forAll gen = do
   x <- Test . lift $ lift gen
-  writeLog $ Input (getCaller callStack) (typeOf x) (ppShow x)
+  writeLog $ Input (getCaller callStack) (typeOf x) (showPretty x)
   return x
 
 -- | Logs an information message to be displayed if the test fails.
@@ -301,15 +317,15 @@ discard =
 
 -- | Fail with an error message, useful for building other failure combinators.
 --
-failWith :: (Monad m, HasCallStack) => String -> Test m a
-failWith =
-  Test . ExceptT . pure . Left . Failure (getCaller callStack)
+failWith :: (Monad m, HasCallStack) => Maybe Diff -> String -> Test m a
+failWith diff msg =
+  Test . ExceptT . pure . Left $ Failure (getCaller callStack) msg diff
 
 -- | Causes a test to fail.
 --
 failure :: (Monad m, HasCallStack) => Test m a
 failure =
-  withFrozenCallStack $ failWith ""
+  withFrozenCallStack $ failWith Nothing ""
 
 -- | Another name for @pure ()@.
 --
@@ -334,12 +350,18 @@ infix 4 ===
 (===) x y =
   if x == y then
     success
-  else do
-    withFrozenCallStack $ failWith $ unlines [
-        "━━━ Not Equal ━━━"
-      , ppShow x
-      , ppShow y
-      ]
+  else
+    case valueDiff <$> mkValue x <*> mkValue y of
+      Nothing ->
+        withFrozenCallStack $
+          failWith Nothing $ unlines [
+              "━━━ Not Equal ━━━"
+            , showPretty x
+            , showPretty y
+            ]
+      Just diff ->
+        withFrozenCallStack $
+          failWith (Just $ Diff "-" "=/=" "+" diff) ""
 
 -- | Fails the test if the 'Either' is 'Left', otherwise returns the value in
 --   the 'Right'.
@@ -347,7 +369,7 @@ infix 4 ===
 liftEither :: (Monad m, Show x, HasCallStack) => Either x a -> Test m a
 liftEither = \case
   Left x -> do
-    withFrozenCallStack $ failWith $ ppShow x
+    withFrozenCallStack $ failWith Nothing $ showPretty x
   Right x ->
     pure x
 

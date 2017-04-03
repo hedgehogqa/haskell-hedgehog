@@ -62,10 +62,10 @@ takeSmallest size seed shrinks slimit = \case
 
   Node (Just (x, w)) xs ->
     case x of
-      Left (Failure loc err) ->
+      Left (Failure loc err mdiff) ->
         let
           status =
-            Failed $ mkFailure size seed shrinks loc err w
+            Failed $ mkFailure size seed shrinks loc err mdiff w
         in
           if shrinks >= fromIntegral slimit then
             -- if we've hit the shrink limit, don't shrink any further
