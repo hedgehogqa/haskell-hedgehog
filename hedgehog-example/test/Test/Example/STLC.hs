@@ -1,8 +1,8 @@
+{-# LANGUAGE DoAndIfThenElse #-}
 {-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 module Test.Example.STLC where
-
 
 import           Control.Applicative
 import           Control.Monad
@@ -33,7 +33,7 @@ data Type =
   | TInt
   | TString
   | TArrow Type Type
-  deriving (Eq, Ord, Show)
+    deriving (Eq, Ord, Show)
 
 data Expr =
     EBool Bool
@@ -42,7 +42,7 @@ data Expr =
   | EVar Text
   | ELam Text Type Expr
   | EApp Expr Expr
-  deriving (Eq, Ord, Show)
+    deriving (Eq, Ord, Show)
 
 -- -----------------------------------------------------------------------------
 

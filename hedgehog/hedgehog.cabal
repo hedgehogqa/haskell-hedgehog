@@ -76,6 +76,7 @@ library
     Hedgehog.Internal.Report
     Hedgehog.Internal.Runner
     Hedgehog.Internal.Seed
+    Hedgehog.Internal.Show
     Hedgehog.Internal.Shrink
     Hedgehog.Internal.Source
     Hedgehog.Internal.TH
