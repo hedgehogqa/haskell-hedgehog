@@ -296,12 +296,12 @@ instance MFunctor Gen where
     mapGen (hoist (hoist f))
 
 embedMaybe ::
-  MonadTrans t =>
-  Monad n =>
-  Monad (t (MaybeT n)) =>
-  (forall a. m a -> t (MaybeT n) a) ->
-  MaybeT m b ->
-  t (MaybeT n) b
+     MonadTrans t
+  => Monad n
+  => Monad (t (MaybeT n))
+  => (forall a. m a -> t (MaybeT n) a)
+  -> MaybeT m b
+  -> t (MaybeT n) b
 embedMaybe f m =
   lift . MaybeT . pure =<< f (runMaybeT m)
 

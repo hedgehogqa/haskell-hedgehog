@@ -197,14 +197,14 @@ takeInfo = \case
     Nothing
 
 mkFailure ::
-  Size ->
-  Seed ->
-  ShrinkCount ->
-  Maybe Span ->
-  String ->
-  Maybe Diff ->
-  [Log] ->
-  FailureReport
+     Size
+  -> Seed
+  -> ShrinkCount
+  -> Maybe Span
+  -> String
+  -> Maybe Diff
+  -> [Log]
+  -> FailureReport
 mkFailure size seed shrinks location message diff logs =
   let
     inputs =
@@ -343,9 +343,9 @@ ppFailedInputTypedArgument ix (FailedInput _ typ val) =
     ]
 
 ppFailedInputDeclaration ::
-  MonadIO m =>
-  FailedInput ->
-  m (Maybe (Declaration (Style, [(Style, Doc Markup)])))
+     MonadIO m
+  => FailedInput
+  -> m (Maybe (Declaration (Style, [(Style, Doc Markup)])))
 ppFailedInputDeclaration (FailedInput msloc _ val) =
   runMaybeT $ do
     sloc <- MaybeT $ pure msloc
@@ -379,10 +379,10 @@ ppFailedInputDeclaration (FailedInput msloc _ val) =
       mapSource (styleInput . insertDoc) decl
 
 ppFailedInput ::
-  MonadIO m =>
-  Int ->
-  FailedInput ->
-  m (Either (Doc Markup) (Declaration (Style, [(Style, Doc Markup)])))
+     MonadIO m
+  => Int
+  -> FailedInput
+  -> m (Either (Doc Markup) (Declaration (Style, [(Style, Doc Markup)])))
 ppFailedInput ix input = do
   mdecl <- ppFailedInputDeclaration input
   case mdecl of
@@ -415,11 +415,11 @@ ppDiff (Diff removed op added diff) = [
   ] ++ fmap ppLineDiff (toLineDiff diff)
 
 ppFailureLocation ::
-  MonadIO m =>
-  String ->
-  Maybe Diff ->
-  Span ->
-  m (Maybe (Declaration (Style, [(Style, Doc Markup)])))
+     MonadIO m
+  => String
+  -> Maybe Diff
+  -> Span
+  -> m (Maybe (Declaration (Style, [(Style, Doc Markup)])))
 ppFailureLocation msg mdiff sloc =
   runMaybeT $ do
     decl <- fmap defaultStyle . MaybeT $ readDeclaration sloc

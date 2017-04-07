@@ -49,13 +49,13 @@ isFailure = \case
     False
 
 takeSmallest ::
-  MonadIO m =>
-  Size ->
-  Seed ->
-  ShrinkCount ->
-  ShrinkLimit ->
-  Node m (Maybe (Either Failure (), [Log])) ->
-  m Status
+     MonadIO m
+  => Size
+  -> Seed
+  -> ShrinkCount
+  -> ShrinkLimit
+  -> Node m (Maybe (Either Failure (), [Log]))
+  -> m Status
 takeSmallest size seed shrinks slimit = \case
   Node Nothing _ ->
     pure GaveUp
@@ -82,14 +82,14 @@ takeSmallest size seed shrinks slimit = \case
         return OK
 
 checkReport ::
-  forall m.
-  MonadIO m =>
-  MonadCatch m =>
-  Config ->
-  Size ->
-  Seed ->
-  Test m () ->
-  m Report
+     forall m.
+     MonadIO m
+  => MonadCatch m
+  => Config
+  -> Size
+  -> Seed
+  -> Test m ()
+  -> m Report
 checkReport cfg size0 seed0 test0 =
   let
     test =
