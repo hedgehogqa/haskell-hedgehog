@@ -1,5 +1,4 @@
 {-# LANGUAGE DoAndIfThenElse #-}
-{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 module Test.Example.STLC where
@@ -9,7 +8,6 @@ import           Control.Monad
 import           Control.Monad.Morph
 import           Control.Monad.Reader
 
-import           Data.Either
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
 import           Data.Maybe
@@ -21,9 +19,6 @@ import           Data.Text (Text)
 import           Hedgehog
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
-
-import           Prelude
-
 
 -- -----------------------------------------------------------------------------
 -- A simply-typed lambda calculus with ints, bools, and strings

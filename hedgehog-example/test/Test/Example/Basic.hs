@@ -36,12 +36,12 @@ prop_commented_out_properties_do_not_run =
 
 prop_test_limit :: Property
 prop_test_limit =
-  withTests 10000 . property $ do
+  withTests 10000 . property $
     success
 
 prop_discard_limit :: Property
 prop_discard_limit =
-  withDiscards 5000 . property $ do
+  withDiscards 5000 . property $
     discard
 
 prop_shrink_limit :: Property

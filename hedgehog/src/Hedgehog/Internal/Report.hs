@@ -18,7 +18,7 @@ module Hedgehog.Internal.Report (
   , Style(..)
   , Markup(..)
 
-  , printReport
+  , renderReport
   , ppReport
 
   , mkFailure
@@ -49,6 +49,7 @@ import           Hedgehog.Range (Size)
 import           System.Console.ANSI (ColorIntensity(..), Color(..))
 import           System.Console.ANSI (ConsoleLayer(..), ConsoleIntensity(..))
 import           System.Console.ANSI (SGR(..), setSGRCode, hSupportsANSI)
+import           System.Directory (makeRelativeToCurrentDirectory)
 import           System.Environment (getArgs)
 import           System.IO (stdout)
 
@@ -102,7 +103,9 @@ data FailureReport =
 --   number of shrinks, and the execution log.
 --
 data Status =
-    Failed !FailureReport
+    Running
+  | Shrinking !FailureReport
+  | Failed !FailureReport
   | GaveUp
   | OK
     deriving (Eq, Show)
@@ -141,7 +144,11 @@ data Style =
     deriving (Eq, Ord, Show)
 
 data Markup =
-    FailedIcon
+    RunningIcon
+  | RunningHeader
+  | ShrinkingIcon
+  | ShrinkingHeader
+  | FailedIcon
   | FailedHeader
   | GaveUpIcon
   | GaveUpHeader
@@ -156,7 +163,6 @@ data Markup =
   | FailureArrows
   | FailureGutter
   | FailureMessage
-  | DiffHeader
   | DiffOperator
   | DiffSame
   | DiffRemoved
@@ -255,6 +261,13 @@ ppShrinkCount = \case
   ShrinkCount n ->
     ppShow n <+> "shrinks"
 
+ppWithDiscardCount :: DiscardCount -> Doc Markup
+ppWithDiscardCount = \case
+  DiscardCount 0 ->
+    mempty
+  n ->
+    " with" <+> ppDiscardCount n
+
 ppShrinkDiscard :: ShrinkCount -> DiscardCount -> Doc Markup
 ppShrinkDiscard s d =
   case (s, d) of
@@ -304,13 +317,12 @@ takeLines sloc =
 readDeclaration :: MonadIO m => Span -> m (Maybe (Declaration ()))
 readDeclaration sloc =
   runMaybeT $ do
+    path <- liftIO . makeRelativeToCurrentDirectory $ spanFile sloc
+
     (name, Pos (Position _ line0 _) src) <- MaybeT $
-      Discovery.readDeclaration (spanFile sloc) (spanEndLine sloc)
+      Discovery.readDeclaration path (spanEndLine sloc)
 
     let
-      path =
-        spanFile sloc
-
       line =
         fromIntegral line0
 
@@ -407,11 +419,9 @@ ppLineDiff = \case
 
 ppDiff :: Diff -> [Doc Markup]
 ppDiff (Diff removed op added diff) = [
-    markup DiffHeader "──╢" <+>
     markup DiffRemoved (WL.text removed) <+>
     markup DiffOperator (WL.text op) <+>
-    markup DiffAdded (WL.text added) <+>
-    markup DiffHeader "╟──"
+    markup DiffAdded (WL.text added)
   ] ++ fmap ppLineDiff (toLineDiff diff)
 
 ppFailureLocation ::
@@ -587,6 +597,22 @@ ppName = \case
 ppReport :: MonadIO m => Maybe String -> Report -> m (Doc Markup)
 ppReport name (Report tests discards status) =
   case status of
+    Running -> do
+      pure . icon RunningIcon '○' . WL.annotate RunningHeader $
+        ppName name <+>
+        "passed" <+>
+        ppTestCount tests <>
+        ppWithDiscardCount discards <+>
+        "(running)"
+
+    Shrinking failure -> do
+      pure . icon ShrinkingIcon '↯' . WL.annotate ShrinkingHeader $
+        ppName name <+>
+        "failed after" <+>
+        ppTestCount tests <>
+        ppShrinkDiscard (failureShrinks failure) discards <+>
+        "(shrinking)"
+
     Failed failure -> do
       pfailure <- ppFailureReport name failure
       pure . WL.vsep $ [
@@ -628,8 +654,8 @@ useColor = do
   else
     liftIO $ hSupportsANSI stdout
 
-printReport :: MonadIO m => Maybe String -> Report -> m ()
-printReport name x = do
+renderReport :: MonadIO m => Maybe String -> Report -> m String
+renderReport name x = do
   doc <- ppReport name x
   color <- useColor
 
@@ -644,8 +670,16 @@ printReport name x = do
       SetConsoleIntensity BoldIntensity
 
     start = \case
+      RunningIcon ->
+        setSGRCode []
+      RunningHeader ->
+        setSGRCode []
+      ShrinkingIcon ->
+        setSGRCode [vivid Red]
+      ShrinkingHeader ->
+        setSGRCode [vivid Red]
       FailedIcon ->
-        setSGRCode [dull Red]
+        setSGRCode [vivid Red]
       FailedHeader ->
         setSGRCode [vivid Red]
       GaveUpIcon ->
@@ -691,8 +725,6 @@ printReport name x = do
       FailureGutter ->
         setSGRCode []
 
-      DiffHeader ->
-        setSGRCode []
       DiffOperator ->
         setSGRCode []
       DiffSame ->
@@ -718,8 +750,7 @@ printReport name x = do
       else
         WL.display
 
-  liftIO .
-    putStrLn .
+  pure .
     display .
     WL.renderSmart 100 $
     WL.indent 2 doc
