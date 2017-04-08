@@ -420,3 +420,12 @@ $(deriveLift ''PropertyConfig)
 $(deriveLift ''TestLimit)
 $(deriveLift ''ShrinkLimit)
 $(deriveLift ''DiscardLimit)
+
+------------------------------------------------------------------------
+-- Internal
+
+-- $internal
+--
+-- These functions are exported in case you need them in a pinch, but are not
+-- part of the public API and may change at any time, even as part of a minor
+-- update.
