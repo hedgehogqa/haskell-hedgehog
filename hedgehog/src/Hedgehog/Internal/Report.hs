@@ -166,7 +166,9 @@ data Markup =
   | FailureArrows
   | FailureGutter
   | FailureMessage
-  | DiffOperator
+  | DiffPrefix
+  | DiffInfix
+  | DiffSuffix
   | DiffSame
   | DiffRemoved
   | DiffAdded
@@ -421,10 +423,12 @@ ppLineDiff = \case
       "+ " <> WL.text x
 
 ppDiff :: Diff -> [Doc Markup]
-ppDiff (Diff removed op added diff) = [
+ppDiff (Diff prefix removed infix_ added suffix diff) = [
+    markup DiffPrefix (WL.text prefix) <>
     markup DiffRemoved (WL.text removed) <+>
-    markup DiffOperator (WL.text op) <+>
-    markup DiffAdded (WL.text added)
+    markup DiffInfix (WL.text infix_) <+>
+    markup DiffAdded (WL.text added) <>
+    markup DiffSuffix (WL.text suffix)
   ] ++ fmap ppLineDiff (toLineDiff diff)
 
 ppFailureLocation ::
@@ -747,7 +751,11 @@ renderReport name x = do
       FailureGutter ->
         setSGRCode []
 
-      DiffOperator ->
+      DiffPrefix ->
+        setSGRCode []
+      DiffInfix ->
+        setSGRCode []
+      DiffSuffix ->
         setSGRCode []
       DiffSame ->
         setSGRCode []

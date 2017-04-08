@@ -76,12 +76,11 @@ instance Show Seed where
 
 instance Read Seed where
   readsPrec p =
-    readParen (p > 10) (\r0 ->
-      [(Seed v g, r3) |
-         ("Seed", r1) <- lex r0,
-         (v, r2) <- readsPrec 11 r1,
-         (g, r3) <- readsPrec 11 r2
-      ])
+    readParen (p > 10) $ \r0 -> do
+      ("Seed", r1) <- lex r0
+      (v, r2) <- readsPrec 11 r1
+      (g, r3) <- readsPrec 11 r2
+      pure (Seed v g, r3)
 
 global :: IORef Seed
 global =

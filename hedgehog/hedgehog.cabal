@@ -85,6 +85,7 @@ library
     Hedgehog.Internal.Source
     Hedgehog.Internal.TH
     Hedgehog.Internal.Tree
+    Hedgehog.Internal.Tripping
 
 test-suite test
   type:

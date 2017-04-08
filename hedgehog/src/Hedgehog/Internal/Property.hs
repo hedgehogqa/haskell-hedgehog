@@ -161,9 +161,11 @@ data Failure =
 --
 data Diff =
   Diff {
-      diffRemoved :: String
-    , diffOperator :: String
+      diffPrefix :: String
+    , diffRemoved :: String
+    , diffInfix :: String
     , diffAdded :: String
+    , diffSuffix :: String
     , diffValue :: ValueDiff
     } deriving (Eq, Show)
 
@@ -380,7 +382,7 @@ infix 4 ===
             ]
       Just diff ->
         withFrozenCallStack $
-          failWith (Just $ Diff "-" "=/=" "+" diff) ""
+          failWith (Just $ Diff "Failed (" "- lhs" "=/=" "+ rhs" ")" diff) ""
 
 -- | Fails the test if the 'Either' is 'Left', otherwise returns the value in
 --   the 'Right'.

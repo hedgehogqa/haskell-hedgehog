@@ -1,4 +1,5 @@
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Test.Hedgehog.Text where
 
 import           Data.Int (Int64)
@@ -7,6 +8,8 @@ import           Data.Typeable (Typeable)
 import           Hedgehog
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
+
+import           Text.Read (readEither)
 
 
 genSize :: Monad m => Gen m Size
@@ -28,8 +31,8 @@ genSeed :: Monad m => Gen m Seed
 genSeed =
   Seed <$> Gen.enumBounded <*> genOdd
 
-genPred :: Monad m => Gen m Int
-genPred =
+genPrecedence :: Monad m => Gen m Int
+genPrecedence =
   Gen.int (Range.constant 0 11)
 
 genString :: Monad m => Gen m String
@@ -37,21 +40,20 @@ genString =
   Gen.string (Range.constant 0 100) Gen.alpha
 
 checkShowAppend :: (Typeable a, Show a) => Gen IO a -> Property
-checkShowAppend g =
+checkShowAppend gen =
   property $ do
-    p <- forAll genPred
-    a <- forAll g
-    r <- forAll genString
-    s <- forAll genString
-    showsPrec p a r ++ s  === showsPrec p a (r ++ s)
+    prec <- forAll genPrecedence
+    x <- forAll gen
+    xsuffix <- forAll genString
+    ysuffix <- forAll genString
+    showsPrec prec x xsuffix ++ ysuffix  === showsPrec prec x (xsuffix ++ ysuffix)
 
 trippingReadShow :: (Eq a, Typeable a, Show a, Read a) => Gen IO a -> Property
-trippingReadShow g =
+trippingReadShow gen =
   property $ do
-    p <- forAll genPred
-    a <- forAll g
-    assert $
-      elem (a, "") (readsPrec p (showsPrec p a ""))
+    prec <- forAll genPrecedence
+    x <- forAll gen
+    tripping x (\z -> showsPrec prec z "") readEither
 
 prop_show_append_size :: Property
 prop_show_append_size =
