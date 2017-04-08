@@ -48,6 +48,14 @@ instance Show Size where
       showString "Size " .
       showsPrec 11 x
 
+instance Read Size where
+  readsPrec p =
+    readParen (p > 10) (\r ->
+      [(Size s, r'') |
+         ("Size", r') <- lex r,
+         (s, r'') <- readsPrec 11 r'
+      ])
+
 -- | A range describes the bounds of a number to generate, which may or may not
 --   be dependent on a 'Size'.
 --
