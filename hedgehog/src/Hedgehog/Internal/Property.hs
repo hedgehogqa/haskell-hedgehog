@@ -8,13 +8,16 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-} -- MonadBase
 module Hedgehog.Internal.Property (
   -- * Property
     Property(..)
-  , Config(..)
+  , GroupName(..)
+  , PropertyName(..)
+  , PropertyConfig(..)
   , TestLimit(..)
   , DiscardLimit(..)
   , ShrinkLimit(..)
@@ -73,6 +76,8 @@ import qualified Hedgehog.Gen as Gen
 import           Hedgehog.Internal.Show
 import           Hedgehog.Internal.Source
 
+import           Language.Haskell.TH.Lift (deriveLift)
+
 ------------------------------------------------------------------------
 
 -- | A property test to check, along with some configurable limits like how
@@ -80,7 +85,7 @@ import           Hedgehog.Internal.Source
 --
 data Property =
   Property {
-      propertyConfig :: !Config
+      propertyConfig :: !PropertyConfig
     , propertyTest :: Test IO ()
     }
 
@@ -91,13 +96,27 @@ newtype Test m a =
       unTest :: ExceptT Failure (WriterT [Log] (Gen m)) a
     } deriving (Functor, Applicative)
 
+-- | The name of a group of properties.
+--
+newtype GroupName =
+  GroupName {
+      unGroupName :: String
+    } deriving (Eq, Ord, Show)
+
+-- | The name of a property.
+--
+newtype PropertyName =
+  PropertyName {
+      unPropertyName :: String
+    } deriving (Eq, Ord, Show)
+
 -- | Configuration for a property test.
 --
-data Config =
-  Config {
-      configTestLimit :: !TestLimit
-    , configDiscardLimit :: !DiscardLimit
-    , configShrinkLimit :: !ShrinkLimit
+data PropertyConfig =
+  PropertyConfig {
+      propertyTestLimit :: !TestLimit
+    , propertyDiscardLimit :: !DiscardLimit
+    , propertyShrinkLimit :: !ShrinkLimit
     } deriving (Eq, Ord, Show)
 
 -- | The number of successful tests that need to be run before a property test
@@ -142,9 +161,11 @@ data Failure =
 --
 data Diff =
   Diff {
-      diffRemoved :: String
-    , diffOperator :: String
+      diffPrefix :: String
+    , diffRemoved :: String
+    , diffInfix :: String
     , diffAdded :: String
+    , diffSuffix :: String
     , diffValue :: ValueDiff
     } deriving (Eq, Show)
 
@@ -240,20 +261,20 @@ instance MonadResource m => MonadResource (Test m) where
 
 -- | The default configuration for a property test.
 --
-defaultConfig :: Config
+defaultConfig :: PropertyConfig
 defaultConfig =
-  Config {
-      configTestLimit =
+  PropertyConfig {
+      propertyTestLimit =
         100
-    , configDiscardLimit =
+    , propertyDiscardLimit =
         100
-    , configShrinkLimit =
+    , propertyShrinkLimit =
         1000
     }
 
 -- | Map a config modification function over a property.
 --
-mapConfig :: (Config -> Config) -> Property -> Property
+mapConfig :: (PropertyConfig -> PropertyConfig) -> Property -> Property
 mapConfig f (Property cfg t) =
   Property (f cfg) t
 
@@ -262,21 +283,21 @@ mapConfig f (Property cfg t) =
 --
 withTests :: TestLimit -> Property -> Property
 withTests n =
-  mapConfig $ \config -> config { configTestLimit = n }
+  mapConfig $ \config -> config { propertyTestLimit = n }
 
 -- | Set the number times a property is allowed to discard before the test
 --   runner gives up.
 --
 withDiscards :: DiscardLimit -> Property -> Property
 withDiscards n =
-  mapConfig $ \config -> config { configDiscardLimit = n }
+  mapConfig $ \config -> config { propertyDiscardLimit = n }
 
 -- | Set the number times a property is allowed to shrink before the test
 --   runner gives up and prints the counterexample.
 --
 withShrinks :: ShrinkLimit -> Property -> Property
 withShrinks n =
-  mapConfig $ \config -> config { configShrinkLimit = n }
+  mapConfig $ \config -> config { propertyShrinkLimit = n }
 
 -- | Creates a property to check.
 --
@@ -361,7 +382,7 @@ infix 4 ===
             ]
       Just diff ->
         withFrozenCallStack $
-          failWith (Just $ Diff "-" "=/=" "+" diff) ""
+          failWith (Just $ Diff "Failed (" "- lhs" "=/=" "+ rhs" ")" diff) ""
 
 -- | Fails the test if the 'Either' is 'Left', otherwise returns the value in
 --   the 'Right'.
@@ -389,3 +410,13 @@ liftExceptT m = do
 withResourceT :: MonadResourceBase m => Test (ResourceT m) a -> Test m a
 withResourceT =
   hoist runResourceT
+
+------------------------------------------------------------------------
+-- FIXME Replace with DeriveLift when we drop 7.10 support.
+
+$(deriveLift ''GroupName)
+$(deriveLift ''PropertyName)
+$(deriveLift ''PropertyConfig)
+$(deriveLift ''TestLimit)
+$(deriveLift ''ShrinkLimit)
+$(deriveLift ''DiscardLimit)

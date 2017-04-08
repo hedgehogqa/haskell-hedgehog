@@ -40,7 +40,7 @@ import           Data.Typeable (TypeRep)
 
 import           Hedgehog.Internal.Discovery (Pos(..), Position(..))
 import qualified Hedgehog.Internal.Discovery as Discovery
-import           Hedgehog.Internal.Property (Log(..), Diff(..))
+import           Hedgehog.Internal.Property (PropertyName(..), Log(..), Diff(..))
 import           Hedgehog.Internal.Seed (Seed)
 import           Hedgehog.Internal.Show
 import           Hedgehog.Internal.Source
@@ -50,7 +50,7 @@ import           System.Console.ANSI (ColorIntensity(..), Color(..))
 import           System.Console.ANSI (ConsoleLayer(..), ConsoleIntensity(..))
 import           System.Console.ANSI (SGR(..), setSGRCode, hSupportsANSI)
 import           System.Directory (makeRelativeToCurrentDirectory)
-import           System.Environment (getArgs)
+import           System.Environment (lookupEnv)
 import           System.IO (stdout)
 
 import           Text.PrettyPrint.Annotated.WL (Doc, (<+>))
@@ -103,14 +103,15 @@ data FailureReport =
 --   number of shrinks, and the execution log.
 --
 data Status =
-    Running
+    Waiting
+  | Running
   | Shrinking !FailureReport
   | Failed !FailureReport
   | GaveUp
   | OK
     deriving (Eq, Show)
 
--- | The reporty from a property test run.
+-- | The report from a property test run.
 --
 data Report =
   Report {
@@ -144,7 +145,9 @@ data Style =
     deriving (Eq, Ord, Show)
 
 data Markup =
-    RunningIcon
+    WaitingIcon
+  | WaitingHeader
+  | RunningIcon
   | RunningHeader
   | ShrinkingIcon
   | ShrinkingHeader
@@ -163,7 +166,9 @@ data Markup =
   | FailureArrows
   | FailureGutter
   | FailureMessage
-  | DiffOperator
+  | DiffPrefix
+  | DiffInfix
+  | DiffSuffix
   | DiffSame
   | DiffRemoved
   | DiffAdded
@@ -418,10 +423,12 @@ ppLineDiff = \case
       "+ " <> WL.text x
 
 ppDiff :: Diff -> [Doc Markup]
-ppDiff (Diff removed op added diff) = [
+ppDiff (Diff prefix removed infix_ added suffix diff) = [
+    markup DiffPrefix (WL.text prefix) <>
     markup DiffRemoved (WL.text removed) <+>
-    markup DiffOperator (WL.text op) <+>
-    markup DiffAdded (WL.text added)
+    markup DiffInfix (WL.text infix_) <+>
+    markup DiffAdded (WL.text added) <>
+    markup DiffSuffix (WL.text suffix)
   ] ++ fmap ppLineDiff (toLineDiff diff)
 
 ppFailureLocation ::
@@ -510,7 +517,7 @@ ppDeclaration decl =
       in
         WL.vsep (ppLocation : ppLines)
 
-ppReproduce :: Maybe String -> Size -> Seed -> Doc Markup
+ppReproduce :: Maybe PropertyName -> Size -> Seed -> Doc Markup
 ppReproduce name size seed =
   WL.vsep [
       markup ReproduceHeader
@@ -519,7 +526,7 @@ ppReproduce name size seed =
         "recheck" <+>
         WL.text (showsPrec 11 size "") <+>
         WL.text (showsPrec 11 seed "") <+>
-        maybe "<property>" WL.text name
+        maybe "<property>" (WL.text . unPropertyName) name
     ]
 
 mergeLine :: Semigroup a => Line a -> Line a -> Line a
@@ -541,7 +548,7 @@ ppTextLines :: String -> [Doc Markup]
 ppTextLines =
   fmap WL.text . List.lines
 
-ppFailureReport :: MonadIO m => Maybe String -> FailureReport -> m (Doc Markup)
+ppFailureReport :: MonadIO m => Maybe PropertyName -> FailureReport -> m (Doc Markup)
 ppFailureReport name (FailureReport size seed _ inputs0 mlocation0 msg mdiff msgs0) = do
   (msgs, mlocation) <-
     case mlocation0 of
@@ -587,18 +594,22 @@ ppFailureReport name (FailureReport size seed _ inputs0 mlocation0 msg mdiff msg
     , [ppReproduce name size seed]
     ]
 
-ppName :: Maybe String -> Doc a
+ppName :: Maybe PropertyName -> Doc a
 ppName = \case
   Nothing ->
     "<interactive>"
-  Just name ->
+  Just (PropertyName name) ->
     WL.text name
 
-ppReport :: MonadIO m => Maybe String -> Report -> m (Doc Markup)
+ppReport :: MonadIO m => Maybe PropertyName -> Report -> m (Doc Markup)
 ppReport name (Report tests discards status) =
   case status of
+    Waiting -> do
+      pure . icon WaitingIcon '○' . WL.annotate WaitingHeader $
+        ppName name
+
     Running -> do
-      pure . icon RunningIcon '○' . WL.annotate RunningHeader $
+      pure . icon RunningIcon '●' . WL.annotate RunningHeader $
         ppName name <+>
         "passed" <+>
         ppTestCount tests <>
@@ -642,19 +653,30 @@ ppReport name (Report tests discards status) =
         "."
 
 useColor :: MonadIO m => m Bool
-useColor = do
-  -- FIXME This is pretty savage, not sure how else to provide this while
-  -- FIXME maintain a seamless experience. Maybe we should just go for a
-  -- FIXME HEDGEHOG_COLOR environment variable instead.
-  args <- liftIO getArgs
-  if elem "--color" args then
-    pure True
-  else if elem "--no-color" args then
-    pure False
-  else
-    liftIO $ hSupportsANSI stdout
+useColor =
+  liftIO $ do
+    menv <- lookupEnv "HEDGEHOG_COLOR"
+    case menv of
+      Just "0" ->
+        pure False
+      Just "no" ->
+        pure False
+      Just "false" ->
+        pure False
 
-renderReport :: MonadIO m => Maybe String -> Report -> m String
+      Just "1" ->
+        pure True
+      Just "yes" ->
+        pure True
+      Just "true" ->
+        pure True
+
+      Just _ ->
+        hSupportsANSI stdout
+      Nothing ->
+        hSupportsANSI stdout
+
+renderReport :: MonadIO m => Maybe PropertyName -> Report -> m String
 renderReport name x = do
   doc <- ppReport name x
   color <- useColor
@@ -670,6 +692,10 @@ renderReport name x = do
       SetConsoleIntensity BoldIntensity
 
     start = \case
+      WaitingIcon ->
+        setSGRCode []
+      WaitingHeader ->
+        setSGRCode []
       RunningIcon ->
         setSGRCode []
       RunningHeader ->
@@ -725,7 +751,11 @@ renderReport name x = do
       FailureGutter ->
         setSGRCode []
 
-      DiffOperator ->
+      DiffPrefix ->
+        setSGRCode []
+      DiffInfix ->
+        setSGRCode []
+      DiffSuffix ->
         setSGRCode []
       DiffSame ->
         setSGRCode []

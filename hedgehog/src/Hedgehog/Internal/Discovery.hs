@@ -1,8 +1,7 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE LambdaCase #-}
 module Hedgehog.Internal.Discovery (
-    PropertyName(..)
-  , PropertySource(..)
+    PropertySource(..)
   , readProperties
   , findProperties
   , readDeclaration
@@ -20,15 +19,11 @@ import qualified Data.Map as Map
 import qualified Data.Ord as Ord
 import           Data.Semigroup (Semigroup(..))
 
+import           Hedgehog.Internal.Property (PropertyName(..))
 import           Hedgehog.Internal.Source (LineNo(..), ColumnNo(..))
 
 ------------------------------------------------------------------------
 -- Property Extraction
-
-newtype PropertyName =
-  PropertyName {
-      unPropertyName :: String
-    } deriving (Eq, Ord, Show)
 
 newtype PropertySource =
   PropertySource {

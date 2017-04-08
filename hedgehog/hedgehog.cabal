@@ -40,6 +40,7 @@ library
   build-depends:
       base                            >= 3          && < 5
     , ansi-terminal                   >= 0.6        && < 0.7
+    , async                           >= 2.0        && < 2.2
     , bytestring                      >= 0.10       && < 0.11
     , concurrent-output               >= 1.7        && < 1.8
     , containers                      >= 0.4        && < 0.6
@@ -53,6 +54,7 @@ library
     , resourcet                       >= 1.1        && < 1.2
     , template-haskell                >= 2.10       && < 2.12
     , text                            >= 1.1        && < 1.3
+    , th-lift                         >= 0.7        && < 0.8
     , time                            >= 1.4        && < 1.9
     , transformers                    >= 0.3        && < 0.6
     , transformers-base               >= 0.4        && < 0.5
@@ -83,6 +85,7 @@ library
     Hedgehog.Internal.Source
     Hedgehog.Internal.TH
     Hedgehog.Internal.Tree
+    Hedgehog.Internal.Tripping
 
 test-suite test
   type:

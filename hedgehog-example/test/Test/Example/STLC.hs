@@ -20,7 +20,7 @@ import           Hedgehog
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
 
--- -----------------------------------------------------------------------------
+------------------------------------------------------------------------
 -- A simply-typed lambda calculus with ints, bools, and strings
 
 data Type =
@@ -39,7 +39,7 @@ data Expr =
   | EApp Expr Expr
     deriving (Eq, Ord, Show)
 
--- -----------------------------------------------------------------------------
+------------------------------------------------------------------------
 
 -- | Evaluate to weak head normal form.
 eval :: Expr -> Expr
@@ -108,7 +108,7 @@ free' binds frees expr =
     EApp f g ->
       free' binds frees f <> free' binds frees g
 
--- -----------------------------------------------------------------------------
+------------------------------------------------------------------------
 
 data TypeError =
     Mismatch Type Type
@@ -152,7 +152,7 @@ typecheck' env expr =
         _ ->
           Left (ExpectedArrow tf)
 
--- -----------------------------------------------------------------------------
+------------------------------------------------------------------------
 
 genType :: Monad m => Gen m Type
 genType =
@@ -164,7 +164,7 @@ genType =
       TArrow <$> genType <*> genType
     ]
 
--- -----------------------------------------------------------------------------
+------------------------------------------------------------------------
 
 genWellTypedExpr :: Monad m => Type -> Gen m Expr
 genWellTypedExpr want =
@@ -240,7 +240,7 @@ genKnownTypeMaybe = do
       , (1, genType)
       ]
 
--- -----------------------------------------------------------------------------
+------------------------------------------------------------------------
 
 -- Generates a term that is ill-typed at some point.
 genIllTypedExpr :: Monad m => Gen m Expr
@@ -270,7 +270,7 @@ genIllTypedApp = do
   x <- Gen.text (Range.linear 1 25) Gen.lower
   pure $ EApp (ELam x t1 f) g
 
--- -----------------------------------------------------------------------------
+------------------------------------------------------------------------
 
 prop_welltyped :: Property
 prop_welltyped =
@@ -300,8 +300,35 @@ prop_idempotent =
     ex <- forAll (genWellTypedExpr ty)
     eval (eval ex) === eval ex
 
--- -----------------------------------------------------------------------------
+------------------------------------------------------------------------
+-- These are just for testing the concurrent test runner
+
+prop_idempotent1 :: Property
+prop_idempotent1 =
+  prop_idempotent
+
+prop_idempotent2 :: Property
+prop_idempotent2 =
+  prop_idempotent
+
+prop_idempotent3 :: Property
+prop_idempotent3 =
+  prop_idempotent
+
+prop_idempotent4 :: Property
+prop_idempotent4 =
+  prop_idempotent
+
+prop_idempotent5 :: Property
+prop_idempotent5 =
+  prop_idempotent
+
+prop_idempotent6 :: Property
+prop_idempotent6 =
+  prop_idempotent
+
+------------------------------------------------------------------------
 
 tests :: IO Bool
 tests =
-  $$(checkAll)
+  $$(checkConcurrent)

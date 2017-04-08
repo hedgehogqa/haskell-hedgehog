@@ -50,11 +50,10 @@ instance Show Size where
 
 instance Read Size where
   readsPrec p =
-    readParen (p > 10) (\r ->
-      [(Size s, r'') |
-         ("Size", r') <- lex r,
-         (s, r'') <- readsPrec 11 r'
-      ])
+    readParen (p > 10) $ \r0 -> do
+      ("Size", r1) <- lex r0
+      (s, r2) <- readsPrec 11 r1
+      pure (Size s, r2)
 
 -- | A range describes the bounds of a number to generate, which may or may not
 --   be dependent on a 'Size'.

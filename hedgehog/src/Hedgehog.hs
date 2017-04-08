@@ -24,7 +24,7 @@
 --
 -- > tests :: IO Bool
 -- > tests =
--- >   $$(checkAll)
+-- >   $$(checkConcurrent)
 --
 -- You can then load the module in GHCi, and run it:
 --
@@ -51,7 +51,8 @@ module Hedgehog (
   , withShrinks
 
   , check
-  , checkAll
+  , checkSequential
+  , checkConcurrent
   , recheck
 
   -- * Test
@@ -66,6 +67,8 @@ module Hedgehog (
   , liftEither
   , liftExceptT
   , withResourceT
+
+  , tripping
   ) where
 
 import           Hedgehog.Gen (Gen)
@@ -80,5 +83,6 @@ import           Hedgehog.Internal.Property (Test, property)
 import           Hedgehog.Internal.Property (TestLimit, withTests)
 import           Hedgehog.Internal.Runner (check, recheck)
 import           Hedgehog.Internal.Seed (Seed(..))
-import           Hedgehog.Internal.TH (checkAll)
+import           Hedgehog.Internal.TH (checkSequential, checkConcurrent)
+import           Hedgehog.Internal.Tripping (tripping)
 import           Hedgehog.Range (Range, Size(..))
