@@ -15,7 +15,9 @@ bug-reports:
 synopsis:
   Hedgehog will eat all your bugs.
 description:
-  Hedgehog will eat all your bugs.
+  Hedgehog is a modern property-based testing system, in the spirit of
+  QuickCheck. Hedgehog uses integrated shrinking, so shrinks obey the
+  invariants of generated values by construction.
 category:
   Testing
 license:
