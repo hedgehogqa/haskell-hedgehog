@@ -7,7 +7,7 @@ hedgehog [![Hackage version](https://img.shields.io/hackage/v/hedgehog.svg?style
 
 [Hedgehog](http://hedgehog.qa/) is a modern property-based testing
 system, in the spirit of QuickCheck. Hedgehog uses integrated shrinking,
-so shrinks obey any invariants of your generated values, by construction.
+so shrinks obey the invariants of generated values by construction.
 
 ## Features
 

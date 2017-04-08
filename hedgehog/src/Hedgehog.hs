@@ -17,7 +17,7 @@
 -- > prop_reverse :: Property
 -- > prop_reverse =
 -- >   property $ do
--- >     xs <- forAll $ Gen.list (Range.linear 0 100) (Gen.enum 'a' 'z')
+-- >     xs <- forAll $ Gen.list (Range.linear 0 100) Gen.alpha
 -- >     reverse (reverse xs) === xs
 --
 -- And add the Template Haskell splice which will run your properies:
