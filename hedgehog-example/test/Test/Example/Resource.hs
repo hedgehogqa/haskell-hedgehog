@@ -55,4 +55,4 @@ prop_unix_sort =
 
 tests :: IO Bool
 tests =
-  $$(checkAll)
+  $$(checkSequential)

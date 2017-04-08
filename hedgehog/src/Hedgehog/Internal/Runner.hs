@@ -2,19 +2,33 @@
 {-# LANGUAGE DoAndIfThenElse #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
 module Hedgehog.Internal.Runner (
   -- * Runner
-    check
-  , checkNamed
+    RunnerConfig(..)
+  , check
+  , checkGroupWith
   , recheck
 
   -- * Internal
   , checkReport
-  , checkConsole
+  , checkConsoleRegion
+  , checkNamed
   ) where
 
-import           Control.Monad.Catch (MonadCatch(..), catchAll)
+import           Control.Concurrent.Async (forConcurrently)
+import           Control.Concurrent.MVar (MVar)
+import qualified Control.Concurrent.MVar as MVar
+import qualified Control.Concurrent.QSem as QSem
+import           Control.Monad (when)
+import           Control.Monad.Catch (MonadMask(..), MonadCatch(..), catchAll, bracket)
 import           Control.Monad.IO.Class (MonadIO(..))
+
+import           Data.Map.Strict (Map)
+import qualified Data.Map.Strict as Map
+import           Data.Traversable (for)
+
+import qualified GHC.Conc as Conc
 
 import           Hedgehog.Gen (runGen)
 import qualified Hedgehog.Gen as Gen
@@ -22,15 +36,29 @@ import           Hedgehog.Internal.Report
 import           Hedgehog.Internal.Seed (Seed)
 import qualified Hedgehog.Internal.Seed as Seed
 import           Hedgehog.Internal.Tree (Tree(..), Node(..))
+import           Hedgehog.Internal.Property (PropertyName(..), GroupName(..))
 import           Hedgehog.Internal.Property (Test, Log(..), Failure(..), runTest)
-import           Hedgehog.Internal.Property (Property(..), Config(..))
+import           Hedgehog.Internal.Property (Property(..), PropertyConfig(..))
 import           Hedgehog.Internal.Property (ShrinkLimit, withTests)
 import           Hedgehog.Range (Size)
 
-import           System.Console.Regions (RegionLayout(..))
-import qualified System.Console.Regions as Console
+import           Language.Haskell.TH.Lift (deriveLift)
 
-------------------------------------------------------------------------
+import           System.Console.Regions (ConsoleRegion, RegionLayout(..), LiftRegion)
+import qualified System.Console.Regions as Console
+import           System.Environment (lookupEnv)
+
+import           Text.Read (readMaybe)
+
+
+-- | Configuration for a property test run.
+--
+data RunnerConfig =
+  RunnerConfig {
+      -- | The number of property tests to run concurrently. 'Nothing' means
+      --   use one worker per processor.
+      runnerWorkers :: !(Maybe Int)
+    } deriving (Eq, Ord, Show)
 
 findM :: Monad m => [a] -> b -> (a -> m (Maybe b)) -> m b
 findM xs0 def p =
@@ -92,7 +120,7 @@ checkReport ::
      forall m.
      MonadIO m
   => MonadCatch m
-  => Config
+  => PropertyConfig
   -> Size
   -> Seed
   -> Test m ()
@@ -111,11 +139,11 @@ checkReport cfg size0 seed0 test0 updateUI =
         -- size has reached limit, reset to 0
         loop tests discards 0 seed
 
-      else if tests >= fromIntegral (configTestLimit cfg) then
+      else if tests >= fromIntegral (propertyTestLimit cfg) then
         -- we've hit the test limit, test was successful
         pure $ Report tests discards OK
 
-      else if discards >= fromIntegral (configDiscardLimit cfg) then
+      else if discards >= fromIntegral (propertyDiscardLimit cfg) then
         -- we've hit the discard limit, give up
         pure $ Report tests discards GaveUp
 
@@ -138,7 +166,7 @@ checkReport cfg size0 seed0 test0 updateUI =
                       size
                       seed
                       0
-                      (configShrinkLimit cfg)
+                      (propertyShrinkLimit cfg)
                       (updateUI . mkReport)
                       node
 
@@ -147,33 +175,165 @@ checkReport cfg size0 seed0 test0 updateUI =
   in
     loop 0 0 size0 seed0
 
-checkConsole :: MonadIO m => Maybe String -> Size -> Seed -> Property -> m Report
-checkConsole name size seed prop =
-  liftIO .
-  Console.displayConsoleRegions .
-  Console.withConsoleRegion Linear $ \region -> do
-    checkReport (propertyConfig prop) size seed (propertyTest prop) $ \report -> do
-      x <- renderReport name report
-      Console.setConsoleRegion region x
+checkConsoleRegion ::
+     MonadIO m
+  => ConsoleRegion
+  -> Maybe PropertyName
+  -> Size
+  -> Seed
+  -> Property
+  -> m Report
+checkConsoleRegion region name size seed prop =
+  liftIO $ do
+    report <-
+      checkReport (propertyConfig prop) size seed (propertyTest prop) $ \report -> do
+        setRegionReport region name report
 
-checkNamed :: MonadIO m => Maybe String -> Property -> m Bool
-checkNamed name prop = do
+    setRegionReport region name report
+
+    pure report
+
+checkNamed :: MonadIO m => ConsoleRegion -> Maybe PropertyName -> Property -> m Bool
+checkNamed region name prop = do
   seed <- liftIO Seed.random
-  report <- checkConsole name 0 seed prop
-  liftIO . putStrLn =<< renderReport name report
+  report <- checkConsoleRegion region name 0 seed prop
   pure $
     reportStatus report == OK
 
 -- | Check a property.
 --
 check :: MonadIO m => Property -> m Bool
-check =
-  checkNamed Nothing
+check prop = do
+  liftIO . displayRegion $ \region ->
+    checkNamed region Nothing prop
 
 -- | Check a property using a specific size and seed.
 --
 recheck :: MonadIO m => Size -> Seed -> Property -> m ()
 recheck size seed prop0 = do
   let prop = withTests 1 prop0
-  report <- checkConsole Nothing size seed prop
-  liftIO . putStrLn =<< renderReport Nothing report
+  _ <- liftIO . displayRegion $ \region ->
+    checkConsoleRegion region Nothing size seed prop
+  pure ()
+
+-- | Check a group of properties using the specified runner config.
+--
+checkGroupWith ::
+     MonadIO m
+  => RunnerConfig
+  -> GroupName
+  -> [(PropertyName, Property)]
+  -> m Bool
+checkGroupWith config group props0 =
+  liftIO $ do
+    n <- maybe getNumWorkers pure (runnerWorkers config)
+
+    -- ensure one spare capability for concurrent-output, it's likely that our
+    -- tests will saturate all the capabilities they're given.
+    updateNumCapabilities (n + 1)
+
+    putStrLn $ "━━━ " ++ unGroupName group ++ " ━━━"
+    Console.displayConsoleRegions $ do
+      mvar <- MVar.newMVar (-1, Map.empty)
+
+      props <-
+        fmap (zip [0..]) . for props0 $ \(name, p) -> do
+          region <- Console.openConsoleRegion Linear
+          setRegionReport region (Just name) $ Report 0 0 Waiting
+          pure (name, p, region)
+
+      qsem <- QSem.newQSem n
+
+      results <-
+        forConcurrently props $ \(ix, (name, p, region)) ->
+          bracket (QSem.waitQSem qsem) (const $ QSem.signalQSem qsem) $ \_ -> do
+            ok <- checkNamed region (Just name) p
+            finishIndexedRegion mvar ix region
+            pure ok
+
+      pure $
+        and results
+
+------------------------------------------------------------------------
+-- concurrent-output utils
+
+displayRegion ::
+     MonadIO m
+  => MonadMask m
+  => LiftRegion m
+  => (ConsoleRegion -> m a)
+  -> m a
+displayRegion =
+  Console.displayConsoleRegions .
+  bracket (Console.openConsoleRegion Linear) finishRegion
+
+setRegionReport ::
+     MonadIO m
+  => LiftRegion m
+  => ConsoleRegion
+  -> Maybe PropertyName
+  -> Report
+  -> m ()
+setRegionReport region name report = do
+  content <- renderReport name report
+  Console.setConsoleRegion region content
+
+finishRegion :: (Monad m, LiftRegion m) => ConsoleRegion -> m ()
+finishRegion region = do
+  content <- Console.getConsoleRegion region
+  Console.finishConsoleRegion region content
+
+flushRegions ::
+     MonadIO m
+  => MVar (Int, Map Int ConsoleRegion)
+  -> m ()
+flushRegions mvar =
+  liftIO $ do
+    again <-
+      MVar.modifyMVar mvar $ \original@(minIx, regions0) ->
+        case Map.minViewWithKey regions0 of
+          Nothing ->
+            pure (original, False)
+
+          Just ((ix, region), regions) ->
+            if ix == minIx + 1 then do
+              finishRegion region
+              pure ((ix, regions), True)
+            else
+              pure (original, False)
+
+    when again $
+      flushRegions mvar
+
+finishIndexedRegion ::
+     MonadIO m
+  => MVar (Int, Map Int ConsoleRegion)
+  -> Int
+  -> ConsoleRegion
+  -> m ()
+finishIndexedRegion mvar ix region = do
+  liftIO . MVar.modifyMVar_ mvar $ \(minIx, regions) ->
+    pure (minIx, Map.insert ix region regions)
+  flushRegions mvar
+
+-- | Update the number of capabilities but never set it lower than it already
+--   is.
+--
+updateNumCapabilities :: Int -> IO ()
+updateNumCapabilities n = do
+  ncaps <- Conc.getNumCapabilities
+  Conc.setNumCapabilities (max n ncaps)
+
+getNumWorkers :: IO Int
+getNumWorkers = do
+  menv <- (readMaybe =<<) <$> lookupEnv "HEDGEHOG_WORKERS"
+  case menv of
+    Nothing ->
+      Conc.getNumProcessors
+    Just env ->
+      pure env
+
+------------------------------------------------------------------------
+-- FIXME Replace with DeriveLift when we drop 7.10 support.
+
+$(deriveLift ''RunnerConfig)

@@ -254,4 +254,4 @@ prop_record =
 
 tests :: IO Bool
 tests =
-  $$(checkAll)
+  $$(checkSequential)
