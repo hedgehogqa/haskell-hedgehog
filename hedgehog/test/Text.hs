@@ -2,7 +2,6 @@ module Text (
     textProperties
   ) where
 
-import           Data.Foldable (elem)
 import           Data.Typeable (Typeable)
 
 import           Hedgehog
