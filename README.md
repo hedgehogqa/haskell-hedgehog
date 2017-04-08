@@ -3,7 +3,7 @@ hedgehog [![Hackage version](https://img.shields.io/hackage/v/hedgehog.svg?style
 
 > Hedgehog will eat all your bugs.
 
-<img src="https://github.com/hedgehogqa/haskell-hedgehog/raw/master/img/hedgehog-logo.png" width="300" align="right"/>
+<img src="https://github.com/hedgehogqa/haskell-hedgehog/raw/master/img/hedgehog-logo.png" width="307" align="right"/>
 
 [Hedgehog](http://hedgehog.qa/) is a modern property-based testing
 system, in the spirit of QuickCheck. Hedgehog uses integrated shrinking,
