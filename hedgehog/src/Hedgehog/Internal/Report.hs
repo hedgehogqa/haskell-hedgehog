@@ -11,9 +11,9 @@ module Hedgehog.Internal.Report (
   , FailureReport(..)
   , FailedInput(..)
 
-  , ShrinkCount
-  , TestCount
-  , DiscardCount
+  , ShrinkCount(..)
+  , TestCount(..)
+  , DiscardCount(..)
 
   , Style(..)
   , Markup(..)
