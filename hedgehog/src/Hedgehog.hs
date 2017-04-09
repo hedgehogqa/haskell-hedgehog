@@ -20,7 +20,7 @@
 -- >     xs <- forAll $ Gen.list (Range.linear 0 100) Gen.alpha
 -- >     reverse (reverse xs) === xs
 --
--- And add the Template Haskell splice which will run your properies:
+-- And add the Template Haskell splice which will run your properties:
 --
 -- > tests :: IO Bool
 -- > tests =
