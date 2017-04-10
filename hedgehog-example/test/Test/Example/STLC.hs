@@ -331,4 +331,4 @@ prop_idempotent6 =
 
 tests :: IO Bool
 tests =
-  $$(checkConcurrent)
+  checkConcurrent $$(discover)

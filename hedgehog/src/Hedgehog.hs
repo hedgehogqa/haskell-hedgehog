@@ -20,11 +20,20 @@
 -- >     xs <- forAll $ Gen.list (Range.linear 0 100) Gen.alpha
 -- >     reverse (reverse xs) === xs
 --
--- And add the Template Haskell splice which will run your properties:
+-- And add the Template Haskell splice which will discover your properties:
 --
 -- > tests :: IO Bool
 -- > tests =
--- >   $$(checkConcurrent)
+-- >   checkConcurrent $$(discover)
+--
+-- If you prefer to avoid macros, you can specify the group of properties to
+-- run manually instead:
+--
+-- > tests :: IO Bool
+-- > tests =
+-- >   checkConcurrent $ Group "Test.Example" [
+-- >       ("prop_reverse", prop_reverse)
+-- >     ]
 --
 -- You can then load the module in GHCi, and run it:
 --
@@ -33,7 +42,8 @@
 --   ✓ prop_reverse passed 100 tests.
 --
 module Hedgehog (
-    Property
+    Group(..)
+  , Property
   , Test
   , TestLimit
   , DiscardLimit
@@ -51,9 +61,11 @@ module Hedgehog (
   , withShrinks
 
   , check
-  , checkSequential
-  , checkConcurrent
   , recheck
+
+  , discover
+  , checkConcurrent
+  , checkSequential
 
   -- * Test
   , forAll
@@ -77,12 +89,12 @@ import           Hedgehog.Internal.Property (discard, failure, success)
 import           Hedgehog.Internal.Property (DiscardLimit, withDiscards)
 import           Hedgehog.Internal.Property (forAll, info)
 import           Hedgehog.Internal.Property (liftEither, liftExceptT, withResourceT)
-import           Hedgehog.Internal.Property (Property)
+import           Hedgehog.Internal.Property (Property, Group(..))
 import           Hedgehog.Internal.Property (ShrinkLimit, withShrinks)
 import           Hedgehog.Internal.Property (Test, property)
 import           Hedgehog.Internal.Property (TestLimit, withTests)
-import           Hedgehog.Internal.Runner (check, recheck)
+import           Hedgehog.Internal.Runner (check, recheck, checkSequential, checkConcurrent)
 import           Hedgehog.Internal.Seed (Seed(..))
-import           Hedgehog.Internal.TH (checkSequential, checkConcurrent)
+import           Hedgehog.Internal.TH (discover)
 import           Hedgehog.Internal.Tripping (tripping)
 import           Hedgehog.Range (Range, Size(..))

@@ -2,9 +2,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Hedgehog.Internal.TH (
     TExpQ
-  , checkSequential
-  , checkConcurrent
-  , checkWith
+  , discover
   ) where
 
 import qualified Data.List as List
@@ -13,7 +11,6 @@ import qualified Data.Ord as Ord
 
 import           Hedgehog.Internal.Discovery
 import           Hedgehog.Internal.Property
-import           Hedgehog.Internal.Runner
 
 import           Language.Haskell.TH
 import           Language.Haskell.TH.Syntax
@@ -21,38 +18,12 @@ import           Language.Haskell.TH.Syntax
 type TExpQ a =
   Q (TExp a)
 
--- | Check all the properties in a file sequentially.
+-- | Discover all the properties in a module.
 --
--- > tests :: IO Bool
--- > tests =
--- >   $$(checkSequential)
+--   Functions starting with `prop_` are assumed to be properties.
 --
-checkSequential :: TExpQ (IO Bool)
-checkSequential =
-  checkWith $
-    RunnerConfig {
-        runnerWorkers =
-          Just 1
-      }
-
--- | Check all the properties in a file concurrently.
---
--- > tests :: IO Bool
--- > tests =
--- >   $$(checkConcurrent)
---
-checkConcurrent :: TExpQ (IO Bool)
-checkConcurrent =
-  checkWith $
-    RunnerConfig {
-        runnerWorkers =
-          Nothing
-      }
-
--- | Check all the properties in a file.
---
-checkWith :: RunnerConfig -> TExpQ (IO Bool)
-checkWith config = do
+discover :: TExpQ Group
+discover = do
   file <- getCurrentFile
   properties <- Map.toList <$> runIO (readProperties file)
 
@@ -68,7 +39,7 @@ checkWith config = do
       fmap (mkNamedProperty . fst) $
       List.sortBy startLine properties
 
-  [|| checkGroupWith config $$(moduleName) $$(listTE names) ||]
+  [|| Group $$(moduleName) $$(listTE names) ||]
 
 mkNamedProperty :: PropertyName -> TExpQ (PropertyName, Property)
 mkNamedProperty name = do

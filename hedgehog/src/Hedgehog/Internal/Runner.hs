@@ -4,11 +4,15 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 module Hedgehog.Internal.Runner (
-  -- * Runner
-    RunnerConfig(..)
-  , check
-  , checkGroupWith
+  -- * Running Individual Properties
+    check
   , recheck
+
+  -- * Running Groups of Properties
+  , RunnerConfig(..)
+  , checkConcurrent
+  , checkSequential
+  , checkGroup
 
   -- * Internal
   , checkReport
@@ -32,14 +36,14 @@ import qualified GHC.Conc as Conc
 
 import           Hedgehog.Gen (runGen)
 import qualified Hedgehog.Gen as Gen
+import           Hedgehog.Internal.Property (Group(..), GroupName(..))
+import           Hedgehog.Internal.Property (Property(..), PropertyConfig(..), PropertyName(..))
+import           Hedgehog.Internal.Property (ShrinkLimit, withTests)
+import           Hedgehog.Internal.Property (Test, Log(..), Failure(..), runTest)
 import           Hedgehog.Internal.Report
 import           Hedgehog.Internal.Seed (Seed)
 import qualified Hedgehog.Internal.Seed as Seed
 import           Hedgehog.Internal.Tree (Tree(..), Node(..))
-import           Hedgehog.Internal.Property (PropertyName(..), GroupName(..))
-import           Hedgehog.Internal.Property (Test, Log(..), Failure(..), runTest)
-import           Hedgehog.Internal.Property (Property(..), PropertyConfig(..))
-import           Hedgehog.Internal.Property (ShrinkLimit, withTests)
 import           Hedgehog.Range (Size)
 
 import           Language.Haskell.TH.Lift (deriveLift)
@@ -218,13 +222,8 @@ recheck size seed prop0 = do
 
 -- | Check a group of properties using the specified runner config.
 --
-checkGroupWith ::
-     MonadIO m
-  => RunnerConfig
-  -> GroupName
-  -> [(PropertyName, Property)]
-  -> m Bool
-checkGroupWith config group props0 =
+checkGroup :: MonadIO m => RunnerConfig -> Group -> m Bool
+checkGroup config (Group group props0) =
   liftIO $ do
     n <- maybe getNumWorkers pure (runnerWorkers config)
 
@@ -253,6 +252,55 @@ checkGroupWith config group props0 =
 
       pure $
         and results
+
+-- | Check a group of properties sequentially.
+--
+--   Using Template Haskell for property discovery:
+--
+-- > tests :: IO Bool
+-- > tests =
+-- >   checkSequential $$(discover)
+--
+--   With manually specified properties:
+--
+-- > tests :: IO Bool
+-- > tests =
+-- >   checkSequential $ Group "Test.Example" [
+-- >       ("prop_reverse", prop_reverse)
+-- >     ]
+--
+--
+checkSequential :: MonadIO m => Group -> m Bool
+checkSequential =
+  checkGroup $
+    RunnerConfig {
+        runnerWorkers =
+          Just 1
+      }
+
+-- | Check a group of properties concurrently.
+--
+--   Using Template Haskell for property discovery:
+--
+-- > tests :: IO Bool
+-- > tests =
+-- >   checkConcurrent $$(discover)
+--
+--   With manually specified properties:
+--
+-- > tests :: IO Bool
+-- > tests =
+-- >   checkConcurrent $ Group "Test.Example" [
+-- >       ("prop_reverse", prop_reverse)
+-- >     ]
+--
+checkConcurrent :: MonadIO m => Group -> m Bool
+checkConcurrent =
+  checkGroup $
+    RunnerConfig {
+        runnerWorkers =
+          Nothing
+      }
 
 ------------------------------------------------------------------------
 -- concurrent-output utils
