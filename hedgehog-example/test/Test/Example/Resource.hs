@@ -1,3 +1,4 @@
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell #-}
 module Test.Example.Resource where
 
@@ -55,4 +56,6 @@ prop_unix_sort =
 
 tests :: IO Bool
 tests =
-  $$(checkSequential)
+  checkSequential $ Group "Test.Example.Resource" [
+      ("prop_unix_sort", prop_unix_sort)
+    ]

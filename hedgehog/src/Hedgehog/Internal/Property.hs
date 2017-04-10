@@ -15,7 +15,6 @@
 module Hedgehog.Internal.Property (
   -- * Property
     Property(..)
-  , GroupName(..)
   , PropertyName(..)
   , PropertyConfig(..)
   , TestLimit(..)
@@ -25,6 +24,10 @@ module Hedgehog.Internal.Property (
   , withTests
   , withDiscards
   , withShrinks
+
+  -- * Group
+  , Group(..)
+  , GroupName(..)
 
   -- * Test
   , Test(..)
@@ -69,6 +72,7 @@ import           Control.Monad.Trans.Resource (ResourceT, runResourceT)
 import           Control.Monad.Trans.Writer.Lazy (WriterT(..))
 import           Control.Monad.Writer.Class (MonadWriter(..))
 
+import           Data.String (IsString)
 import           Data.Typeable (Typeable, TypeRep, typeOf)
 
 import           Hedgehog.Gen (Gen)
@@ -96,19 +100,12 @@ newtype Test m a =
       unTest :: ExceptT Failure (WriterT [Log] (Gen m)) a
     } deriving (Functor, Applicative)
 
--- | The name of a group of properties.
---
-newtype GroupName =
-  GroupName {
-      unGroupName :: String
-    } deriving (Eq, Ord, Show)
-
 -- | The name of a property.
 --
 newtype PropertyName =
   PropertyName {
       unPropertyName :: String
-    } deriving (Eq, Ord, Show)
+    } deriving (Eq, Ord, Show, IsString)
 
 -- | Configuration for a property test.
 --
@@ -137,6 +134,21 @@ newtype ShrinkLimit =
 newtype DiscardLimit =
   DiscardLimit Int
   deriving (Eq, Ord, Show, Num, Enum, Real, Integral)
+
+-- | A named collection of property tests.
+--
+data Group =
+  Group {
+      groupName :: !GroupName
+    , groupProperties :: ![(PropertyName, Property)]
+    }
+
+-- | The name of a group of properties.
+--
+newtype GroupName =
+  GroupName {
+      unGroupName :: String
+    } deriving (Eq, Ord, Show, IsString)
 
 --
 -- FIXME This whole Log/Failure thing could be a lot more structured to allow
