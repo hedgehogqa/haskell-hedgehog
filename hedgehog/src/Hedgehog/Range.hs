@@ -34,6 +34,10 @@ import           Data.Bifunctor (bimap)
 
 import           Prelude hiding (minimum, maximum)
 
+-- $setup
+-- >>> import Data.Int (Int8)
+-- >>> let x = 3
+
 -- | Tests are parameterized by the size of the randomly-generated data, the
 --   meaning of which depends on the particular generator used.
 --
