@@ -37,11 +37,11 @@ towards destination x =
 
 -- | Shrink a floating-point number by edging towards a destination.
 --
---   >>> towards 0.0 100
---   [0.0,50.0,75.0,87.5,93.75,96.875,98.4375,..
+--   >>> take 7 (towardsFloat 0.0 100)
+--   [0.0,50.0,75.0,87.5,93.75,96.875,98.4375]
 --
---   >>> towards 1.0 0.5
---   [1.0,0.75,0.625,0.5625,0.53125,0.515625,0.5078125,..
+--   >>> take 7 (towardsFloat 1.0 0.5)
+--   [1.0,0.75,0.625,0.5625,0.53125,0.515625,0.5078125]
 --
 --   /Note we always try the destination first, as that is the optimal shrink./
 --
