@@ -88,6 +88,7 @@ module Hedgehog.Gen (
   -- ** Collections
   , maybe
   , list
+  , seq
   , nonEmpty
   , set
   , map
@@ -163,6 +164,8 @@ import qualified Data.List.NonEmpty as NonEmpty
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Maybe as Maybe
+import           Data.Sequence (Seq)
+import qualified Data.Sequence as Seq
 import           Data.Set (Set)
 import           Data.Text (Text)
 import qualified Data.Text as Text
@@ -177,7 +180,7 @@ import qualified Hedgehog.Internal.Tree as Tree
 import           Hedgehog.Range (Size, Range)
 import qualified Hedgehog.Range as Range
 
-import           Prelude hiding (filter, print, maybe, map)
+import           Prelude hiding (filter, print, maybe, map, seq)
 
 
 ------------------------------------------------------------------------
@@ -947,6 +950,12 @@ list range gen =
     shrink Shrink.list $ do
       k <- integral_ range
       replicateM k (freeze gen)
+
+-- | Generates a seq using a 'Range' to determine the length.
+--
+seq :: Monad m => Range Int -> Gen m a -> Gen m (Seq a)
+seq range gen =
+  Seq.fromList <$> list range gen
 
 -- | Generates a non-empty list using a 'Range' to determine the length.
 --
