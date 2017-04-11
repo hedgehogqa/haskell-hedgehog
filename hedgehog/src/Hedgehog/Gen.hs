@@ -74,6 +74,7 @@ module Hedgehog.Gen (
   , bytes
 
   -- ** Choice
+  , constant
   , element
   , choice
   , frequency
@@ -767,6 +768,13 @@ bytes range =
 
 ------------------------------------------------------------------------
 -- Combinators - Choice
+
+-- | Trivial generator that always produces the same element.
+--
+--   /This is another name for 'pure' \/ 'return'./
+constant :: Monad m => a -> Gen m a
+constant =
+  pure
 
 -- | Randomly selects one of the elements in the list.
 --
