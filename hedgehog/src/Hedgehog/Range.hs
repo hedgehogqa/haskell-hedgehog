@@ -23,11 +23,20 @@ module Hedgehog.Range (
   , linearFracFrom
   , linearBounded
 
+  -- * Exponential
+  , exponential
+  , exponentialFrom
+  , exponentialBounded
+  , exponentialFloat
+  , exponentialFloatFrom
+
   -- * Internal
   -- $internal
   , clamp
   , scaleLinear
   , scaleLinearFrac
+  , scaleExponential
+  , scaleExponentialFloat
   ) where
 
 import           Data.Bifunctor (bimap)
@@ -299,6 +308,148 @@ scaleLinearFrac sz0 z n =
       (n - z) * (fromIntegral sz / 99)
   in
     z + diff
+
+-- | Construct a range which scales the second bound exponentially relative to
+--   the size parameter.
+--
+--   >>> bounds 0 $ exponential 1 512
+--   (1,1)
+--
+--   >>> bounds 11 $ exponential 1 512
+--   (1,2)
+--
+--   >>> bounds 22 $ exponential 1 512
+--   (1,4)
+--
+--   >>> bounds 77 $ exponential 1 512
+--   (1,128)
+--
+--   >>> bounds 88 $ exponential 1 512
+--   (1,256)
+--
+--   >>> bounds 99 $ exponential 1 512
+--   (1,512)
+--
+exponential :: Integral a => a -> a -> Range a
+exponential x y =
+  exponentialFrom x x y
+
+-- | Construct a range which scales the bounds exponentially relative to the
+-- size parameter.
+--
+--   >>> bounds 0 $ exponentialFrom 0 (-128) 512
+--   (0,0)
+--
+--   >>> bounds 25 $ exponentialFrom 0 (-128) 512
+--   (-2,4)
+--
+--   >>> bounds 50 $ exponentialFrom 0 (-128) 512
+--   (-11,22)
+--
+--   >>> bounds 75 $ exponentialFrom 0 (-128) 512
+--   (-39,112)
+--
+--   >>> bounds 99 $ exponentialFrom x (-128) 512
+--   (-128,512)
+--
+exponentialFrom :: Integral a => a -> a -> a -> Range a
+exponentialFrom z x y =
+  Range z $ \sz ->
+    let
+      sized_x =
+        clamp x y $ scaleExponential sz z x
+
+      sized_y =
+        clamp x y $ scaleExponential sz z y
+    in
+      (sized_x, sized_y)
+
+-- | Construct a range which is scaled exponentially relative to the size
+--   parameter and uses the full range of a data type.
+--
+--   >>> bounds 0 (exponentialBounded :: Range Int8)
+--   (0,0)
+--
+--   >>> bounds 50 (exponentialBounded :: Range Int8)
+--   (-11,11)
+--
+--   >>> bounds 99 (exponentialBounded :: Range Int8)
+--   (-128,127)
+--
+exponentialBounded :: (Bounded a, Integral a) => Range a
+exponentialBounded =
+  exponentialFrom 0 minBound maxBound
+
+-- | Construct a range which scales the second bound exponentially relative to
+--   the size parameter.
+--
+--   This works the same as 'exponential', but for floating-point values.
+--
+--   >>> bounds 0 $ exponentialFloat 0 10
+--   (0.0,0.0)
+--
+--   >>> bounds 50 $ exponentialFloat 0 10
+--   (0.0,2.357035250656098)
+--
+--   >>> bounds 99 $ exponentialFloat 0 10
+--   (0.0,10.0)
+--
+exponentialFloat :: (Floating a, Ord a) => a -> a -> Range a
+exponentialFloat x y =
+  exponentialFloatFrom x x y
+
+-- | Construct a range which scales the bounds exponentially relative to the
+--   size parameter.
+--
+--   This works the same as 'exponentialFrom', but for floating-point values.
+--
+--   >>> bounds 0 $ exponentialFloatFrom 0 (-10) 20
+--   (0.0,0.0)
+--
+--   >>> bounds 50 $ exponentialFloatFrom 0 (-10) 20
+--   (-2.357035250656098,3.6535836249197002)
+--
+--   >>> bounds 99 $ exponentialFloatFrom x (-10) 20
+--   (-10.0,20.0)
+--
+exponentialFloatFrom :: (Floating a, Ord a) => a -> a -> a -> Range a
+exponentialFloatFrom z x y =
+  Range z $ \sz ->
+    let
+      sized_x =
+        clamp x y $ scaleExponentialFloat sz z x
+
+      sized_y =
+        clamp x y $ scaleExponentialFloat sz z y
+    in
+      (sized_x, sized_y)
+
+-- | Scale an integral exponentially with the size parameter.
+--
+scaleExponential :: Integral a => Size -> a -> a -> a
+scaleExponential sz z0 n0 =
+  let
+    z =
+      fromIntegral z0
+
+    n =
+      fromIntegral n0
+  in
+    round (scaleExponentialFloat sz z n :: Double)
+
+-- | Scale a floating-point number exponentially with the size parameter.
+--
+scaleExponentialFloat :: Floating a => Size -> a -> a -> a
+scaleExponentialFloat sz0 z n =
+  let
+    sz =
+      clamp 0 99 sz0
+
+    diff =
+      (((abs (n - z) + 1) ** (realToFrac sz / 99)) - 1) * signum (n - z)
+  in
+    z + diff
+
 
 ------------------------------------------------------------------------
 -- Internal
