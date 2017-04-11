@@ -37,9 +37,9 @@
 --
 -- You can then load the module in GHCi, and run it:
 --
--- >>> tests
--- ━━━ Test.Example ━━━
---   ✓ prop_reverse passed 100 tests.
+-- > λ tests
+-- > ━━━ Test.Example ━━━
+-- >   ✓ prop_reverse passed 100 tests.
 --
 module Hedgehog (
     Group(..)
