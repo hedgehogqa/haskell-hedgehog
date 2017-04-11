@@ -9,4 +9,5 @@ for PACKAGE in $PACKAGES; do
     cd $PACKAGE
     $ROOT/bin/mafia build
     $ROOT/bin/mafia testci
+    [ -d src ] && $($ROOT/bin/mafia install doctest)/doctest src
 done

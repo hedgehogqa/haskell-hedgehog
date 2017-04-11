@@ -9,3 +9,5 @@ for PACKAGE in $PACKAGES; do
     cd $PACKAGE
     $ROOT/bin/mafia lock # FIXME mafia really needs 'mafia setup'
 done
+
+$ROOT/bin/mafia install doctest
