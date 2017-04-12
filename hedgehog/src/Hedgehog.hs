@@ -43,7 +43,9 @@
 --
 module Hedgehog (
     Group(..)
+  , GroupName
   , Property
+  , PropertyName
   , Test
   , TestLimit
   , DiscardLimit
@@ -89,7 +91,7 @@ import           Hedgehog.Internal.Property (discard, failure, success)
 import           Hedgehog.Internal.Property (DiscardLimit, withDiscards)
 import           Hedgehog.Internal.Property (forAll, info)
 import           Hedgehog.Internal.Property (liftEither, liftExceptT, withResourceT)
-import           Hedgehog.Internal.Property (Property, Group(..))
+import           Hedgehog.Internal.Property (Property, PropertyName, Group(..), GroupName)
 import           Hedgehog.Internal.Property (ShrinkLimit, withShrinks)
 import           Hedgehog.Internal.Property (Test, property)
 import           Hedgehog.Internal.Property (TestLimit, withTests)
