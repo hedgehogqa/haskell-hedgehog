@@ -275,7 +275,7 @@ checkGroup config (Group group props0) =
 --
 checkSequential :: MonadIO m => Group -> m Bool
 checkSequential =
-  checkGroup $
+  checkGroup
     RunnerConfig {
         runnerWorkers =
           Just 1
@@ -299,7 +299,7 @@ checkSequential =
 --
 checkConcurrent :: MonadIO m => Group -> m Bool
 checkConcurrent =
-  checkGroup $
+  checkGroup
     RunnerConfig {
         runnerWorkers =
           Nothing

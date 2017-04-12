@@ -687,7 +687,7 @@ detectMark = do
 #if mingw32_HOST_OS
    pure False
 #else
-   user <- liftIO $ getEffectiveUserName
+   user <- liftIO getEffectiveUserName
    pure $ user == "mth"
 #endif
 
