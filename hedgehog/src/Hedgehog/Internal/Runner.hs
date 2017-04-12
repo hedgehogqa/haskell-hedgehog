@@ -16,6 +16,7 @@ module Hedgehog.Internal.Runner (
 
   -- * Internal
   , checkReport
+  , checkReportNoCatch
   , checkConsoleRegion
   , checkNamed
   ) where
@@ -130,11 +131,20 @@ checkReport ::
   -> Test m ()
   -> (Report -> m ())
   -> m Report
-checkReport cfg size0 seed0 test0 updateUI =
-  let
-    test =
-      catchAll test0 (fail . show)
+checkReport cfg size0 seed0 test updateUI =
+  checkReportNoCatch cfg size0 seed0 (catchAll test (fail . show)) updateUI
 
+checkReportNoCatch ::
+     forall m.
+     MonadIO m
+  => PropertyConfig
+  -> Size
+  -> Seed
+  -> Test m ()
+  -> (Report -> m ())
+  -> m Report
+checkReportNoCatch cfg size0 seed0 test updateUI =
+  let
     loop :: TestCount -> DiscardCount -> Size -> Seed -> m Report
     loop !tests !discards !size !seed = do
       updateUI $ Report tests discards Running
