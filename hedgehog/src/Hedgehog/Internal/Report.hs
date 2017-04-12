@@ -1,4 +1,6 @@
+{-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE DoAndIfThenElse #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
@@ -7,19 +9,24 @@
 module Hedgehog.Internal.Report (
   -- * Report
     Report(..)
-  , Status(..)
+  , Progress(..)
+  , Result(..)
   , FailureReport(..)
   , FailedInput(..)
 
-  , ShrinkCount
-  , TestCount
-  , DiscardCount
+  , ShrinkCount(..)
+  , TestCount(..)
+  , DiscardCount(..)
 
   , Style(..)
   , Markup(..)
 
-  , renderReport
-  , ppReport
+  , renderProgress
+  , renderResult
+  , renderDoc
+
+  , ppProgress
+  , ppResult
 
   , mkFailure
   ) where
@@ -97,28 +104,33 @@ data FailureReport =
     , failureMessages :: ![String]
     } deriving (Eq, Show)
 
--- | The status of a property test run.
+-- | The status of a running property test.
+--
+data Progress =
+    Waiting
+  | Running
+  | Shrinking !FailureReport
+    deriving (Eq, Show)
+
+-- | The status of a completed property test.
 --
 --   In the case of a failure it provides the seed used for the test, the
 --   number of shrinks, and the execution log.
 --
-data Status =
-    Waiting
-  | Running
-  | Shrinking !FailureReport
-  | Failed !FailureReport
+data Result =
+    Failed !FailureReport
   | GaveUp
   | OK
     deriving (Eq, Show)
 
--- | The report from a property test run.
+-- | A report on a running or completed property test.
 --
-data Report =
+data Report a =
   Report {
       reportTests :: !TestCount
     , reportDiscards :: !DiscardCount
-    , reportStatus :: !Status
-    } deriving (Show)
+    , reportStatus :: !a
+    } deriving (Show, Functor, Foldable, Traversable)
 
 ------------------------------------------------------------------------
 -- Pretty Printing Helpers
@@ -601,8 +613,8 @@ ppName = \case
   Just (PropertyName name) ->
     WL.text name
 
-ppReport :: MonadIO m => Maybe PropertyName -> Report -> m (Doc Markup)
-ppReport name (Report tests discards status) =
+ppProgress :: MonadIO m => Maybe PropertyName -> Report Progress -> m (Doc Markup)
+ppProgress name (Report tests discards status) =
   case status of
     Waiting ->
       pure . icon WaitingIcon '○' . WL.annotate WaitingHeader $
@@ -624,6 +636,9 @@ ppReport name (Report tests discards status) =
         ppShrinkDiscard (failureShrinks failure) discards <+>
         "(shrinking)"
 
+ppResult :: MonadIO m => Maybe PropertyName -> Report Result -> m (Doc Markup)
+ppResult name (Report tests discards result) =
+  case result of
     Failed failure -> do
       pfailure <- ppFailureReport name failure
       pure . WL.vsep $ [
@@ -637,6 +652,7 @@ ppReport name (Report tests discards status) =
         , pfailure
         , mempty
         ]
+
     GaveUp ->
       pure . icon GaveUpIcon '⚐' . WL.annotate GaveUpHeader $
         ppName name <+>
@@ -645,6 +661,7 @@ ppReport name (Report tests discards status) =
         ", passed" <+>
         ppTestCount tests <>
         "."
+
     OK ->
       pure . icon SuccessIcon '✓' . WL.annotate SuccessHeader $
         ppName name <+>
@@ -676,9 +693,8 @@ useColor =
       Nothing ->
         hSupportsANSI stdout
 
-renderReport :: MonadIO m => Maybe PropertyName -> Report -> m String
-renderReport name x = do
-  doc <- ppReport name x
+renderDoc :: MonadIO m => Doc Markup -> m String
+renderDoc doc = do
   color <- useColor
 
   let
@@ -784,3 +800,11 @@ renderReport name x = do
     display .
     WL.renderSmart 100 $
     WL.indent 2 doc
+
+renderProgress :: MonadIO m => Maybe PropertyName -> Report Progress -> m String
+renderProgress name x = do
+  renderDoc =<< ppProgress name x
+
+renderResult :: MonadIO m => Maybe PropertyName -> Report Result -> m String
+renderResult name x = do
+  renderDoc =<< ppResult name x

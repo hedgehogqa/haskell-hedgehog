@@ -90,9 +90,9 @@ takeSmallest ::
   -> Seed
   -> ShrinkCount
   -> ShrinkLimit
-  -> (Status -> m ())
+  -> (Progress -> m ())
   -> Node m (Maybe (Either Failure (), [Log]))
-  -> m Status
+  -> m Result
 takeSmallest size seed shrinks slimit updateUI = \case
   Node Nothing _ ->
     pure GaveUp
@@ -128,14 +128,14 @@ checkReport ::
   -> Size
   -> Seed
   -> Test m ()
-  -> (Report -> m ())
-  -> m Report
+  -> (Report Progress -> m ())
+  -> m (Report Result)
 checkReport cfg size0 seed0 test0 updateUI =
   let
     test =
       catchAll test0 (fail . show)
 
-    loop :: TestCount -> DiscardCount -> Size -> Seed -> m Report
+    loop :: TestCount -> DiscardCount -> Size -> Seed -> m (Report Result)
     loop !tests !discards !size !seed = do
       updateUI $ Report tests discards Running
 
@@ -186,23 +186,25 @@ checkConsoleRegion ::
   -> Size
   -> Seed
   -> Property
-  -> m Report
+  -> m (Report Result)
 checkConsoleRegion region name size seed prop =
   liftIO $ do
-    report <-
-      checkReport (propertyConfig prop) size seed (propertyTest prop) $ \report ->
-        setRegionReport region name report
+    result <-
+      checkReport (propertyConfig prop) size seed (propertyTest prop) $ \status ->
+        Console.setConsoleRegion region =<<
+          renderProgress name status
 
-    setRegionReport region name report
+    Console.setConsoleRegion region =<<
+      renderResult name result
 
-    pure report
+    pure result
 
 checkNamed :: MonadIO m => ConsoleRegion -> Maybe PropertyName -> Property -> m Bool
 checkNamed region name prop = do
   seed <- liftIO Seed.random
-  report <- checkConsoleRegion region name 0 seed prop
+  result <- checkConsoleRegion region name 0 seed prop
   pure $
-    reportStatus report == OK
+    reportStatus result == OK
 
 -- | Check a property.
 --
@@ -238,7 +240,8 @@ checkGroup config (Group group props0) =
       props <-
         fmap (zip [0..]) . for props0 $ \(name, p) -> do
           region <- Console.openConsoleRegion Linear
-          setRegionReport region (Just name) $ Report 0 0 Waiting
+          Console.setConsoleRegion region =<<
+            renderProgress (Just name) (Report 0 0 Waiting)
           pure (name, p, region)
 
       qsem <- QSem.newQSem n
@@ -314,17 +317,6 @@ displayRegion ::
 displayRegion =
   Console.displayConsoleRegions .
   bracket (Console.openConsoleRegion Linear) finishRegion
-
-setRegionReport ::
-     MonadIO m
-  => LiftRegion m
-  => ConsoleRegion
-  -> Maybe PropertyName
-  -> Report
-  -> m ()
-setRegionReport region name report = do
-  content <- renderReport name report
-  Console.setConsoleRegion region content
 
 finishRegion :: (Monad m, LiftRegion m) => ConsoleRegion -> m ()
 finishRegion region = do
