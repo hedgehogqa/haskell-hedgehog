@@ -604,11 +604,11 @@ ppName = \case
 ppReport :: MonadIO m => Maybe PropertyName -> Report -> m (Doc Markup)
 ppReport name (Report tests discards status) =
   case status of
-    Waiting -> do
+    Waiting ->
       pure . icon WaitingIcon '○' . WL.annotate WaitingHeader $
         ppName name
 
-    Running -> do
+    Running ->
       pure . icon RunningIcon '●' . WL.annotate RunningHeader $
         ppName name <+>
         "passed" <+>
@@ -616,7 +616,7 @@ ppReport name (Report tests discards status) =
         ppWithDiscardCount discards <+>
         "(running)"
 
-    Shrinking failure -> do
+    Shrinking failure ->
       pure . icon ShrinkingIcon '↯' . WL.annotate ShrinkingHeader $
         ppName name <+>
         "failed after" <+>
