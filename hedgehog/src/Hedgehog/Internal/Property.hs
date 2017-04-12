@@ -372,7 +372,7 @@ assert :: (Monad m, HasCallStack) => Bool -> Test m ()
 assert b =
   if b then
     success
-  else do
+  else
     withFrozenCallStack failure
 
 infix 4 ===
@@ -401,7 +401,7 @@ infix 4 ===
 --
 liftEither :: (Monad m, Show x, HasCallStack) => Either x a -> Test m a
 liftEither = \case
-  Left x -> do
+  Left x ->
     withFrozenCallStack $ failWith Nothing $ showPretty x
   Right x ->
     pure x
@@ -410,7 +410,7 @@ liftEither = \case
 --   the 'Right'.
 --
 liftExceptT :: (Monad m, Show x, HasCallStack) => ExceptT x m a -> Test m a
-liftExceptT m = do
+liftExceptT m =
   withFrozenCallStack liftEither =<< lift (runExceptT m)
 
 -- | Run a computation which requires resource acquisition / release.
