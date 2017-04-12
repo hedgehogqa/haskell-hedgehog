@@ -1172,7 +1172,7 @@ sample :: MonadIO m => Gen m a -> m [a]
 sample gen =
   fmap (fmap nodeValue . Maybe.catMaybes) .
   replicateM 10 $ do
-    seed <- liftIO $ Seed.random
+    seed <- liftIO Seed.random
     runMaybeT . runTree $ runGen 30 seed gen
 
 -- | Print the value produced by a generator, and the first level of shrinks,
@@ -1216,7 +1216,7 @@ printTreeWith size seed gen = do
 --
 print :: (MonadIO m, Show a) => Gen m a -> m ()
 print gen = do
-  seed <- liftIO $ Seed.random
+  seed <- liftIO Seed.random
   printWith 30 seed gen
 
 -- | Run a generator with a random seed and print the resulting shrink tree.
@@ -1238,7 +1238,7 @@ print gen = do
 --
 printTree :: (MonadIO m, Show a) => Gen m a -> m ()
 printTree gen = do
-  seed <- liftIO $ Seed.random
+  seed <- liftIO Seed.random
   printTreeWith 30 seed gen
 
 -- | Render a generator as a tree of strings.
