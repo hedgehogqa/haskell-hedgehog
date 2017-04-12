@@ -1,3 +1,4 @@
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveTraversable #-}
@@ -64,8 +65,20 @@ import           Text.PrettyPrint.Annotated.WL (Doc, (<+>))
 import qualified Text.PrettyPrint.Annotated.WL as WL
 import           Text.Printf (printf)
 
+#if !mingw32_HOST_OS
+import           System.Posix.User (getEffectiveUserName)
+#endif
+
 ------------------------------------------------------------------------
 -- Data
+
+-- | Whether to render a report using ANSI colors or not.
+--
+data UseColor =
+    DetectColor
+  | DisableColor
+  | EnableColor
+    deriving (Eq, Ord, Show)
 
 -- | The numbers of times a property was able to shrink after a failing test.
 --
@@ -669,8 +682,17 @@ ppResult name (Report tests discards result) =
         ppTestCount tests <>
         "."
 
-useColor :: MonadIO m => m Bool
-useColor =
+detectMark :: MonadIO m => m Bool
+detectMark = do
+#if mingw32_HOST_OS
+   pure False
+#else
+   user <- liftIO $ getEffectiveUserName
+   pure $ user == "mth"
+#endif
+
+detectColor :: MonadIO m => m Bool
+detectColor =
   liftIO $ do
     menv <- lookupEnv "HEDGEHOG_COLOR"
     case menv of
@@ -688,15 +710,24 @@ useColor =
       Just "true" ->
         pure True
 
-      Just _ ->
-        hSupportsANSI stdout
-      Nothing ->
-        hSupportsANSI stdout
+      _ -> do
+        mth <- detectMark
+        if mth then
+          pure False -- avoid getting fired :)
+        else
+          hSupportsANSI stdout
 
-renderDoc :: MonadIO m => Doc Markup -> m String
-renderDoc doc = do
-  color <- useColor
+useColor :: MonadIO m => UseColor -> m Bool
+useColor = \case
+  DetectColor ->
+    detectColor
+  DisableColor ->
+    pure False
+  EnableColor ->
+    pure True
 
+renderDoc :: MonadIO m => UseColor -> Doc Markup -> m String
+renderDoc color doc = do
   let
     dull =
       SetColor Foreground Dull
@@ -790,8 +821,11 @@ renderDoc doc = do
     end _ =
       setSGRCode [Reset]
 
+  colorOK <- useColor color
+
+  let
     display =
-      if color then
+      if colorOK then
         WL.displayDecorated start end id
       else
         WL.display
@@ -803,8 +837,8 @@ renderDoc doc = do
 
 renderProgress :: MonadIO m => Maybe PropertyName -> Report Progress -> m String
 renderProgress name x = do
-  renderDoc =<< ppProgress name x
+  renderDoc DetectColor =<< ppProgress name x
 
 renderResult :: MonadIO m => Maybe PropertyName -> Report Result -> m String
 renderResult name x = do
-  renderDoc =<< ppResult name x
+  renderDoc DetectColor =<< ppResult name x
