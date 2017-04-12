@@ -31,7 +31,7 @@ newtype PropertySource =
     } deriving (Eq, Ord, Show)
 
 readProperties :: MonadIO m => FilePath -> m (Map PropertyName PropertySource)
-readProperties path = do
+readProperties path =
   findProperties path <$> liftIO (readFile path)
 
 readDeclaration :: MonadIO m => FilePath -> LineNo -> m (Maybe (String, Pos String))
