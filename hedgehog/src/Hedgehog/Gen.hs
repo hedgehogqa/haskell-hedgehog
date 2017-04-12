@@ -240,7 +240,7 @@ liftTree x =
 --   at the nodes. 'Nothing' means discarded, 'Just' means we have a value.
 --
 runDiscardEffect :: Monad m => Tree (MaybeT m) a -> Tree m (Maybe a)
-runDiscardEffect s = do
+runDiscardEffect s =
   Tree $ do
     mx <- runMaybeT $ runTree s
     case mx of
@@ -933,7 +933,7 @@ just g = do
 -- | Generates a 'Nothing' some of the time.
 --
 maybe :: Monad m => Gen m a -> Gen m (Maybe a)
-maybe gen = do
+maybe gen =
   sized $ \n ->
     frequency [
         (2, pure Nothing)

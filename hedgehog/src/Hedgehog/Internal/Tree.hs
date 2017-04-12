@@ -242,7 +242,7 @@ passNode (Node (x, _) xs) =
 
 passTree :: MonadWriter w m => Tree m (a, w -> w) -> Tree m a
 passTree (Tree m) =
-  Tree $ do
+  Tree $
     pure . passNode =<< m
 
 instance MonadWriter w m => MonadWriter w (Tree m) where

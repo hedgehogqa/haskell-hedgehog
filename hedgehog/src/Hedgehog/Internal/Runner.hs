@@ -190,7 +190,7 @@ checkConsoleRegion ::
 checkConsoleRegion region name size seed prop =
   liftIO $ do
     report <-
-      checkReport (propertyConfig prop) size seed (propertyTest prop) $ \report -> do
+      checkReport (propertyConfig prop) size seed (propertyTest prop) $ \report ->
         setRegionReport region name report
 
     setRegionReport region name report
@@ -207,7 +207,7 @@ checkNamed region name prop = do
 -- | Check a property.
 --
 check :: MonadIO m => Property -> m Bool
-check prop = do
+check prop =
   liftIO . displayRegion $ \region ->
     checkNamed region Nothing prop
 

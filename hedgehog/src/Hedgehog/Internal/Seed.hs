@@ -93,7 +93,7 @@ global =
 -- | Create a random 'Seed' using an effectful source of randomness.
 --
 random :: MonadIO m => m Seed
-random = do
+random =
   liftIO $ IORef.atomicModifyIORef' global split
 
 -- | Create a 'Seed' using an 'Int64'.

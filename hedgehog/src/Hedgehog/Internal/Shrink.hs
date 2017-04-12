@@ -72,7 +72,7 @@ towardsFloat destination x =
 --   /Note we always try the empty list first, as that is the optimal shrink./
 --
 list :: [a] -> [[a]]
-list xs = do
+list xs =
  concatMap
    (\k -> removes k xs)
    (halves $ length xs)
