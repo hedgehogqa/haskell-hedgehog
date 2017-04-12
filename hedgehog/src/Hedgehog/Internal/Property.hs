@@ -72,6 +72,7 @@ import           Control.Monad.Trans.Resource (ResourceT, runResourceT)
 import           Control.Monad.Trans.Writer.Lazy (WriterT(..))
 import           Control.Monad.Writer.Class (MonadWriter(..))
 
+import           Data.Semigroup (Semigroup)
 import           Data.String (IsString)
 import           Data.Typeable (Typeable, TypeRep, typeOf)
 
@@ -105,7 +106,7 @@ newtype Test m a =
 newtype PropertyName =
   PropertyName {
       unPropertyName :: String
-    } deriving (Eq, Ord, Show, IsString)
+    } deriving (Eq, Ord, Show, IsString, Semigroup)
 
 -- | Configuration for a property test.
 --
@@ -148,7 +149,7 @@ data Group =
 newtype GroupName =
   GroupName {
       unGroupName :: String
-    } deriving (Eq, Ord, Show, IsString)
+    } deriving (Eq, Ord, Show, IsString, Semigroup)
 
 --
 -- FIXME This whole Log/Failure thing could be a lot more structured to allow
