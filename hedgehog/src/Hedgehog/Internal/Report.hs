@@ -687,7 +687,7 @@ detectMark = do
 #if mingw32_HOST_OS
    pure False
 #else
-   user <- liftIO $ getEffectiveUserName
+   user <- liftIO getEffectiveUserName
    pure $ user == "mth"
 #endif
 
@@ -836,9 +836,9 @@ renderDoc color doc = do
     WL.indent 2 doc
 
 renderProgress :: MonadIO m => Maybe PropertyName -> Report Progress -> m String
-renderProgress name x = do
+renderProgress name x =
   renderDoc DetectColor =<< ppProgress name x
 
 renderResult :: MonadIO m => Maybe PropertyName -> Report Result -> m String
-renderResult name x = do
+renderResult name x =
   renderDoc DetectColor =<< ppResult name x
