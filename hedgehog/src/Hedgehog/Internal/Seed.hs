@@ -1,5 +1,4 @@
 {-# LANGUAGE CPP #-}
-{-# LANGUAGE LambdaCase #-}
 -- |
 -- This is a port of "Fast Splittable Pseudorandom Number Generators" by Steele
 -- et. al. [1].
