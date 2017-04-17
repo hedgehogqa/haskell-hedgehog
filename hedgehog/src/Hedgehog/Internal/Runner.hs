@@ -1,5 +1,6 @@
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DoAndIfThenElse #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -23,14 +24,14 @@ module Hedgehog.Internal.Runner (
 import           Control.Concurrent.Async (forConcurrently)
 import           Control.Concurrent.MVar (MVar)
 import qualified Control.Concurrent.MVar as MVar
-import qualified Control.Concurrent.QSem as QSem
+import           Control.Concurrent.STM (STM, atomically)
+import qualified Control.Concurrent.STM.TMVar as TMVar
 import           Control.Monad (when)
 import           Control.Monad.Catch (MonadMask(..), MonadCatch(..), catchAll, bracket)
 import           Control.Monad.IO.Class (MonadIO(..))
 
 import           Data.Map.Strict (Map)
 import qualified Data.Map.Strict as Map
-import           Data.Traversable (for)
 
 import qualified GHC.Conc as Conc
 
@@ -225,36 +226,39 @@ recheck size seed prop0 = do
 -- | Check a group of properties using the specified runner config.
 --
 checkGroup :: MonadIO m => RunnerConfig -> Group -> m Bool
-checkGroup config (Group group props0) =
+checkGroup config (Group group props) =
   liftIO $ do
     n <- maybe getNumWorkers pure (runnerWorkers config)
 
-    -- ensure one spare capability for concurrent-output, it's likely that our
-    -- tests will saturate all the capabilities they're given.
-    updateNumCapabilities (n + 1)
+    -- ensure few spare capabilities for concurrent-output, it's likely that
+    -- our tests will saturate all the capabilities they're given.
+    updateNumCapabilities (n + 2)
 
     putStrLn $ "━━━ " ++ unGroupName group ++ " ━━━"
     Console.displayConsoleRegions $ do
-      mvar <- MVar.newMVar (-1, Map.empty)
+      remaining <- Console.openConsoleRegion Linear
 
-      props <-
-        fmap (zip [0..]) . for props0 $ \(name, p) -> do
-          region <- Console.openConsoleRegion Linear
-          Console.setConsoleRegion region =<<
-            renderProgress (Just name) (Report 0 0 Waiting)
-          pure (name, p, region)
+      let
+        start (TasksRemaining tasks) _ix (name, prop) =
+          liftIO $ do
+            ppremaining <- renderRemaining $ PropertyCount tasks
 
-      qsem <- QSem.newQSem n
+            atomically $ do
+              region <- Console.openConsoleRegion Linear
+              moveToBottom remaining
 
-      results <-
-        forConcurrently props $ \(ix, (name, p, region)) ->
-          bracket (QSem.waitQSem qsem) (const $ QSem.signalQSem qsem) $ \_ -> do
-            ok <- checkNamed region (Just name) p
-            finishIndexedRegion mvar ix region
-            pure ok
+              if tasks == 0 then
+                Console.closeConsoleRegion remaining
+              else
+                Console.setConsoleRegion remaining ppremaining
 
-      pure $
-        and results
+              pure (name, prop, region)
+
+        finalize (_name, _prop, region) =
+          finishRegion region
+
+      runTasks n props start finalize $ \(name, prop, region) ->
+        checkNamed region (Just name) prop
 
 -- | Check a group of properties sequentially.
 --
@@ -306,6 +310,87 @@ checkConcurrent =
       }
 
 ------------------------------------------------------------------------
+-- quick and dirty task queue
+
+newtype TaskIndex =
+  TaskIndex Int
+  deriving (Eq, Ord, Enum, Num)
+
+newtype TasksRemaining =
+  TasksRemaining Int
+
+dequeueMVar ::
+     MVar [(TaskIndex, a)]
+  -> (TasksRemaining -> TaskIndex -> a -> IO b)
+  -> IO (Maybe (TaskIndex, b))
+dequeueMVar mvar start =
+  MVar.modifyMVar mvar $ \case
+    [] ->
+      pure ([], Nothing)
+    (ix, x) : xs -> do
+      y <- start (TasksRemaining $ length xs) ix x
+      pure (xs, Just (ix, y))
+
+runTasks ::
+     Int
+  -> [a]
+  -> (TasksRemaining -> TaskIndex -> a -> IO b)
+  -> (b -> IO ())
+  -> (b -> IO Bool)
+  -> IO Bool
+runTasks n tasks start finalize runTask = do
+  qvar <- MVar.newMVar (zip [0..] tasks)
+  fvar <- MVar.newMVar (-1, Map.empty)
+
+  let
+    worker r0 = do
+      mx <- dequeueMVar qvar start
+      case mx of
+        Nothing ->
+          pure r0
+        Just (ix, x) -> do
+          r <- runTask x
+          finalizeTask fvar ix (finalize x)
+          worker (r0 && r)
+
+  -- FIXME ensure all workers have finished running
+  fmap and . forConcurrently [1..max 1 n] $ \_ix ->
+    worker True
+
+runActiveFinalizers ::
+     MonadIO m
+  => MVar (TaskIndex, Map TaskIndex (IO ()))
+  -> m ()
+runActiveFinalizers mvar =
+  liftIO $ do
+    again <-
+      MVar.modifyMVar mvar $ \original@(minIx, finalizers0) ->
+        case Map.minViewWithKey finalizers0 of
+          Nothing ->
+            pure (original, False)
+
+          Just ((ix, finalize), finalizers) ->
+            if ix == minIx + 1 then do
+              finalize
+              pure ((ix, finalizers), True)
+            else
+              pure (original, False)
+
+    when again $
+      runActiveFinalizers mvar
+
+finalizeTask ::
+     MonadIO m
+  => MVar (TaskIndex, Map TaskIndex (IO ()))
+  -> TaskIndex
+  -> IO ()
+  -> m ()
+finalizeTask mvar ix finalize = do
+  liftIO . MVar.modifyMVar_ mvar $ \(minIx, finalizers) ->
+    pure (minIx, Map.insert ix finalize finalizers)
+  runActiveFinalizers mvar
+
+------------------------------------------------------------------------
 -- concurrent-output utils
 
 displayRegion ::
@@ -318,43 +403,24 @@ displayRegion =
   Console.displayConsoleRegions .
   bracket (Console.openConsoleRegion Linear) finishRegion
 
-finishRegion :: (Monad m, LiftRegion m) => ConsoleRegion -> m ()
-finishRegion region = do
-  content <- Console.getConsoleRegion region
-  Console.finishConsoleRegion region content
+moveToBottom :: ConsoleRegion -> STM ()
+moveToBottom region = do
+  mxs <- TMVar.tryTakeTMVar Console.regionList
+  case mxs of
+    Nothing ->
+      pure ()
+    Just xs0 ->
+      let
+        xs1 =
+          filter (/= region) xs0
+      in
+        TMVar.putTMVar Console.regionList (region : xs1)
 
-flushRegions ::
-     MonadIO m
-  => MVar (Int, Map Int ConsoleRegion)
-  -> m ()
-flushRegions mvar =
-  liftIO $ do
-    again <-
-      MVar.modifyMVar mvar $ \original@(minIx, regions0) ->
-        case Map.minViewWithKey regions0 of
-          Nothing ->
-            pure (original, False)
-
-          Just ((ix, region), regions) ->
-            if ix == minIx + 1 then do
-              finishRegion region
-              pure ((ix, regions), True)
-            else
-              pure (original, False)
-
-    when again $
-      flushRegions mvar
-
-finishIndexedRegion ::
-     MonadIO m
-  => MVar (Int, Map Int ConsoleRegion)
-  -> Int
-  -> ConsoleRegion
-  -> m ()
-finishIndexedRegion mvar ix region = do
-  liftIO . MVar.modifyMVar_ mvar $ \(minIx, regions) ->
-    pure (minIx, Map.insert ix region regions)
-  flushRegions mvar
+finishRegion :: MonadIO m => ConsoleRegion -> m ()
+finishRegion region =
+  liftIO . atomically $ do
+    content <- Console.getConsoleRegion region
+    Console.finishConsoleRegion region content
 
 -- | Update the number of capabilities but never set it lower than it already
 --   is.
