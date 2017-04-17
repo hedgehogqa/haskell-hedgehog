@@ -87,8 +87,11 @@ library
     Hedgehog.Gen
     Hedgehog.Range
 
+    Hedgehog.Internal.Config
     Hedgehog.Internal.Discovery
     Hedgehog.Internal.Property
+    Hedgehog.Internal.Queue
+    Hedgehog.Internal.Region
     Hedgehog.Internal.Report
     Hedgehog.Internal.Runner
     Hedgehog.Internal.Seed
