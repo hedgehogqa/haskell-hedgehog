@@ -18,14 +18,17 @@ module Hedgehog.Internal.Report (
   , ShrinkCount(..)
   , TestCount(..)
   , DiscardCount(..)
+  , PropertyCount(..)
 
   , Style(..)
   , Markup(..)
 
+  , renderRemaining
   , renderProgress
   , renderResult
   , renderDoc
 
+  , ppRemaining
   , ppProgress
   , ppResult
 
@@ -98,6 +101,12 @@ newtype DiscardCount =
   DiscardCount Int
   deriving (Eq, Ord, Show, Num, Enum, Real, Integral)
 
+-- | The number of properties in a group.
+--
+newtype PropertyCount =
+  PropertyCount Int
+  deriving (Eq, Ord, Show, Num, Enum, Real, Integral)
+
 data FailedInput =
   FailedInput {
       failedSpan :: !(Maybe Span)
@@ -120,8 +129,7 @@ data FailureReport =
 -- | The status of a running property test.
 --
 data Progress =
-    Waiting
-  | Running
+    Running
   | Shrinking !FailureReport
     deriving (Eq, Show)
 
@@ -170,8 +178,8 @@ data Style =
     deriving (Eq, Ord, Show)
 
 data Markup =
-    WaitingIcon
-  | WaitingHeader
+    RemainingIcon
+  | RemainingHeader
   | RunningIcon
   | RunningHeader
   | ShrinkingIcon
@@ -290,6 +298,13 @@ ppShrinkCount = \case
     "1 shrink"
   ShrinkCount n ->
     ppShow n <+> "shrinks"
+
+ppPropertyCount :: PropertyCount -> Doc a
+ppPropertyCount = \case
+  PropertyCount 1 ->
+    "1 property"
+  PropertyCount n ->
+    ppShow n <+> "properties"
 
 ppWithDiscardCount :: DiscardCount -> Doc Markup
 ppWithDiscardCount = \case
@@ -626,13 +641,14 @@ ppName = \case
   Just (PropertyName name) ->
     WL.text name
 
+ppRemaining :: MonadIO m => PropertyCount -> m (Doc Markup)
+ppRemaining remaining =
+  pure . icon RemainingIcon '○' . WL.annotate RemainingHeader $
+    ppPropertyCount remaining <+> "waiting to run"
+
 ppProgress :: MonadIO m => Maybe PropertyName -> Report Progress -> m (Doc Markup)
 ppProgress name (Report tests discards status) =
   case status of
-    Waiting ->
-      pure . icon WaitingIcon '○' . WL.annotate WaitingHeader $
-        ppName name
-
     Running ->
       pure . icon RunningIcon '●' . WL.annotate RunningHeader $
         ppName name <+>
@@ -739,9 +755,9 @@ renderDoc color doc = do
       SetConsoleIntensity BoldIntensity
 
     start = \case
-      WaitingIcon ->
+      RemainingIcon ->
         setSGRCode []
-      WaitingHeader ->
+      RemainingHeader ->
         setSGRCode []
       RunningIcon ->
         setSGRCode []
@@ -834,6 +850,10 @@ renderDoc color doc = do
     display .
     WL.renderSmart 100 $
     WL.indent 2 doc
+
+renderRemaining :: MonadIO m => PropertyCount -> m String
+renderRemaining x =
+  renderDoc DetectColor =<< ppRemaining x
 
 renderProgress :: MonadIO m => Maybe PropertyName -> Report Progress -> m String
 renderProgress name x =
