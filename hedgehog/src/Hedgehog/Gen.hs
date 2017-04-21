@@ -899,8 +899,7 @@ discard =
 -- @
 --
 --   It differs from the above in that we keep some state to avoid looping
---   forever. If we trigger these limits then the whole whole generator is
---   discarded.
+--   forever. If we trigger these limits then the whole generator is discarded.
 --
 filter :: Monad m => (a -> Bool) -> Gen m a -> Gen m a
 filter p gen =
