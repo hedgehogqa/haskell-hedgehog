@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveTraversable #-}
@@ -9,7 +8,8 @@
 {-# LANGUAGE TupleSections #-}
 module Hedgehog.Internal.Report (
   -- * Report
-    Report(..)
+    Summary(..)
+  , Report(..)
   , Progress(..)
   , Result(..)
   , FailureReport(..)
@@ -23,15 +23,16 @@ module Hedgehog.Internal.Report (
   , Style(..)
   , Markup(..)
 
-  , renderRemaining
   , renderProgress
   , renderResult
+  , renderSummary
   , renderDoc
 
-  , ppRemaining
   , ppProgress
   , ppResult
+  , ppSummary
 
+  , fromResult
   , mkFailure
   ) where
 
@@ -49,6 +50,7 @@ import           Data.Maybe (mapMaybe, catMaybes)
 import           Data.Semigroup (Semigroup(..))
 import           Data.Typeable (TypeRep)
 
+import           Hedgehog.Internal.Config
 import           Hedgehog.Internal.Discovery (Pos(..), Position(..))
 import qualified Hedgehog.Internal.Discovery as Discovery
 import           Hedgehog.Internal.Property (PropertyName(..), Log(..), Diff(..))
@@ -59,29 +61,15 @@ import           Hedgehog.Range (Size)
 
 import           System.Console.ANSI (ColorIntensity(..), Color(..))
 import           System.Console.ANSI (ConsoleLayer(..), ConsoleIntensity(..))
-import           System.Console.ANSI (SGR(..), setSGRCode, hSupportsANSI)
+import           System.Console.ANSI (SGR(..), setSGRCode)
 import           System.Directory (makeRelativeToCurrentDirectory)
-import           System.Environment (lookupEnv)
-import           System.IO (stdout)
 
 import           Text.PrettyPrint.Annotated.WL (Doc, (<+>))
 import qualified Text.PrettyPrint.Annotated.WL as WL
 import           Text.Printf (printf)
 
-#if !mingw32_HOST_OS
-import           System.Posix.User (getEffectiveUserName)
-#endif
-
 ------------------------------------------------------------------------
 -- Data
-
--- | Whether to render a report using ANSI colors or not.
---
-data UseColor =
-    DetectColor
-  | DisableColor
-  | EnableColor
-    deriving (Eq, Ord, Show)
 
 -- | The numbers of times a property was able to shrink after a failing test.
 --
@@ -153,6 +141,49 @@ data Report a =
     , reportStatus :: !a
     } deriving (Show, Functor, Foldable, Traversable)
 
+-- | A summary of all the properties executed.
+--
+data Summary =
+  Summary {
+      summaryWaiting :: !PropertyCount
+    , summaryRunning :: !PropertyCount
+    , summaryFailed :: !PropertyCount
+    , summaryGaveUp :: !PropertyCount
+    , summaryOK :: !PropertyCount
+    } deriving (Show)
+
+instance Monoid Summary where
+  mempty =
+    Summary 0 0 0 0 0
+  mappend (Summary x1 x2 x3 x4 x5) (Summary y1 y2 y3 y4 y5) =
+    Summary
+      (x1 + y1)
+      (x2 + y2)
+      (x3 + y3)
+      (x4 + y4)
+      (x5 + y5)
+
+instance Semigroup Summary
+
+-- | Construct a summary from a single result.
+--
+fromResult :: Result -> Summary
+fromResult = \case
+  Failed _ ->
+    mempty { summaryFailed = 1 }
+  GaveUp ->
+    mempty { summaryGaveUp = 1 }
+  OK ->
+    mempty { summaryOK = 1 }
+
+summaryCompleted :: Summary -> PropertyCount
+summaryCompleted (Summary _ _ x3 x4 x5) =
+  x3 + x4 + x5
+
+summaryTotal :: Summary -> PropertyCount
+summaryTotal (Summary x1 x2 x3 x4 x5) =
+  x1 + x2 + x3 + x4 + x5
+
 ------------------------------------------------------------------------
 -- Pretty Printing Helpers
 
@@ -178,8 +209,8 @@ data Style =
     deriving (Eq, Ord, Show)
 
 data Markup =
-    RemainingIcon
-  | RemainingHeader
+    WaitingIcon
+  | WaitingHeader
   | RunningIcon
   | RunningHeader
   | ShrinkingIcon
@@ -299,12 +330,9 @@ ppShrinkCount = \case
   ShrinkCount n ->
     ppShow n <+> "shrinks"
 
-ppPropertyCount :: PropertyCount -> Doc a
-ppPropertyCount = \case
-  PropertyCount 1 ->
-    "1 property"
-  PropertyCount n ->
-    ppShow n <+> "properties"
+ppRawPropertyCount :: PropertyCount -> Doc a
+ppRawPropertyCount (PropertyCount n) =
+  ppShow n
 
 ppWithDiscardCount :: DiscardCount -> Doc Markup
 ppWithDiscardCount = \case
@@ -641,11 +669,6 @@ ppName = \case
   Just (PropertyName name) ->
     WL.text name
 
-ppRemaining :: MonadIO m => PropertyCount -> m (Doc Markup)
-ppRemaining remaining =
-  pure . icon RemainingIcon '○' . WL.annotate RemainingHeader $
-    ppPropertyCount remaining <+> "waiting to run"
-
 ppProgress :: MonadIO m => Maybe PropertyName -> Report Progress -> m (Doc Markup)
 ppProgress name (Report tests discards status) =
   case status of
@@ -698,52 +721,68 @@ ppResult name (Report tests discards result) =
         ppTestCount tests <>
         "."
 
-detectMark :: MonadIO m => m Bool
-detectMark = do
-#if mingw32_HOST_OS
-   pure False
-#else
-   user <- liftIO getEffectiveUserName
-   pure $ user == "mth"
-#endif
+ppWhenNonZero :: Doc a -> PropertyCount -> Maybe (Doc a)
+ppWhenNonZero suffix n =
+  if n <= 0 then
+    Nothing
+  else
+    Just $ ppRawPropertyCount n <+> suffix
 
-detectColor :: MonadIO m => m Bool
-detectColor =
-  liftIO $ do
-    menv <- lookupEnv "HEDGEHOG_COLOR"
-    case menv of
-      Just "0" ->
-        pure False
-      Just "no" ->
-        pure False
-      Just "false" ->
-        pure False
+annotateSummary :: Summary -> Doc Markup -> Doc Markup
+annotateSummary summary =
+  if summaryFailed summary > 0 then
+    icon FailedIcon '✗' . WL.annotate FailedHeader
+  else if summaryGaveUp summary > 0 then
+    icon GaveUpIcon '⚐' . WL.annotate GaveUpHeader
+  else if summaryWaiting summary > 0 || summaryRunning summary > 0 then
+    icon WaitingIcon '○' . WL.annotate WaitingHeader
+  else
+    icon SuccessIcon '✓' . WL.annotate SuccessHeader
 
-      Just "1" ->
-        pure True
-      Just "yes" ->
-        pure True
-      Just "true" ->
-        pure True
+ppSummary :: MonadIO m => Summary -> m (Doc Markup)
+ppSummary summary =
+  let
+    complete =
+      summaryCompleted summary == summaryTotal summary
 
-      _ -> do
-        mth <- detectMark
-        if mth then
-          pure False -- avoid getting fired :)
-        else
-          hSupportsANSI stdout
+    prefix end =
+      if complete then
+        mempty
+      else
+        ppRawPropertyCount (summaryCompleted summary) <>
+        "/" <>
+        ppRawPropertyCount (summaryTotal summary) <+>
+        "complete" <> end
 
-useColor :: MonadIO m => UseColor -> m Bool
-useColor = \case
-  DetectColor ->
-    detectColor
-  DisableColor ->
-    pure False
-  EnableColor ->
-    pure True
+    addPrefix xs =
+      if null xs then
+        prefix mempty : []
+      else
+        prefix ": " : xs
 
-renderDoc :: MonadIO m => UseColor -> Doc Markup -> m String
-renderDoc color doc = do
+    suffix =
+      if complete then
+        "."
+      else
+        " (running)"
+  in
+    pure .
+      annotateSummary summary .
+      (<> suffix) .
+      WL.hcat .
+      addPrefix .
+      WL.punctuate ", " $
+      catMaybes [
+          ppWhenNonZero "failed" (summaryFailed summary)
+        , ppWhenNonZero "gave up" (summaryGaveUp summary)
+        , if complete then
+            ppWhenNonZero "succeeded" (summaryOK summary)
+          else
+            Nothing
+        ]
+
+renderDoc :: MonadIO m => Maybe UseColor -> Doc Markup -> m String
+renderDoc mcolor doc = do
   let
     dull =
       SetColor Foreground Dull
@@ -755,9 +794,9 @@ renderDoc color doc = do
       SetConsoleIntensity BoldIntensity
 
     start = \case
-      RemainingIcon ->
+      WaitingIcon ->
         setSGRCode []
-      RemainingHeader ->
+      WaitingHeader ->
         setSGRCode []
       RunningIcon ->
         setSGRCode []
@@ -837,28 +876,29 @@ renderDoc color doc = do
     end _ =
       setSGRCode [Reset]
 
-  colorOK <- useColor color
+  color <- resolveColor mcolor
 
   let
     display =
-      if colorOK then
-        WL.displayDecorated start end id
-      else
-        WL.display
+      case color of
+        EnableColor ->
+          WL.displayDecorated start end id
+        DisableColor ->
+          WL.display
 
   pure .
     display .
     WL.renderSmart 100 $
     WL.indent 2 doc
 
-renderRemaining :: MonadIO m => PropertyCount -> m String
-renderRemaining x =
-  renderDoc DetectColor =<< ppRemaining x
+renderProgress :: MonadIO m => Maybe UseColor -> Maybe PropertyName -> Report Progress -> m String
+renderProgress mcolor name x =
+  renderDoc mcolor =<< ppProgress name x
 
-renderProgress :: MonadIO m => Maybe PropertyName -> Report Progress -> m String
-renderProgress name x =
-  renderDoc DetectColor =<< ppProgress name x
+renderResult :: MonadIO m => Maybe UseColor -> Maybe PropertyName -> Report Result -> m String
+renderResult mcolor name x =
+  renderDoc mcolor =<< ppResult name x
 
-renderResult :: MonadIO m => Maybe PropertyName -> Report Result -> m String
-renderResult name x =
-  renderDoc DetectColor =<< ppResult name x
+renderSummary :: MonadIO m => Maybe UseColor -> Summary -> m String
+renderSummary mcolor x =
+  renderDoc mcolor =<< ppSummary x
