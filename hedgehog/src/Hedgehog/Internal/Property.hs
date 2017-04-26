@@ -36,6 +36,7 @@ module Hedgehog.Internal.Property (
   , Diff(..)
   , forAll
   , info
+  , input
   , discard
   , failure
   , success
@@ -334,14 +335,21 @@ writeLog =
 forAll :: (Monad m, Show a, Typeable a, HasCallStack) => Gen m a -> Test m a
 forAll gen = do
   x <- Test . lift $ lift gen
-  writeLog $ Input (getCaller callStack) (typeOf x) (showPretty x)
-  return x
+  input x
 
 -- | Logs an information message to be displayed if the test fails.
 --
 info :: Monad m => String -> Test m ()
 info =
   writeLog . Info
+
+-- | Adds a value to the log, such that it appears in counterexample reports.
+--
+-- Equivalent to @forAll . pure@
+--
+input :: (Monad m, Show a, Typeable a, HasCallStack) => a -> Test m a
+input x =
+  (writeLog $ Input (getCaller callStack) (typeOf x) (showPretty x)) *> pure x
 
 -- | Discards a test entirely.
 --
