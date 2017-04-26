@@ -73,4 +73,4 @@ prop_tripping_append_seed =
 
 tests :: IO Bool
 tests =
-  checkConcurrent $$(discover)
+  checkParallel $$(discover)

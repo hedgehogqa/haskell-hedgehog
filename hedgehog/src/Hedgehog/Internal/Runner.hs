@@ -11,7 +11,7 @@ module Hedgehog.Internal.Runner (
 
   -- * Running Groups of Properties
   , RunnerConfig(..)
-  , checkConcurrent
+  , checkParallel
   , checkSequential
   , checkGroup
 
@@ -350,22 +350,28 @@ checkSequential =
 
 -- | Check a group of properties in parallel.
 --
+--   /Warning: although this check function runs tests faster than/
+--   /'checkSequential', it should be noted that it may cause problems with/
+--   /properties that are not self-contained. For example, if you have a group/
+--   /of tests which all use the same database table, you may find that they/
+--   /interfere with each other when being run in parallel./
+--
 --   Using Template Haskell for property discovery:
 --
 -- > tests :: IO Bool
 -- > tests =
--- >   checkConcurrent $$(discover)
+-- >   checkParallel $$(discover)
 --
 --   With manually specified properties:
 --
 -- > tests :: IO Bool
 -- > tests =
--- >   checkConcurrent $ Group "Test.Example" [
+-- >   checkParallel $ Group "Test.Example" [
 -- >       ("prop_reverse", prop_reverse)
 -- >     ]
 --
-checkConcurrent :: MonadIO m => Group -> m Bool
-checkConcurrent =
+checkParallel :: MonadIO m => Group -> m Bool
+checkParallel =
   checkGroup
     RunnerConfig {
         runnerWorkers =
