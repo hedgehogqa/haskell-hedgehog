@@ -35,6 +35,7 @@ module Hedgehog.Internal.Property (
   , Failure(..)
   , Diff(..)
   , forAll
+  , forAllWith
   , info
   , discard
   , failure
@@ -74,7 +75,6 @@ import           Control.Monad.Writer.Class (MonadWriter(..))
 
 import           Data.Semigroup (Semigroup)
 import           Data.String (IsString)
-import           Data.Typeable (Typeable, TypeRep, typeOf)
 
 import           Hedgehog.Gen (Gen)
 import qualified Hedgehog.Gen as Gen
@@ -161,7 +161,7 @@ newtype GroupName =
 --
 data Log =
     Info String
-  | Input (Maybe Span) TypeRep String
+  | Input (Maybe Span) String
     deriving (Eq, Show)
 
 -- | Details on where and why a test failed.
@@ -331,10 +331,20 @@ writeLog =
 
 -- | Generates a random input for the test by running the provided generator.
 --
-forAll :: (Monad m, Show a, Typeable a, HasCallStack) => Gen m a -> Test m a
-forAll gen = do
+forAll :: (Monad m, Show a, HasCallStack) => Gen m a -> Test m a
+forAll gen =
+  withFrozenCallStack $ forAllWith showPretty gen
+
+-- | Generates a random input for the test by running the provided generator.
+--
+--   /This is a the same as 'forAll' but allows the user to provide a custom/
+--   /rendering function. This is useful for values which don't have a/
+--   /'Show' instance./
+--
+forAllWith :: (Monad m, HasCallStack) => (a -> String) -> Gen m a -> Test m a
+forAllWith render gen = do
   x <- Test . lift $ lift gen
-  writeLog $ Input (getCaller callStack) (typeOf x) (showPretty x)
+  writeLog $ Input (getCaller callStack) (render x)
   return x
 
 -- | Logs an information message to be displayed if the test fails.

@@ -48,7 +48,6 @@ import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Maybe (mapMaybe, catMaybes)
 import           Data.Semigroup (Semigroup(..))
-import           Data.Typeable (TypeRep)
 
 import           Hedgehog.Internal.Config
 import           Hedgehog.Internal.Discovery (Pos(..), Position(..))
@@ -98,7 +97,6 @@ newtype PropertyCount =
 data FailedInput =
   FailedInput {
       failedSpan :: !(Maybe Span)
-    , failedType :: !TypeRep
     , failedValue :: !String
     } deriving (Eq, Show)
 
@@ -259,8 +257,8 @@ instance Semigroup Style where
 
 takeInput :: Log -> Maybe FailedInput
 takeInput = \case
-  Input loc typ val ->
-    Just $ FailedInput loc typ val
+  Input loc val ->
+    Just $ FailedInput loc val
   _ ->
     Nothing
 
@@ -420,10 +418,9 @@ lastLineSpan sloc decl =
         lineSpan x
 
 ppFailedInputTypedArgument :: Int -> FailedInput -> Doc Markup
-ppFailedInputTypedArgument ix (FailedInput _ typ val) =
+ppFailedInputTypedArgument ix (FailedInput _ val) =
   WL.vsep [
-      WL.text "forAll" <> ppShow ix <+> "::" <+> ppShow typ
-    , WL.text "forAll" <> ppShow ix <+> "="
+      WL.text "forAll" <> ppShow ix <+> "="
     , WL.indent 2 . WL.vsep . fmap (markup InputValue . WL.text) $ lines val
     ]
 
@@ -431,7 +428,7 @@ ppFailedInputDeclaration ::
      MonadIO m
   => FailedInput
   -> m (Maybe (Declaration (Style, [(Style, Doc Markup)])))
-ppFailedInputDeclaration (FailedInput msloc _ val) =
+ppFailedInputDeclaration (FailedInput msloc val) =
   runMaybeT $ do
     sloc <- MaybeT $ pure msloc
     decl <- fmap defaultStyle . MaybeT $ readDeclaration sloc
