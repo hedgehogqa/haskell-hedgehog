@@ -72,6 +72,7 @@ module Hedgehog (
   -- * Test
   , forAll
   , info
+  , input
   , success
   , discard
   , failure
@@ -89,7 +90,7 @@ import           Hedgehog.Gen (Gen)
 import           Hedgehog.Internal.Property (assert, (===))
 import           Hedgehog.Internal.Property (discard, failure, success)
 import           Hedgehog.Internal.Property (DiscardLimit, withDiscards)
-import           Hedgehog.Internal.Property (forAll, info)
+import           Hedgehog.Internal.Property (forAll, info, input)
 import           Hedgehog.Internal.Property (liftEither, liftExceptT, withResourceT)
 import           Hedgehog.Internal.Property (Property, PropertyName, Group(..), GroupName)
 import           Hedgehog.Internal.Property (ShrinkLimit, withShrinks)
