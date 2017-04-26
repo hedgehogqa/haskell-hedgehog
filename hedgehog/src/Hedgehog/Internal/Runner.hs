@@ -350,6 +350,12 @@ checkSequential =
 
 -- | Check a group of properties in parallel.
 --
+--   /Warning: although this check function runs tests faster than/
+--   /'checkSequential', it should be noted that it may cause problems with/
+--   /properties that are not self-contained. For example, if you have a group/
+--   /of tests which all use the same database table, you may find that they/
+--   /interfere with each other when being run in parallel./
+--
 --   Using Template Haskell for property discovery:
 --
 -- > tests :: IO Bool
