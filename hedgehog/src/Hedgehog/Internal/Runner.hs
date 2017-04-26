@@ -11,7 +11,7 @@ module Hedgehog.Internal.Runner (
 
   -- * Running Groups of Properties
   , RunnerConfig(..)
-  , checkConcurrent
+  , checkParallel
   , checkSequential
   , checkGroup
 
@@ -354,18 +354,18 @@ checkSequential =
 --
 -- > tests :: IO Bool
 -- > tests =
--- >   checkConcurrent $$(discover)
+-- >   checkParallel $$(discover)
 --
 --   With manually specified properties:
 --
 -- > tests :: IO Bool
 -- > tests =
--- >   checkConcurrent $ Group "Test.Example" [
+-- >   checkParallel $ Group "Test.Example" [
 -- >       ("prop_reverse", prop_reverse)
 -- >     ]
 --
-checkConcurrent :: MonadIO m => Group -> m Bool
-checkConcurrent =
+checkParallel :: MonadIO m => Group -> m Bool
+checkParallel =
   checkGroup
     RunnerConfig {
         runnerWorkers =

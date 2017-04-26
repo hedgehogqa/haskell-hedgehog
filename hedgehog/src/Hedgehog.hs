@@ -24,14 +24,14 @@
 --
 -- > tests :: IO Bool
 -- > tests =
--- >   checkConcurrent $$(discover)
+-- >   checkParallel $$(discover)
 --
 -- If you prefer to avoid macros, you can specify the group of properties to
 -- run manually instead:
 --
 -- > tests :: IO Bool
 -- > tests =
--- >   checkConcurrent $ Group "Test.Example" [
+-- >   checkParallel $ Group "Test.Example" [
 -- >       ("prop_reverse", prop_reverse)
 -- >     ]
 --
@@ -66,7 +66,7 @@ module Hedgehog (
   , recheck
 
   , discover
-  , checkConcurrent
+  , checkParallel
   , checkSequential
 
   -- * Test
@@ -95,7 +95,7 @@ import           Hedgehog.Internal.Property (Property, PropertyName, Group(..), 
 import           Hedgehog.Internal.Property (ShrinkLimit, withShrinks)
 import           Hedgehog.Internal.Property (Test, property)
 import           Hedgehog.Internal.Property (TestLimit, withTests)
-import           Hedgehog.Internal.Runner (check, recheck, checkSequential, checkConcurrent)
+import           Hedgehog.Internal.Runner (check, recheck, checkSequential, checkParallel)
 import           Hedgehog.Internal.Seed (Seed(..))
 import           Hedgehog.Internal.TH (discover)
 import           Hedgehog.Internal.Tripping (tripping)
