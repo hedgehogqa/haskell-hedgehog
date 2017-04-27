@@ -56,7 +56,7 @@ setRegion (Region var) content =
   liftRegion $ do
     mregion <- TVar.readTVar var
     case mregion of
-      Nothing -> do
+      Nothing ->
         pure ()
 
       Just region ->
