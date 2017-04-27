@@ -1019,7 +1019,7 @@ uniqueInsert n xs kvs0 =
       [] ->
         Right xs
       (k, v) : kvs ->
-        uniqueInsert n (Map.insertWith (\x _ -> x) k v xs) kvs
+        uniqueInsert n (Map.insertWith const k v xs) kvs
 
 -- | Check that list contains at least a certain number of elements.
 --
