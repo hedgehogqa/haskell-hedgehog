@@ -13,7 +13,7 @@ module Hedgehog.Internal.Report (
   , Progress(..)
   , Result(..)
   , FailureReport(..)
-  , FailedInput(..)
+  , FailedAnnotation(..)
 
   , ShrinkCount(..)
   , TestCount(..)
@@ -94,8 +94,8 @@ newtype PropertyCount =
   PropertyCount Int
   deriving (Eq, Ord, Show, Num, Enum, Real, Integral)
 
-data FailedInput =
-  FailedInput {
+data FailedAnnotation =
+  FailedAnnotation {
       failedSpan :: !(Maybe Span)
     , failedValue :: !String
     } deriving (Eq, Show)
@@ -105,7 +105,7 @@ data FailureReport =
       failureSize :: !Size
     , failureSeed :: !Seed
     , failureShrinks :: !ShrinkCount
-    , failureInputs :: ![FailedInput]
+    , failureAnnotations :: ![FailedAnnotation]
     , failureLocation :: !(Maybe Span)
     , failureMessage :: !String
     , failureDiff :: !(Maybe Diff)
@@ -201,8 +201,8 @@ data Declaration a =
     } deriving (Eq, Ord, Show, Functor)
 
 data Style =
-    StyleInfo
-  | StyleInput
+    StyleDefault
+  | StyleAnnotation
   | StyleFailure
     deriving (Eq, Ord, Show)
 
@@ -223,8 +223,8 @@ data Markup =
   | StyledLineNo !Style
   | StyledBorder !Style
   | StyledSource !Style
-  | InputGutter
-  | InputValue
+  | AnnotationGutter
+  | AnnotationValue
   | FailureArrows
   | FailureGutter
   | FailureMessage
@@ -246,19 +246,19 @@ instance Semigroup Style where
         StyleFailure
       (_, StyleFailure) ->
         StyleFailure
-      (StyleInput, _) ->
-        StyleInput
-      (_, StyleInput) ->
-        StyleInput
-      (StyleInfo, _) ->
-        StyleInfo
+      (StyleAnnotation, _) ->
+        StyleAnnotation
+      (_, StyleAnnotation) ->
+        StyleAnnotation
+      (StyleDefault, _) ->
+        StyleDefault
 
 ------------------------------------------------------------------------
 
-takeInput :: Log -> Maybe FailedInput
-takeInput = \case
-  Input loc val ->
-    Just $ FailedInput loc val
+takeAnnotation :: Log -> Maybe FailedAnnotation
+takeAnnotation = \case
+  Annotation loc val ->
+    Just $ FailedAnnotation loc val
   _ ->
     Nothing
 
@@ -281,7 +281,7 @@ mkFailure ::
 mkFailure size seed shrinks location message diff logs =
   let
     inputs =
-      mapMaybe takeInput logs
+      mapMaybe takeAnnotation logs
 
     footnotes =
       mapMaybe takeFootnote logs
@@ -406,7 +406,7 @@ readDeclaration sloc =
 
 defaultStyle :: Declaration a -> Declaration (Style, [(Style, Doc Markup)])
 defaultStyle =
-  fmap $ const (StyleInfo, [])
+  fmap $ const (StyleDefault, [])
 
 lastLineSpan :: Monad m => Span -> Declaration a -> MaybeT m (ColumnNo, ColumnNo)
 lastLineSpan sloc decl =
@@ -417,18 +417,18 @@ lastLineSpan sloc decl =
       pure $
         lineSpan x
 
-ppFailedInputTypedArgument :: Int -> FailedInput -> Doc Markup
-ppFailedInputTypedArgument ix (FailedInput _ val) =
+ppFailedInputTypedArgument :: Int -> FailedAnnotation -> Doc Markup
+ppFailedInputTypedArgument ix (FailedAnnotation _ val) =
   WL.vsep [
       WL.text "forAll" <> ppShow ix <+> "="
-    , WL.indent 2 . WL.vsep . fmap (markup InputValue . WL.text) $ lines val
+    , WL.indent 2 . WL.vsep . fmap (markup AnnotationValue . WL.text) $ lines val
     ]
 
 ppFailedInputDeclaration ::
      MonadIO m
-  => FailedInput
+  => FailedAnnotation
   -> m (Maybe (Declaration (Style, [(Style, Doc Markup)])))
-ppFailedInputDeclaration (FailedInput msloc val) =
+ppFailedInputDeclaration (FailedAnnotation msloc val) =
   runMaybeT $ do
     sloc <- MaybeT $ pure msloc
     decl <- fmap defaultStyle . MaybeT $ readDeclaration sloc
@@ -437,12 +437,12 @@ ppFailedInputDeclaration (FailedInput msloc val) =
     let
       ppValLine =
         WL.indent startCol .
-          (markup InputGutter (WL.text "│ ") <>) .
-          markup InputValue .
+          (markup AnnotationGutter (WL.text "│ ") <>) .
+          markup AnnotationValue .
           WL.text
 
       valDocs =
-        fmap ((StyleInput, ) . ppValLine) $
+        fmap ((StyleAnnotation, ) . ppValLine) $
         List.lines val
 
       startLine =
@@ -452,7 +452,7 @@ ppFailedInputDeclaration (FailedInput msloc val) =
         fromIntegral $ spanEndLine sloc
 
       styleInput kvs =
-        foldr (Map.adjust . fmap . first $ const StyleInput) kvs [startLine..endLine]
+        foldr (Map.adjust . fmap . first $ const StyleAnnotation) kvs [startLine..endLine]
 
       insertDoc =
         Map.adjust (fmap . second $ const valDocs) endLine
@@ -463,7 +463,7 @@ ppFailedInputDeclaration (FailedInput msloc val) =
 ppFailedInput ::
      MonadIO m
   => Int
-  -> FailedInput
+  -> FailedAnnotation
   -> m (Either (Doc Markup) (Declaration (Style, [(Style, Doc Markup)])))
 ppFailedInput ix input = do
   mdecl <- ppFailedInputDeclaration input
@@ -553,9 +553,9 @@ ppDeclaration decl =
       let
         ppLocation =
           WL.indent (digits + 1) $
-            markup (StyledBorder StyleInfo) "┏━━" <+>
+            markup (StyledBorder StyleDefault) "┏━━" <+>
             markup DeclarationLocation (WL.text (declarationFile decl)) <+>
-            markup (StyledBorder StyleInfo) "━━━"
+            markup (StyledBorder StyleDefault) "━━━"
 
         digits =
           length . show . unLineNo $ lineNumber lastLine
@@ -819,22 +819,22 @@ renderDoc mcolor doc = do
       DeclarationLocation ->
         setSGRCode []
 
-      StyledLineNo StyleInfo ->
+      StyledLineNo StyleDefault ->
         setSGRCode []
-      StyledSource StyleInfo ->
+      StyledSource StyleDefault ->
         setSGRCode []
-      StyledBorder StyleInfo ->
+      StyledBorder StyleDefault ->
         setSGRCode []
 
-      StyledLineNo StyleInput ->
+      StyledLineNo StyleAnnotation ->
         setSGRCode [dull Magenta]
-      StyledSource StyleInput ->
+      StyledSource StyleAnnotation ->
         setSGRCode []
-      StyledBorder StyleInput ->
+      StyledBorder StyleAnnotation ->
         setSGRCode []
-      InputGutter ->
+      AnnotationGutter ->
         setSGRCode [dull Magenta]
-      InputValue ->
+      AnnotationValue ->
         setSGRCode [dull Magenta]
 
       StyledLineNo StyleFailure ->
