@@ -6,6 +6,9 @@ module Test.Example.Basic where
 
 import           Control.Monad (guard)
 
+import qualified Data.List as List
+import qualified Data.Text as Text
+
 import           Hedgehog
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
@@ -249,6 +252,24 @@ prop_record =
     x <- forAll genRecord
     y <- forAll genRecord
     x === y
+
+------------------------------------------------------------------------
+-- Example 6 - Text.takeEnd
+
+prop_takeEnd :: Property
+prop_takeEnd =
+  property $ do
+    xs <- forAll $ Gen.string (Range.linear 0 100) Gen.unicode
+    n <- forAll $ Gen.int (Range.linear 0 100)
+
+    let
+      string =
+        List.reverse . List.take (fromIntegral n) $ List.reverse xs
+
+      text =
+        Text.unpack . Text.takeEnd n $ Text.pack xs
+
+    string === text
 
 ------------------------------------------------------------------------
 
