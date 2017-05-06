@@ -109,7 +109,7 @@ data FailureReport =
     , failureLocation :: !(Maybe Span)
     , failureMessage :: !String
     , failureDiff :: !(Maybe Diff)
-    , failureMessages :: ![String]
+    , failureFootnotes :: ![String]
     } deriving (Eq, Show)
 
 -- | The status of a running property test.
@@ -262,9 +262,9 @@ takeInput = \case
   _ ->
     Nothing
 
-takeInfo :: Log -> Maybe String
-takeInfo = \case
-  Info x ->
+takeFootnote :: Log -> Maybe String
+takeFootnote = \case
+  Footnote x ->
     Just x
   _ ->
     Nothing
@@ -283,10 +283,10 @@ mkFailure size seed shrinks location message diff logs =
     inputs =
       mapMaybe takeInput logs
 
-    info =
-      mapMaybe takeInfo logs
+    footnotes =
+      mapMaybe takeFootnote logs
   in
-    FailureReport size seed shrinks inputs location message diff info
+    FailureReport size seed shrinks inputs location message diff footnotes
 
 ------------------------------------------------------------------------
 -- Pretty Printing
