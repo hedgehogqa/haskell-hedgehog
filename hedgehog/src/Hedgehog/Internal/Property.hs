@@ -36,7 +36,7 @@ module Hedgehog.Internal.Property (
   , Diff(..)
   , forAll
   , forAllWith
-  , info
+  , footnote
   , discard
   , failure
   , success
@@ -160,8 +160,8 @@ newtype GroupName =
 -- | Log messages which are recorded during a test run.
 --
 data Log =
-    Info String
-  | Input (Maybe Span) String
+    Input (Maybe Span) String
+  | Footnote String
     deriving (Eq, Show)
 
 -- | Details on where and why a test failed.
@@ -347,11 +347,14 @@ forAllWith render gen = do
   writeLog $ Input (getCaller callStack) (render x)
   return x
 
--- | Logs an information message to be displayed if the test fails.
+-- | Logs a message to be displayed as additional information in the footer of
+--   the failure report.
 --
-info :: Monad m => String -> Test m ()
-info =
-  writeLog . Info
+--   This will only be written to the output if the test fails.
+--
+footnote :: Monad m => String -> Test m ()
+footnote =
+  writeLog . Footnote
 
 -- | Discards a test entirely.
 --
