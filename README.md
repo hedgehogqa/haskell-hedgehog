@@ -50,7 +50,7 @@ And add the Template Haskell splice which will discover your properties:
 ```hs
 tests :: IO Bool
 tests =
-  checkConcurrent $$(discover)
+  checkParallel $$(discover)
 ```
 
 If you prefer to avoid macros, you can specify the group of properties
@@ -59,7 +59,7 @@ to run manually instead:
 ```hs
 tests :: IO Bool
 tests =
-  checkConcurrent $ Group "Test.Example" [
+  checkParallel $ Group "Test.Example" [
       ("prop_reverse", prop_reverse)
     ]
 ```
