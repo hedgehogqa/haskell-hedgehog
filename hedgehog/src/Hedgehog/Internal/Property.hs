@@ -36,7 +36,10 @@ module Hedgehog.Internal.Property (
   , Diff(..)
   , forAll
   , forAllWith
+  , annotate
+  , annotateShow
   , footnote
+  , footnoteShow
   , discard
   , failure
   , success
@@ -160,7 +163,7 @@ newtype GroupName =
 -- | Log messages which are recorded during a test run.
 --
 data Log =
-    Input (Maybe Span) String
+    Annotation (Maybe Span) String
   | Footnote String
     deriving (Eq, Show)
 
@@ -344,17 +347,36 @@ forAll gen =
 forAllWith :: (Monad m, HasCallStack) => (a -> String) -> Gen m a -> Test m a
 forAllWith render gen = do
   x <- Test . lift $ lift gen
-  writeLog $ Input (getCaller callStack) (render x)
+  withFrozenCallStack $ annotate (render x)
   return x
+
+-- | Annotates the source code with a message that might be useful for
+--   debugging a test failure.
+--
+annotate :: (Monad m, HasCallStack) => String -> Test m ()
+annotate x = do
+  writeLog $ Annotation (getCaller callStack) x
+
+-- | Annotates the source code with a value that might be useful for
+--   debugging a test failure.
+--
+annotateShow :: (Monad m, Show a, HasCallStack) => a -> Test m ()
+annotateShow x = do
+  withFrozenCallStack $ annotate (showPretty x)
 
 -- | Logs a message to be displayed as additional information in the footer of
 --   the failure report.
 --
---   This will only be written to the output if the test fails.
---
 footnote :: Monad m => String -> Test m ()
 footnote =
   writeLog . Footnote
+
+-- | Logs a value to be displayed as additional information in the footer of
+--   the failure report.
+--
+footnoteShow :: (Monad m, Show a) => a -> Test m ()
+footnoteShow =
+  writeLog . Footnote . showPretty
 
 -- | Discards a test entirely.
 --
