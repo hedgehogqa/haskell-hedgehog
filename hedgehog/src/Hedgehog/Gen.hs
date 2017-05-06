@@ -65,6 +65,10 @@ module Hedgehog.Gen (
   , upper
   , alpha
   , alphaNum
+  , ascii
+  , latin1
+  , unicode
+  , unicodeAll
 
   -- ** Strings
   , string
@@ -126,6 +130,9 @@ module Hedgehog.Gen (
 
   -- ** Shrinking
   , atLeast
+
+  -- ** Characters
+  , isSurrogate
 
   -- ** Subterms
   , Vec(..)
@@ -728,6 +735,38 @@ alphaNum :: Monad m => Gen m Char
 alphaNum =
   -- FIXME optimize lookup, use a SmallArray or something.
   element "abcdefghiklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
+
+-- | Generates an ASCII character: @'\0'..'\127'@
+--
+ascii :: Monad m => Gen m Char
+ascii =
+  enum '\0' '\127'
+
+-- | Generates a Latin-1 character: @'\0'..'\255'@
+--
+latin1 :: Monad m => Gen m Char
+latin1 =
+  enum '\0' '\255'
+
+-- | Generates a Unicode character, excluding invalid standalone surrogates:
+--   @'\0'..'\1114111' (excluding '\55296'..'\57344')@
+--
+unicode :: Monad m => Gen m Char
+unicode =
+  filter (not . isSurrogate) unicodeAll
+
+-- | Generates a Unicode character, including invalid standalone surrogates:
+--   @'\0'..'\1114111'@
+--
+unicodeAll :: Monad m => Gen m Char
+unicodeAll =
+  enumBounded
+
+-- | Check if a character is in the surrogate category.
+--
+isSurrogate :: Char -> Bool
+isSurrogate x =
+  x >= '\55296' && x <= '\57344'
 
 ------------------------------------------------------------------------
 -- Combinators - Strings
