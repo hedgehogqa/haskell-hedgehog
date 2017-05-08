@@ -1,3 +1,7 @@
+## Version 0.2.1 (2017-05-09)
+
+- Added `ascii`, `latin1`, `unicode` character generators.
+
 ## Version 0.2 (2017-05-06)
 
 - Added a quiet test runner which can be activated by setting `HEDGEHOG_VERBOSITY=0`
