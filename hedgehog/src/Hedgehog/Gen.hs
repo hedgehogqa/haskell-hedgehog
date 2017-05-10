@@ -749,7 +749,7 @@ latin1 =
   enum '\0' '\255'
 
 -- | Generates a Unicode character, excluding invalid standalone surrogates:
---   @'\0'..'\1114111' (excluding '\55296'..'\57344')@
+--   @'\0'..'\1114111' (excluding '\55296'..'\57343')@
 --
 unicode :: Monad m => Gen m Char
 unicode =
@@ -766,7 +766,7 @@ unicodeAll =
 --
 isSurrogate :: Char -> Bool
 isSurrogate x =
-  x >= '\55296' && x <= '\57344'
+  x >= '\55296' && x <= '\57343'
 
 ------------------------------------------------------------------------
 -- Combinators - Strings
