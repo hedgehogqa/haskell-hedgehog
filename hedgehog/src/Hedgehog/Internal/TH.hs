@@ -12,8 +12,8 @@ import qualified Data.Ord as Ord
 import           Hedgehog.Internal.Discovery
 import           Hedgehog.Internal.Property
 
-import           Language.Haskell.TH
-import           Language.Haskell.TH.Syntax
+import           Language.Haskell.TH (Exp(..), Q, TExp, location, runIO)
+import           Language.Haskell.TH.Syntax (Loc(..), mkName, unTypeQ, unsafeTExpCoerce)
 
 type TExpQ a =
   Q (TExp a)
