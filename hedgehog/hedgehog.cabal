@@ -116,6 +116,9 @@ test-suite test
   hs-source-dirs:
     test
 
+  other-modules:
+    Test.Hedgehog.Text
+
   build-depends:
       hedgehog
     , base                            >= 3          && < 5
