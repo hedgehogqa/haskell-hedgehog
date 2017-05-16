@@ -1,3 +1,9 @@
+## Version 0.2.2 (2017-05-16)
+
+- Fixed scope of `unicode` character generators.
+- Widen version bounds for some dependencies.
+- Expose test modules to fix build on nix / hydra.
+
 ## Version 0.2.1 (2017-05-09)
 
 - Added `ascii`, `latin1`, `unicode` character generators.
