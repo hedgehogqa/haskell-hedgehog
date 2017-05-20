@@ -119,7 +119,7 @@ upperBound sz range =
 --
 singleton :: a -> Range a
 singleton x =
-  Range x $ \_ -> (x, x)
+  Range x $ const (x, x)
 
 -- | Construct a range which is unaffected by the size parameter.
 --
@@ -156,7 +156,7 @@ constant x y =
 --
 constantFrom :: a -> a -> a -> Range a
 constantFrom z x y =
-  Range z $ \_ -> (x, y)
+  Range z $ const (x, y)
 
 -- | Construct a range which is unaffected by the size parameter using the full
 --   range of a data type.
