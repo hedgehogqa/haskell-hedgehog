@@ -2,8 +2,8 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Test.Example.Resource where
 
-import           Control.Monad.IO.Class
-import           Control.Monad.Trans.Except
+import           Control.Monad.IO.Class (MonadIO(..))
+import           Control.Monad.Trans.Except (ExceptT, throwE)
 
 import           Hedgehog
 import qualified Hedgehog.Gen as Gen

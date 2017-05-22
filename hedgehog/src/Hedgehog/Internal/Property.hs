@@ -48,6 +48,7 @@ module Hedgehog.Internal.Property (
 
   , liftEither
   , liftExceptT
+  , withExceptT
   , withResourceT
 
   -- * Internal
@@ -81,6 +82,7 @@ import           Data.String (IsString)
 
 import           Hedgehog.Gen (Gen)
 import qualified Hedgehog.Gen as Gen
+import           Hedgehog.Internal.Distributive
 import           Hedgehog.Internal.Show
 import           Hedgehog.Internal.Source
 
@@ -218,6 +220,24 @@ instance MonadTrans Test where
 instance MFunctor Test where
   hoist f =
     Test . hoist (hoist (hoist f)) . unTest
+
+distributeTest :: Transformer t Test m => Test (t m) a -> t (Test m) a
+distributeTest =
+  hoist Test .
+  distribute .
+  hoist distribute .
+  hoist (hoist distribute) .
+  unTest
+
+instance Distributive Test where
+  type Transformer t Test m = (
+      Transformer t Gen m
+    , Transformer t (WriterT [Log]) (Gen m)
+    , Transformer t (ExceptT Failure) (WriterT [Log] (Gen m))
+    )
+
+  distribute =
+    distributeTest
 
 instance PrimMonad m => PrimMonad (Test m) where
   type PrimState (Test m) =
@@ -448,6 +468,13 @@ liftEither = \case
 liftExceptT :: (Monad m, Show x, HasCallStack) => ExceptT x m a -> Test m a
 liftExceptT m =
   withFrozenCallStack liftEither =<< lift (runExceptT m)
+
+-- | Fails the test if the 'ExceptT' is 'Left', otherwise returns the value in
+--   the 'Right'.
+--
+withExceptT :: (Monad m, Show x, HasCallStack) => Test (ExceptT x m) a -> Test m a
+withExceptT m =
+  withFrozenCallStack liftEither =<< runExceptT (distribute m)
 
 -- | Run a computation which requires resource acquisition / release.
 --

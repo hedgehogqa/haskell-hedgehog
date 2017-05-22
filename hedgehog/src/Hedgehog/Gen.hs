@@ -145,7 +145,7 @@ module Hedgehog.Gen (
   ) where
 
 import           Control.Applicative (Alternative(..))
-import           Control.Monad (MonadPlus(..), mfilter, filterM, replicateM, ap)
+import           Control.Monad (MonadPlus(..), mfilter, filterM, replicateM, ap, join)
 import           Control.Monad.Base (MonadBase(..))
 import           Control.Monad.Catch (MonadThrow(..), MonadCatch(..))
 import           Control.Monad.Error.Class (MonadError(..))
@@ -178,6 +178,7 @@ import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import           Data.Word (Word8, Word16, Word32, Word64)
 
+import           Hedgehog.Internal.Distributive (Distributive(..))
 import           Hedgehog.Internal.Seed (Seed)
 import qualified Hedgehog.Internal.Seed as Seed
 import qualified Hedgehog.Internal.Shrink as Shrink
@@ -233,7 +234,7 @@ freeze gen =
       Nothing ->
         mzero
       Just (Node x xs) ->
-        pure (x, liftTree . Tree . pure $ Node x xs)
+        pure (x, liftTree . Tree.fromNode $ Node x xs)
 
 -- | Lift a predefined shrink tree in to a generator, ignoring the seed and the
 --   size.
@@ -246,14 +247,8 @@ liftTree x =
 --   at the nodes. 'Nothing' means discarded, 'Just' means we have a value.
 --
 runDiscardEffect :: Monad m => Tree (MaybeT m) a -> Tree m (Maybe a)
-runDiscardEffect s =
-  Tree $ do
-    mx <- runMaybeT $ runTree s
-    case mx of
-      Nothing ->
-        pure $ Node Nothing []
-      Just (Node x xs) ->
-        pure $ Node (Just x) (fmap runDiscardEffect xs)
+runDiscardEffect =
+  runMaybeT . distribute
 
 ------------------------------------------------------------------------
 -- Gen instances
@@ -330,6 +325,21 @@ embedGen f gen =
 instance MMonad Gen where
   embed =
     embedGen
+
+distributeGen :: Transformer t Gen m => Gen (t m) a -> t (Gen m) a
+distributeGen x =
+  join . lift . Gen $ \size seed ->
+    pure . hoist liftTree . distribute . hoist distribute $ runGen size seed x
+
+instance Distributive Gen where
+  type Transformer t Gen m = (
+      Monad (t (Gen m))
+    , Transformer t MaybeT m
+    , Transformer t Tree (MaybeT m)
+    )
+
+  distribute =
+    distributeGen
 
 instance PrimMonad m => PrimMonad (Gen m) where
   type PrimState (Gen m) =
