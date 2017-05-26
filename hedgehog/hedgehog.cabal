@@ -54,7 +54,7 @@ library
     , containers                      >= 0.4        && < 0.6
     , directory                       >= 1.2        && < 1.4
     , exceptions                      >= 0.7        && < 0.9
-    , mmorph                          >= 1.0        && < 1.1
+    , mmorph                          >= 1.0        && < 1.2
     , mtl                             >= 2.1        && < 2.3
     , pretty-show                     >= 1.6        && < 1.7
     , primitive                       >= 0.6        && < 0.7
