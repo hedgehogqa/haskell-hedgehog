@@ -9,6 +9,8 @@ module Hedgehog.Internal.Tree (
     Tree(..)
   , Node(..)
 
+  , fromNode
+
   , unfold
   , unfoldForest
 
@@ -19,7 +21,7 @@ module Hedgehog.Internal.Tree (
   ) where
 
 import           Control.Applicative (Alternative(..))
-import           Control.Monad (MonadPlus(..), ap)
+import           Control.Monad (MonadPlus(..), ap, join)
 import           Control.Monad.Base (MonadBase(..))
 import           Control.Monad.Catch (MonadThrow(..), MonadCatch(..), Exception)
 import           Control.Monad.Error.Class (MonadError(..))
@@ -36,6 +38,8 @@ import           Control.Monad.Writer.Class (MonadWriter(..))
 import           Data.Functor.Classes (Show1(..), showsPrec1)
 import           Data.Functor.Classes (showsUnaryWith, showsBinaryWith)
 #endif
+
+import           Hedgehog.Internal.Distributive
 
 ------------------------------------------------------------------------
 
@@ -54,6 +58,12 @@ data Node m a =
       nodeValue :: a
     , nodeChildren :: [Tree m a]
     }
+
+-- | Create a 'Tree' from a 'Node'
+--
+fromNode :: Applicative m => Node m a -> Tree m a
+fromNode =
+  Tree . pure
 
 -- | Create a tree from a value and an unfolding function.
 --
@@ -166,6 +176,19 @@ embedTree f (Tree m) =
 instance MMonad Tree where
   embed f m =
     embedTree f m
+
+distributeNode :: Transformer t Tree m => Node (t m) a -> t (Tree m) a
+distributeNode (Node x xs) =
+  join . lift . fromNode . Node (pure x) $
+    fmap (pure . distributeTree) xs
+
+distributeTree :: Transformer t Tree m => Tree (t m) a -> t (Tree m) a
+distributeTree x =
+  distributeNode =<< hoist lift (runTree x)
+
+instance Distributive Tree where
+  distribute =
+    distributeTree
 
 instance PrimMonad m => PrimMonad (Tree m) where
   type PrimState (Tree m) =
