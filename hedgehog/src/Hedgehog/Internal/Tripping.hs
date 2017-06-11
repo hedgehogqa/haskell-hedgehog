@@ -7,25 +7,29 @@ import           Hedgehog.Internal.Show
 import           Hedgehog.Internal.Source
 
 
--- | Test that a pair of render / parse functions are compatible.
+-- | Test that a pair of encode / decode functions are compatible.
 --
 tripping ::
      HasCallStack
   => Applicative f
   => Monad m
+  => Show b
   => Show (f a)
   => Eq (f a)
   => a
   -> (a -> b)
   -> (b -> f a)
   -> Test m ()
-tripping x render parse =
+tripping x encode decode =
   let
     mx =
       pure x
 
+    i =
+      encode x
+
     my =
-      (parse . render) x
+      decode i
   in
     if mx == my then
       success
@@ -36,12 +40,17 @@ tripping x render parse =
             failWith Nothing $ unlines [
                 "━━━ Original ━━━"
               , showPretty mx
+              , "━━━ Intermediate ━━━"
+              , showPretty i
               , "━━━ Roundtrip ━━━"
               , showPretty my
               ]
 
         Just diff ->
           withFrozenCallStack $
-              failWith
-                (Just $ Diff "Failed (" "- Original" "/" "+ Roundtrip" ")" diff)
-                ""
+            failWith
+              (Just $ Diff "━━━ " "- Original" "/" "+ Roundtrip" " ━━━" diff) $
+              unlines [
+                  "━━━ Intermediate ━━━"
+                , showPretty i
+                ]
