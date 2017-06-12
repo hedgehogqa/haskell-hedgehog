@@ -28,9 +28,8 @@ import           Control.Monad.IO.Class (MonadIO(..))
 
 import           Data.Semigroup ((<>))
 
-import           Hedgehog.Gen (runGen)
-import qualified Hedgehog.Gen as Gen
 import           Hedgehog.Internal.Config
+import           Hedgehog.Internal.Gen (runGen, runDiscardEffect)
 import           Hedgehog.Internal.Property (Group(..), GroupName(..))
 import           Hedgehog.Internal.Property (Property(..), PropertyConfig(..), PropertyName(..))
 import           Hedgehog.Internal.Property (ShrinkLimit, withTests)
@@ -104,7 +103,7 @@ takeSmallest size seed shrinks slimit updateUI = \case
       Left (Failure loc err mdiff) -> do
         let
           failure =
-            mkFailure size seed shrinks loc err mdiff w
+            mkFailure size seed shrinks loc err mdiff (reverse w)
 
         updateUI $ Shrinking failure
 
@@ -157,7 +156,7 @@ checkReport cfg size0 seed0 test0 updateUI =
         case Seed.split seed of
           (s0, s1) -> do
             node@(Node x _) <-
-              runTree . Gen.runDiscardEffect $ runGen size s0 (runTest test)
+              runTree . runDiscardEffect $ runGen size s0 (runTest test)
             case x of
               Nothing ->
                 loop tests (discards + 1) (size + 1) s1

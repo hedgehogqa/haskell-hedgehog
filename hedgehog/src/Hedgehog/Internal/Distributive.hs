@@ -31,6 +31,8 @@ class Distributive g where
       , MFunctor f
       )
 
+  -- | Distribute one monad transformer over another.
+  --
   distribute :: Transformer f g m => g (f m) a -> f (g m) a
 
 instance Distributive MaybeT where
