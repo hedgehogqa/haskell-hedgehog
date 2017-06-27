@@ -29,6 +29,8 @@
 -- If you prefer to avoid macros, you can specify the group of properties to
 -- run manually instead:
 --
+-- > {-# LANGUAGE OverloadedStrings #-}
+-- >
 -- > tests :: IO Bool
 -- > tests =
 -- >   checkParallel $ Group "Test.Example" [
@@ -82,33 +84,67 @@ module Hedgehog (
   , assert
   , (===)
 
+  , liftCatch
+  , liftCatchIO
   , liftEither
   , liftExceptT
+
+  , withCatch
   , withExceptT
   , withResourceT
 
   , tripping
 
+  -- * Abstract State Machine
+  , Command(..)
+  , Callback(..)
+  , Action
+  , executeSequential
+
+  , Concrete(..)
+  , Symbolic(..)
+  , Var
+  , Opaque(..)
+
   -- * Transformers
   , distribute
+
+  -- * Functors
+  , HTraversable(..)
+
+  , Eq1
+  , eq1
+
+  , Ord1
+  , compare1
+
+  , Show1
+  , showsPrec1
   ) where
 
-import           Hedgehog.Gen (Gen)
-import           Hedgehog.Internal.Distributive (distribute)
+import           Data.Functor.Classes (Eq1, eq1, Ord1, compare1, Show1, showsPrec1)
+
+import           Hedgehog.Internal.Distributive (Distributive(..))
+import           Hedgehog.Internal.Gen (Gen)
+import           Hedgehog.Internal.HTraversable (HTraversable(..))
+import           Hedgehog.Internal.Opaque (Opaque(..))
 import           Hedgehog.Internal.Property (annotate, annotateShow)
 import           Hedgehog.Internal.Property (assert, (===))
 import           Hedgehog.Internal.Property (discard, failure, success)
 import           Hedgehog.Internal.Property (DiscardLimit, withDiscards)
 import           Hedgehog.Internal.Property (footnote, footnoteShow)
 import           Hedgehog.Internal.Property (forAll, forAllWith)
-import           Hedgehog.Internal.Property (liftEither, liftExceptT)
+import           Hedgehog.Internal.Property (liftCatch, liftCatchIO, liftEither, liftExceptT)
 import           Hedgehog.Internal.Property (Property, PropertyName, Group(..), GroupName)
 import           Hedgehog.Internal.Property (ShrinkLimit, withShrinks)
 import           Hedgehog.Internal.Property (Test, property)
 import           Hedgehog.Internal.Property (TestLimit, withTests)
-import           Hedgehog.Internal.Property (withExceptT, withResourceT)
+import           Hedgehog.Internal.Property (withCatch, withExceptT, withResourceT)
+import           Hedgehog.Internal.Range (Range, Size(..))
 import           Hedgehog.Internal.Runner (check, recheck, checkSequential, checkParallel)
 import           Hedgehog.Internal.Seed (Seed(..))
+import           Hedgehog.Internal.State (Command(..), Callback(..), Action)
+import           Hedgehog.Internal.State (executeSequential)
+import           Hedgehog.Internal.State (Var(..), Symbolic(..), Concrete(..))
 import           Hedgehog.Internal.TH (discover)
 import           Hedgehog.Internal.Tripping (tripping)
-import           Hedgehog.Range (Range, Size(..))

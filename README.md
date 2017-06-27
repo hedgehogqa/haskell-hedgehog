@@ -57,6 +57,8 @@ If you prefer to avoid macros, you can specify the group of properties
 to run manually instead:
 
 ```hs
+{-# LANGUAGE OverloadedStrings #-}
+
 tests :: IO Bool
 tests =
   checkParallel $ Group "Test.Example" [

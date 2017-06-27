@@ -46,8 +46,12 @@ module Hedgehog.Internal.Property (
   , assert
   , (===)
 
+  , liftCatch
+  , liftCatchIO
   , liftEither
   , liftExceptT
+
+  , withCatch
   , withExceptT
   , withResourceT
 
@@ -80,9 +84,10 @@ import           Control.Monad.Writer.Class (MonadWriter(..))
 import           Data.Semigroup (Semigroup)
 import           Data.String (IsString)
 
-import           Hedgehog.Gen (Gen)
-import qualified Hedgehog.Gen as Gen
 import           Hedgehog.Internal.Distributive
+import           Hedgehog.Internal.Exception
+import           Hedgehog.Internal.Gen (Gen)
+import qualified Hedgehog.Internal.Gen as Gen
 import           Hedgehog.Internal.Show
 import           Hedgehog.Internal.Source
 
@@ -469,12 +474,39 @@ liftExceptT :: (Monad m, Show x, HasCallStack) => ExceptT x m a -> Test m a
 liftExceptT m =
   withFrozenCallStack liftEither =<< lift (runExceptT m)
 
+-- | Fails the test if the action throws an exception.
+--
+--   /The benefit of using this over 'lift' is that the location of the
+--   exception will be shown in the output./
+--
+liftCatch :: (MonadCatch m, HasCallStack) => m a -> Test m a
+liftCatch m =
+  withFrozenCallStack liftEither =<< lift (tryAll m)
+
+-- | Fails the test if the action throws an exception.
+--
+--   /The benefit of using this over 'liftIO' is that the location of the
+--   exception will be shown in the output./
+--
+liftCatchIO :: (MonadIO m, HasCallStack) => IO a -> Test m a
+liftCatchIO m =
+  withFrozenCallStack liftEither =<< liftIO (tryAll m)
+
 -- | Fails the test if the 'ExceptT' is 'Left', otherwise returns the value in
 --   the 'Right'.
 --
 withExceptT :: (Monad m, Show x, HasCallStack) => Test (ExceptT x m) a -> Test m a
 withExceptT m =
   withFrozenCallStack liftEither =<< runExceptT (distribute m)
+
+-- | Fails the test if the action throws an exception.
+--
+--   /The benefit of using this over simply letting the exception bubble up is
+--   that the location of the closest 'withCatch' will be shown in the output./
+--
+withCatch :: (MonadCatch m, HasCallStack) => Test m a -> Test m a
+withCatch m =
+  withFrozenCallStack liftEither =<< tryAll m
 
 -- | Run a computation which requires resource acquisition / release.
 --

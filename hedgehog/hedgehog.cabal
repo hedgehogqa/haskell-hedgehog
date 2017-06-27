@@ -65,7 +65,7 @@ library
     , text                            >= 1.1        && < 1.3
     , th-lift                         >= 0.7        && < 0.8
     , time                            >= 1.4        && < 1.9
-    , transformers                    >= 0.3        && < 0.6
+    , transformers                    >= 0.5        && < 0.6
     , transformers-base               >= 0.4        && < 0.5
     , wl-pprint-annotated             >= 0.0        && < 0.2
 
@@ -91,8 +91,13 @@ library
     Hedgehog.Internal.Config
     Hedgehog.Internal.Discovery
     Hedgehog.Internal.Distributive
+    Hedgehog.Internal.Exception
+    Hedgehog.Internal.Gen
+    Hedgehog.Internal.HTraversable
+    Hedgehog.Internal.Opaque
     Hedgehog.Internal.Property
     Hedgehog.Internal.Queue
+    Hedgehog.Internal.Range
     Hedgehog.Internal.Region
     Hedgehog.Internal.Report
     Hedgehog.Internal.Runner
@@ -100,6 +105,7 @@ library
     Hedgehog.Internal.Show
     Hedgehog.Internal.Shrink
     Hedgehog.Internal.Source
+    Hedgehog.Internal.State
     Hedgehog.Internal.TH
     Hedgehog.Internal.Tree
     Hedgehog.Internal.Tripping
