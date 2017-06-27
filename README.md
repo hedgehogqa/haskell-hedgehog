@@ -76,7 +76,7 @@ You can then load the module in GHCi, and run it:
 ```
 
  [hackage]: http://hackage.haskell.org/package/hedgehog
- [hackage-shield]: https://img.shields.io/badge/hackage-v0.3-blue.svg
+ [hackage-shield]: https://img.shields.io/badge/hackage-v0.4-blue.svg
 
  [travis]: https://travis-ci.org/hedgehogqa/haskell-hedgehog
  [travis-shield]: https://travis-ci.org/hedgehogqa/haskell-hedgehog.svg?branch=master
