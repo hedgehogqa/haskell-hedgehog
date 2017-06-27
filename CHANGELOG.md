@@ -1,3 +1,8 @@
+## Version 0.4 (2017-06-28)
+
+- Abstract state machine testing, check out the [process registry example](https://github.com/hedgehogqa/haskell-hedgehog/blob/master/hedgehog-example/test/Test/Example/Registry.hs) to see how it works (#89, @jystic)
+- `liftCatch`, `liftCatchIO`, `withCatch` functions for isolating exceptions during tests (#89, @jystic)
+
 ## Version 0.3 (2017-06-11)
 
 - Exponential range combinators (#43, @chris-martin)
