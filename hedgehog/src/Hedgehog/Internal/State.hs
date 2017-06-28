@@ -55,8 +55,6 @@ import           Data.Functor.Classes (Eq1(..), Ord1(..), Show1(..), showsPrec1)
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Maybe as Maybe
-import           Data.Set (Set)
-import qualified Data.Set as Set
 import           Data.Typeable (Typeable, TypeRep, Proxy(..), typeRep)
 
 import           Hedgehog.Internal.Gen (Gen)
@@ -338,31 +336,52 @@ instance Show (Action m state) where
       showString " :<- " .
       showsPrec 11 input
 
+-- | Extract the variable name and the type from a symbolic value.
+--
+takeSymbolic :: forall a. Symbolic a -> (Var, TypeRep)
+takeSymbolic (Symbolic var) =
+  (var, typeRep (Proxy :: Proxy a))
+
+-- | Insert a symbolic variable in to a map of variables to types.
+--
+insertSymbolic :: Symbolic a -> Map Var TypeRep -> Map Var TypeRep
+insertSymbolic s =
+  let
+    (var, typ) =
+      takeSymbolic s
+  in
+    Map.insert var typ
+
 -- | Collects all the symbolic values in a data structure and produces a set of
 --   all the variables they refer to.
 --
-takeVariables :: HTraversable t => t Symbolic -> Set Var
+takeVariables :: forall t. HTraversable t => t Symbolic -> Map Var TypeRep
 takeVariables xs =
   let
-    go x@(Symbolic var) = do
-      modify (Set.insert var)
+    go x = do
+      modify (insertSymbolic x)
       pure x
   in
-    flip execState Set.empty $ htraverse go xs
+    flip execState Map.empty $ htraverse go xs
 
 -- | Checks that the symbolic values in the data structure refer only to the
---   variables in the provided set.
+--   variables in the provided set, and that they are of the correct type.
 --
-variablesOK :: HTraversable t => t Symbolic -> Set Var -> Bool
+variablesOK :: HTraversable t => t Symbolic -> Map Var TypeRep -> Bool
 variablesOK xs allowed =
-  Set.null (takeVariables xs `Set.difference` allowed)
+  let
+    vars =
+      takeVariables xs
+  in
+    Map.null (vars `Map.difference` allowed) &&
+    and (Map.intersectionWith (==) vars allowed)
 
 -- | Drops invalid actions from the sequence.
 --
 dropInvalid :: (forall v. state v) -> [Action m state] -> [Action m state]
 dropInvalid initial =
   let
-    loop step@(Action input output@(Symbolic var) _execute require update _ensure) = do
+    loop step@(Action input output _execute require update _ensure) = do
       ((state0, vars0), steps0) <- get
 
       when (require state0 input && variablesOK input vars0) $
@@ -371,14 +390,14 @@ dropInvalid initial =
             update state0 input output
 
           vars =
-            Set.insert var vars0
+            insertSymbolic output vars0
 
           steps =
             steps0 ++ [step]
         in
           put ((state, vars), steps)
   in
-    snd . flip execState ((initial, Set.empty), []) . traverse_ loop
+    snd . flip execState ((initial, Map.empty), []) . traverse_ loop
 
 -- | Generates a single action from a set of possible commands.
 --
