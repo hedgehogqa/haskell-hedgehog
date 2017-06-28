@@ -1,3 +1,7 @@
+## Version 0.4.1 (2017-06-28)
+
+- Fixed runtime type error that could occur when shrinking state machine commands (#91, @jystic)
+
 ## Version 0.4 (2017-06-28)
 
 - Abstract state machine testing, check out the [process registry example](https://github.com/hedgehogqa/haskell-hedgehog/blob/master/hedgehog-example/test/Test/Example/Registry.hs) to see how it works (#89, @jystic)
