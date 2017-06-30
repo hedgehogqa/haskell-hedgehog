@@ -11,8 +11,10 @@ module Hedgehog.Internal.Opaque (
 --   For example:
 --
 -- @
---   data Ref v =
---     Ref (v (Opaque (IORef Int)))
+--   data State v =
+--     State {
+--         stateRefs :: [Var (Opaque (IORef Int)) v]
+--       } deriving (Eq, Show)
 -- @
 --
 newtype Opaque a =
