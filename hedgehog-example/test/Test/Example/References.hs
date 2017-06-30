@@ -20,31 +20,14 @@ import qualified Hedgehog.Range as Range
 ------------------------------------------------------------------------
 -- State
 
-data Ref v =
-  Ref (v (Opaque (IORef Int)))
-
 data State v =
   State {
-      stateRefs :: [(Ref v, Int)]
+      stateRefs :: [(Var (Opaque (IORef Int)) v, Int)]
     } deriving (Eq, Show)
 
 initialState :: State v
 initialState =
   State []
-
-instance Eq1 v => Eq (Ref v) where
-  (==) (Ref x) (Ref y) =
-    eq1 x y
-
-instance Show1 v => Show (Ref v) where
-  showsPrec p (Ref x) =
-    showParen (p >= 11) $
-      showString "Ref " .
-      showsPrec1 11 x
-
-instance HTraversable Ref where
-  htraverse f (Ref v) =
-    fmap Ref (f v)
 
 ------------------------------------------------------------------------
 -- NewRef
@@ -70,14 +53,14 @@ newRef =
     Command gen execute [
         Update $ \(State xs) _i o ->
           State $
-            xs ++ [(Ref o, 0)]
+            xs ++ [(o, 0)]
       ]
 
 ------------------------------------------------------------------------
 -- ReadRef
 
 data ReadRef v =
-  ReadRef (Ref v)
+  ReadRef (Var (Opaque (IORef Int)) v)
   deriving (Eq, Show)
 
 instance HTraversable ReadRef where
@@ -95,14 +78,14 @@ readRef =
           Just $
             ReadRef <$> Gen.element (fmap fst xs)
 
-    execute (ReadRef (Ref (Concrete (Opaque ref)))) =
-      liftIO $ IORef.readIORef ref
+    execute (ReadRef ref) =
+      liftIO $ IORef.readIORef (opaque ref)
   in
     Command gen execute [
         Require $ \(State xs) (ReadRef ref) ->
           elem ref $ fmap fst xs
 
-      , Ensure $ \s (ReadRef ref) o ->
+      , Ensure $ \_s0 s (ReadRef ref) o ->
           lookup ref (stateRefs s) === Just o
       ]
 
@@ -110,7 +93,7 @@ readRef =
 -- WriteRef
 
 data WriteRef v =
-  WriteRef (Ref v) Int
+  WriteRef (Var (Opaque (IORef Int)) v) Int
   deriving (Eq, Show)
 
 instance HTraversable WriteRef where
@@ -130,8 +113,8 @@ writeRef =
               <$> Gen.element (fmap fst xs)
               <*> Gen.int (Range.linear 0 100)
 
-    execute (WriteRef (Ref (Concrete (Opaque ref))) x) =
-      liftIO $ IORef.writeIORef ref x
+    execute (WriteRef ref x) =
+      liftIO $ IORef.writeIORef (opaque ref) x
   in
     Command gen execute [
         Require $ \(State xs) (WriteRef ref _) ->
@@ -146,7 +129,7 @@ writeRef =
 -- IncRef
 
 data IncRef v =
-  IncRef (Ref v)
+  IncRef (Var (Opaque (IORef Int)) v)
   deriving (Eq, Show)
 
 instance HTraversable IncRef where
@@ -164,9 +147,9 @@ incRef =
           Just $
             IncRef <$> Gen.element (fmap fst xs)
 
-    execute (IncRef (Ref (Concrete (Opaque ref)))) = do
-      x <- liftIO $ IORef.readIORef ref
-      liftIO $ IORef.writeIORef ref (x + 2) -- deliberate bug
+    execute (IncRef ref) = do
+      x <- liftIO $ IORef.readIORef (opaque ref)
+      liftIO $ IORef.writeIORef (opaque ref) (x + 2) -- deliberate bug
   in
     Command gen execute [
         Require $ \(State xs) (IncRef ref) ->

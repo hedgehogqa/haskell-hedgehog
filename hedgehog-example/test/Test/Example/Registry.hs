@@ -1,6 +1,7 @@
 --
 -- Translated from https://github.com/rjmh/registry/blob/master/registry_eqc.erl
 --
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE TemplateHaskell #-}
 module Test.Example.Registry where
@@ -33,44 +34,23 @@ import           System.IO.Unsafe (unsafePerformIO)
 --   #state{}.
 --
 
-data Pid v =
-  Pid (v Int)
+newtype Pid =
+  Pid Int
+  deriving (Eq, Ord, Show, Num)
 
-data Name =
+newtype Name =
   Name String
   deriving (Eq, Ord, Show)
 
 data State v =
   State {
-      statePids :: Set (Pid v)
-    , stateRegs :: Map Name (Pid v)
+      statePids :: Set (Var Pid v)
+    , stateRegs :: Map Name (Var Pid v)
     } deriving (Eq, Show)
 
 initialState :: State v
 initialState =
   State Set.empty Map.empty
-
---
--- FIXME derive automatically, this isn't fun :(
---
-
-instance Eq1 v => Eq (Pid v) where
-  (==) (Pid x) (Pid y) =
-    eq1 x y
-
-instance Ord1 v => Ord (Pid v) where
-  compare (Pid x) (Pid y) =
-    compare1 x y
-
-instance Show1 v => Show (Pid v) where
-  showsPrec p (Pid x) =
-    showParen (p >= 11) $
-      showString "Pid " .
-      showsPrec1 11 x
-
-instance HTraversable Pid where
-  htraverse f (Pid v) =
-    fmap Pid (f v)
 
 ------------------------------------------------------------------------
 -- %% spawn
@@ -107,7 +87,7 @@ spawn =
         Update $ \s _i o ->
           s {
             statePids =
-              Set.insert (Pid o) (statePids s)
+              Set.insert o (statePids s)
           }
       ]
 
@@ -133,7 +113,7 @@ spawn =
 --
 
 data Register v =
-  Register Name (Pid v)
+  Register Name (Var Pid v)
   deriving (Eq, Show)
 
 instance HTraversable Register where
@@ -159,8 +139,8 @@ register =
               <$> genName
               <*> Gen.element xs
 
-    execute (Register (Name name) (Pid (Concrete pid))) =
-      liftIO $ ioRegister name pid
+    execute (Register name pid) =
+      liftIO $ ioRegister name (concrete pid)
   in
     Command gen execute [
         Require $ \s (Register name _) ->
@@ -207,7 +187,7 @@ unregister =
       Just $
         Unregister <$> genName
 
-    execute (Unregister (Name name)) =
+    execute (Unregister name) =
       liftIO $ ioUnregister name
   in
     Command gen execute [
@@ -229,7 +209,7 @@ unregister =
 
 type ProcessTable = HashTable.CuckooHashTable String Int
 
-pidRef :: IORef Int
+pidRef :: IORef Pid
 pidRef =
   unsafePerformIO $ IORef.newIORef 0
 {-# NOINLINE pidRef #-}
@@ -245,14 +225,14 @@ ioReset = do
   ks <- fmap fst <$> HashTable.toList procTable
   traverse_ (HashTable.delete procTable) ks
 
-ioSpawn :: IO Int
+ioSpawn :: IO Pid
 ioSpawn = do
   pid <- IORef.readIORef pidRef
   IORef.writeIORef pidRef (pid + 1)
   pure pid
 
-ioRegister :: String -> Int -> IO ()
-ioRegister name pid = do
+ioRegister :: Name -> Pid -> IO ()
+ioRegister (Name name) (Pid pid) = do
   m <- HashTable.lookup procTable name
 
   when (isJust m) $
@@ -260,8 +240,8 @@ ioRegister name pid = do
 
   HashTable.insert procTable name pid
 
-ioUnregister :: String -> IO ()
-ioUnregister name = do
+ioUnregister :: Name -> IO ()
+ioUnregister (Name name) = do
   m <- HashTable.lookup procTable name
 
   when (isNothing m) $

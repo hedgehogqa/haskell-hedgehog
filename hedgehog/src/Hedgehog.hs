@@ -101,9 +101,12 @@ module Hedgehog (
   , Action
   , executeSequential
 
+  , Var(..)
+  , concrete
+  , opaque
+
+  , Symbolic
   , Concrete(..)
-  , Symbolic(..)
-  , Var
   , Opaque(..)
 
   -- * Transformers
@@ -145,6 +148,6 @@ import           Hedgehog.Internal.Runner (check, recheck, checkSequential, chec
 import           Hedgehog.Internal.Seed (Seed(..))
 import           Hedgehog.Internal.State (Command(..), Callback(..), Action)
 import           Hedgehog.Internal.State (executeSequential)
-import           Hedgehog.Internal.State (Var(..), Symbolic(..), Concrete(..))
+import           Hedgehog.Internal.State (Var(..), Symbolic, Concrete(..), concrete, opaque)
 import           Hedgehog.Internal.TH (discover)
 import           Hedgehog.Internal.Tripping (tripping)
