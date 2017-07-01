@@ -44,9 +44,6 @@ import           Hedgehog.Range (Size)
 
 import           Language.Haskell.TH.Lift (deriveLift)
 
-import           System.Console.Regions (ConsoleRegion, RegionLayout(..))
-import qualified System.Console.Regions as Console
-
 
 -- | Configuration for a property test run.
 --
@@ -258,10 +255,10 @@ checkGroup config (Group group props) =
       summaryFailed summary == 0 &&
       summaryGaveUp summary == 0
 
-updateSummary :: ConsoleRegion -> TVar Summary -> Maybe UseColor -> (Summary -> Summary) -> IO ()
+updateSummary :: Region -> TVar Summary -> Maybe UseColor -> (Summary -> Summary) -> IO ()
 updateSummary sregion svar mcolor f = do
   summary <- atomically (TVar.modifyTVar' svar f >> TVar.readTVar svar)
-  Console.setConsoleRegion sregion =<< renderSummary mcolor summary
+  setRegion sregion =<< renderSummary mcolor summary
 
 checkGroupWith ::
      WorkerCount
@@ -270,8 +267,7 @@ checkGroupWith ::
   -> [(PropertyName, Property)]
   -> IO Summary
 checkGroupWith n verbosity mcolor props =
-  displayRegions $ do
-    sregion <- Console.openConsoleRegion Linear
+  displayRegion $ \sregion -> do
     svar <- atomically . TVar.newTVar $ mempty { summaryWaiting = PropertyCount (length props) }
 
     let
@@ -314,8 +310,6 @@ checkGroupWith n verbosity mcolor props =
           pure result
 
     updateSummary sregion svar mcolor (const summary)
-    Console.finishConsoleRegion sregion =<< Console.getConsoleRegion sregion
-
     pure summary
 
 -- | Check a group of properties sequentially.

@@ -84,6 +84,7 @@ module Hedgehog (
   , assert
   , (===)
 
+  , evaluate
   , liftCatch
   , liftCatchIO
   , liftEither
@@ -135,6 +136,7 @@ import           Hedgehog.Internal.Property (annotate, annotateShow)
 import           Hedgehog.Internal.Property (assert, (===))
 import           Hedgehog.Internal.Property (discard, failure, success)
 import           Hedgehog.Internal.Property (DiscardLimit, withDiscards)
+import           Hedgehog.Internal.Property (evaluate)
 import           Hedgehog.Internal.Property (footnote, footnoteShow)
 import           Hedgehog.Internal.Property (forAll, forAllWith)
 import           Hedgehog.Internal.Property (liftCatch, liftCatchIO, liftEither, liftExceptT)

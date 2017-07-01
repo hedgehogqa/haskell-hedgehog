@@ -6,7 +6,7 @@ module Hedgehog.Internal.Queue (
 
   , runTasks
   , finalizeTask
- 
+
   , runActiveFinalizers
   , dequeueMVar
 
