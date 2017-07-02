@@ -42,8 +42,8 @@ data Expr =
 ------------------------------------------------------------------------
 
 -- | Evaluate to weak head normal form.
-eval :: Expr -> Expr
-eval expr =
+evaluate :: Expr -> Expr
+evaluate expr =
   case expr of
     EBool _ ->
       expr
@@ -56,9 +56,9 @@ eval expr =
     ELam _ _ _ ->
       expr
     EApp f g ->
-      case eval f of
+      case evaluate f of
         ELam x _t e ->
-          eval (subst x g e)
+          evaluate (subst x g e)
         h ->
           EApp h g
 
@@ -184,9 +184,9 @@ shrinkExpr :: Expr -> [Expr]
 shrinkExpr expr =
   case expr of
     EApp f g ->
-      case eval f of
+      case evaluate f of
         ELam x _ e ->
-          [eval (subst x g e)]
+          [evaluate (subst x g e)]
         _ ->
           []
     _ ->
@@ -283,7 +283,7 @@ prop_illtyped :: Property
 prop_illtyped =
   property $ do
     ex <- forAll genIllTypedExpr
-    _t <- liftEither (typecheck ex)
+    _t <- evalEither (typecheck ex)
     success
 
 prop_consistent :: Property
@@ -291,14 +291,14 @@ prop_consistent =
   property $ do
     ty <- forAll genType
     ex <- forAll (genWellTypedExpr ty)
-    typecheck (eval ex) === pure ty
+    typecheck (evaluate ex) === pure ty
 
 prop_idempotent :: Property
 prop_idempotent =
   property $ do
     ty <- forAll genType
     ex <- forAll (genWellTypedExpr ty)
-    eval (eval ex) === eval ex
+    evaluate (evaluate ex) === evaluate ex
 
 ------------------------------------------------------------------------
 -- These are just for testing the concurrent test runner

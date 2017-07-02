@@ -10,16 +10,11 @@ import           Hedgehog.Internal.Source
 -- | Test that a pair of encode / decode functions are compatible.
 --
 tripping ::
-     HasCallStack
-  => Applicative f
-  => Monad m
-  => Show b
-  => Show (f a)
-  => Eq (f a)
+     (MonadTest m, Applicative f, Show b, Show (f a), Eq (f a), HasCallStack)
   => a
   -> (a -> b)
   -> (b -> f a)
-  -> Test m ()
+  -> m ()
 tripping x encode decode =
   let
     mx =

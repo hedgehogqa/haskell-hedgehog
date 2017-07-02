@@ -73,7 +73,7 @@ instance HTraversable Spawn where
   htraverse _ Spawn =
     pure Spawn
 
-spawn :: Monad m => Command m IO State
+spawn :: (Monad n, MonadIO m) => Command n m State
 spawn =
   let
     gen _ =
@@ -126,7 +126,7 @@ genName :: Monad m => Gen m Name
 genName =
   Name <$> Gen.element ["a", "b", "c", "d"]
 
-register :: Monad m => Command m IO State
+register :: (Monad n, MonadIO m) => Command n m State
 register =
   let
     gen s =
@@ -180,7 +180,7 @@ instance HTraversable Unregister where
   htraverse _ (Unregister name) =
     Unregister <$> pure name
 
-unregister :: Monad m => Command m IO State
+unregister :: (Monad n, MonadIO m) => Command n m State
 unregister =
   let
     gen _ =
@@ -258,7 +258,7 @@ prop_registry =
     actions <- forAll $
       Gen.actions (Range.linear 1 100) initialState [spawn, register, unregister]
 
-    liftCatchIO ioReset
+    evalIO ioReset
     executeSequential initialState actions
 
 ------------------------------------------------------------------------
