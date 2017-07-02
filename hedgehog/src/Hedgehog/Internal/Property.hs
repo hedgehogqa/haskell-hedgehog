@@ -43,8 +43,11 @@ module Hedgehog.Internal.Property (
   , discard
   , failure
   , success
+
   , assert
   , (===)
+
+  , evaluate
 
   , liftCatch
   , liftCatchIO
@@ -60,6 +63,8 @@ module Hedgehog.Internal.Property (
   , defaultConfig
   , mapConfig
   , failWith
+  , failDiff
+  , failException
   , writeLog
   , runTest
   ) where
@@ -68,6 +73,7 @@ import           Control.Applicative (Alternative(..))
 import           Control.Monad (MonadPlus(..))
 import           Control.Monad.Base (MonadBase(..))
 import           Control.Monad.Catch (MonadThrow(..), MonadCatch(..))
+import           Control.Monad.Catch (SomeException(..), displayException)
 import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Monad.IO.Class (MonadIO(..))
 import           Control.Monad.Morph (MFunctor(..))
@@ -81,8 +87,11 @@ import           Control.Monad.Trans.Resource (ResourceT, runResourceT)
 import           Control.Monad.Trans.Writer.Lazy (WriterT(..))
 import           Control.Monad.Writer.Class (MonadWriter(..))
 
+import qualified Data.Char as Char
+import qualified Data.List as List
 import           Data.Semigroup (Semigroup)
 import           Data.String (IsString)
+import           Data.Typeable (typeOf)
 
 import           Hedgehog.Internal.Distributive
 import           Hedgehog.Internal.Exception
@@ -342,9 +351,10 @@ withShrinks n =
 
 -- | Creates a property to check.
 --
-property :: Test IO () -> Property
-property =
-  Property defaultConfig
+property :: HasCallStack => Test IO () -> Property
+property m =
+  Property defaultConfig $
+    either (withFrozenCallStack failException) pure =<< tryAll m
 
 ------------------------------------------------------------------------
 -- Test
@@ -415,6 +425,33 @@ failWith :: (Monad m, HasCallStack) => Maybe Diff -> String -> Test m a
 failWith diff msg =
   Test . ExceptT . pure . Left $ Failure (getCaller callStack) msg diff
 
+-- | Fails with an error which shows the difference between two values.
+--
+failDiff :: (Monad m, Show a, Show b, HasCallStack) => a -> b -> Test m ()
+failDiff x y =
+  case valueDiff <$> mkValue x <*> mkValue y of
+    Nothing ->
+      withFrozenCallStack $
+        failWith Nothing $ unlines [
+            "━━━ Not Equal ━━━"
+          , showPretty x
+          , showPretty y
+          ]
+    Just diff ->
+      withFrozenCallStack $
+        failWith (Just $ Diff "Failed (" "- lhs" "=/=" "+ rhs" ")" diff) ""
+
+-- | Fails with an error which renders the type of an exception and its error
+--   message.
+--
+failException :: (Monad m, HasCallStack) => SomeException -> Test m a
+failException (SomeException x) =
+  withFrozenCallStack $
+    failWith Nothing $ unlines [
+        "━━━ Exception: " ++ show (typeOf x) ++ " ━━━"
+      , List.dropWhileEnd Char.isSpace (displayException x)
+      ]
+
 -- | Causes a test to fail.
 --
 failure :: (Monad m, HasCallStack) => Test m a
@@ -430,8 +467,9 @@ success =
 -- | Fails the test if the condition provided is 'False'.
 --
 assert :: (Monad m, HasCallStack) => Bool -> Test m ()
-assert b =
-  if b then
+assert b = do
+  ok <- withFrozenCallStack $ evaluate b
+  if ok then
     success
   else
     withFrozenCallStack failure
@@ -440,22 +478,19 @@ infix 4 ===
 
 -- | Fails the test if the two arguments provided are not equal.
 --
-(===) :: (Monad m, Eq a, Show a, HasCallStack) => a -> a -> Test m ()
-(===) x y =
-  if x == y then
+(===) :: (MonadIO m, Eq a, Show a, HasCallStack) => a -> a -> Test m ()
+(===) x y = do
+  ok <- withFrozenCallStack $ evaluate (x == y)
+  if ok then
     success
   else
-    case valueDiff <$> mkValue x <*> mkValue y of
-      Nothing ->
-        withFrozenCallStack $
-          failWith Nothing $ unlines [
-              "━━━ Not Equal ━━━"
-            , showPretty x
-            , showPretty y
-            ]
-      Just diff ->
-        withFrozenCallStack $
-          failWith (Just $ Diff "Failed (" "- lhs" "=/=" "+ rhs" ")" diff) ""
+    withFrozenCallStack $ failDiff x y
+
+-- | Fails the test if the value throws an exception when evaluated.
+--
+evaluate :: (Monad m, HasCallStack) => a -> Test m a
+evaluate x =
+  either (withFrozenCallStack failException) pure (tryEvaluate x)
 
 -- | Fails the test if the 'Either' is 'Left', otherwise returns the value in
 --   the 'Right'.
@@ -481,7 +516,7 @@ liftExceptT m =
 --
 liftCatch :: (MonadCatch m, HasCallStack) => m a -> Test m a
 liftCatch m =
-  withFrozenCallStack liftEither =<< lift (tryAll m)
+  either (withFrozenCallStack failException) pure =<< lift (tryAll m)
 
 -- | Fails the test if the action throws an exception.
 --
@@ -490,7 +525,7 @@ liftCatch m =
 --
 liftCatchIO :: (MonadIO m, HasCallStack) => IO a -> Test m a
 liftCatchIO m =
-  withFrozenCallStack liftEither =<< liftIO (tryAll m)
+  either (withFrozenCallStack failException) pure =<< liftIO (tryAll m)
 
 -- | Fails the test if the 'ExceptT' is 'Left', otherwise returns the value in
 --   the 'Right'.
@@ -506,7 +541,7 @@ withExceptT m =
 --
 withCatch :: (MonadCatch m, HasCallStack) => Test m a -> Test m a
 withCatch m =
-  withFrozenCallStack liftEither =<< tryAll m
+  either (withFrozenCallStack failException) pure =<< tryAll m
 
 -- | Run a computation which requires resource acquisition / release.
 --
