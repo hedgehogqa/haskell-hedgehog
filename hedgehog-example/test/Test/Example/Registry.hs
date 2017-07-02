@@ -21,6 +21,7 @@ import qualified Data.Set as Set
 
 import           Hedgehog
 import qualified Hedgehog.Gen as Gen
+import qualified Hedgehog.Internal.State as Gen
 import qualified Hedgehog.Range as Range
 
 import           System.IO.Unsafe (unsafePerformIO)
@@ -247,23 +248,39 @@ ioUnregister (Name name) = do
   when (isNothing m) $
     fail "ioUnregister: not registered"
 
-  -- Uncomment to fix implementation
-  --HashTable.delete procTable name
+  HashTable.delete procTable name
 
 ------------------------------------------------------------------------
 
-prop_registry :: Property
-prop_registry =
+prop_registry_sequential :: Property
+prop_registry_sequential =
   property $ do
     actions <- forAll $
-      Gen.actions (Range.linear 1 100) initialState [spawn, register, unregister]
+      Gen.sequential
+        (Range.linear 1 100)
+        initialState
+        [spawn, register, unregister]
 
     evalIO ioReset
-    executeSequential initialState actions
+    Gen.executeSequential initialState actions
+
+prop_registry_parallel :: Property
+prop_registry_parallel =
+  withRetries 10 . property $ do
+    actions <- forAll $
+      Gen.parallel
+        (Range.linear 1 100)
+        (Range.linear 1 10)
+        initialState
+        [spawn, register, unregister]
+
+    test $ do
+      evalIO ioReset
+      Gen.executeParallel initialState actions
 
 ------------------------------------------------------------------------
 
 return []
 tests :: IO Bool
 tests =
-  checkParallel $$(discover)
+  checkSequential $$(discover)

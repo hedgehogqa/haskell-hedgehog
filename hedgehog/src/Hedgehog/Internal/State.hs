@@ -3,6 +3,7 @@
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE DoAndIfThenElse #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE KindSignatures #-}
@@ -37,21 +38,27 @@ module Hedgehog.Internal.State (
 
   -- * Actions
   , Action(..)
+  , Sequential(..)
+  , Parallel(..)
   , takeVariables
   , variablesOK
   , dropInvalid
   , action
-  , actions
-  , execute
+  , sequential
+  , parallel
   , executeSequential
+  , executeParallel
   ) where
 
-import           Control.Monad (when, foldM_)
+import qualified Control.Concurrent.Async.Lifted as Async
+import           Control.Monad (foldM, foldM_)
 import           Control.Monad.Catch (MonadCatch)
 import           Control.Monad.Morph (hoist)
-import           Control.Monad.State.Class (get, put, modify)
+import           Control.Monad.State.Class (MonadState, get, put, modify)
 import           Control.Monad.Trans.Class (lift)
-import           Control.Monad.Trans.State (StateT, execState, evalStateT)
+import           Control.Monad.Trans.Control (MonadBaseControl)
+import           Control.Monad.Trans.State (State, runState, execState)
+import           Control.Monad.Trans.State (StateT(..), evalStateT)
 
 import           Data.Dynamic (Dynamic, toDyn, fromDynamic, dynTypeRep)
 import           Data.Foldable (traverse_)
@@ -62,13 +69,14 @@ import qualified Data.Map as Map
 import qualified Data.Maybe as Maybe
 import           Data.Typeable (Typeable, TypeRep, Proxy(..), typeRep)
 
+import           Hedgehog.Internal.Distributive (Distributive(..))
 import           Hedgehog.Internal.Gen (Gen)
 import qualified Hedgehog.Internal.Gen as Gen
 import           Hedgehog.Internal.HTraversable (HTraversable(..))
 import           Hedgehog.Internal.Opaque (Opaque(..))
-import           Hedgehog.Internal.Property (MonadTest, evalEither, evalM, success)
+import           Hedgehog.Internal.Property (MonadTest(..), Test, evalEither, evalM, success, runTest, failWith)
 import           Hedgehog.Internal.Range (Range)
-import qualified Hedgehog.Internal.Shrink as Shrink
+import           Hedgehog.Internal.Show (showPretty)
 import           Hedgehog.Internal.Source (HasCallStack, withFrozenCallStack)
 
 
@@ -241,7 +249,7 @@ reify vars =
 
 -- | Optional command configuration.
 --
-data Callback input output m state =
+data Callback input output state =
   -- | A pre-condition for a command that must be verified before the command
   --   can be executed. This is mainly used during shrinking to ensure that it
   --   is still OK to run a command despite the fact that some previously
@@ -262,12 +270,12 @@ data Callback input output m state =
   --   This callback receives the state prior to execution as the first
   --   argument, and the state after execution as the second argument.
   --
-  | Ensure (state Concrete -> state Concrete -> input Concrete -> output -> m ())
+  | Ensure (state Concrete -> state Concrete -> input Concrete -> output -> Test ())
 
 callbackRequire1 ::
      state Symbolic
   -> input Symbolic
-  -> Callback input output m state
+  -> Callback input output state
   -> Bool
 callbackRequire1 s i = \case
   Require f ->
@@ -282,7 +290,7 @@ callbackUpdate1 ::
   => state v
   -> input v
   -> Var output v
-  -> Callback input output m state
+  -> Callback input output state
   -> state v
 callbackUpdate1 s i o = \case
   Require _ ->
@@ -293,13 +301,12 @@ callbackUpdate1 s i o = \case
     s
 
 callbackEnsure1 ::
-     MonadTest m
-  => state Concrete
+     state Concrete
   -> state Concrete
   -> input Concrete
   -> output
-  -> Callback input output m state
-  -> m ()
+  -> Callback input output state
+  -> Test ()
 callbackEnsure1 s0 s i o = \case
   Require _ ->
     success
@@ -309,7 +316,7 @@ callbackEnsure1 s0 s i o = \case
     f s0 s i o
 
 callbackRequire ::
-     [Callback input output m state]
+     [Callback input output state]
   -> state Symbolic
   -> input Symbolic
   -> Bool
@@ -318,7 +325,7 @@ callbackRequire callbacks s i =
 
 callbackUpdate ::
      Ord1 v
-  => [Callback input output m state]
+  => [Callback input output state]
   -> state v
   -> input v
   -> Var output v
@@ -327,13 +334,12 @@ callbackUpdate callbacks s0 i o =
   foldl (\s -> callbackUpdate1 s i o) s0 callbacks
 
 callbackEnsure ::
-     MonadTest m
-  => [Callback input output m state]
+     [Callback input output state]
   -> state Concrete
   -> state Concrete
   -> input Concrete
   -> output
-  -> m ()
+  -> Test ()
 callbackEnsure callbacks s0 s i o =
   traverse_ (callbackEnsure1 s0 s i o) callbacks
 
@@ -361,7 +367,7 @@ data Command n m (state :: (* -> *) -> *) =
     --   as pre-condtions, post-conditions and state updates.
     --
     , commandCallbacks ::
-        [Callback input output m state]
+        [Callback input output state]
     }
 
 -- | Checks that input for a command can be executed in the given state.
@@ -393,7 +399,7 @@ data Action m (state :: (* -> *) -> *) =
         forall v. Ord1 v => state v -> input v -> Var output v -> state v
 
     , actionEnsure ::
-        state Concrete -> state Concrete -> input Concrete -> output -> m ()
+        state Concrete -> state Concrete -> input Concrete -> output -> Test ()
     }
 
 instance Show (Action m state) where
@@ -444,15 +450,45 @@ variablesOK xs allowed =
     Map.null (vars `Map.difference` allowed) &&
     and (Map.intersectionWith (==) vars allowed)
 
+data Context state =
+  Context {
+      contextState :: state Symbolic
+    , _contextVars :: Map Name TypeRep
+    }
+
+mkContext :: state Symbolic -> Context state
+mkContext initial =
+  Context initial Map.empty
+
+contextUpdate :: MonadState (Context state) m => state Symbolic -> m ()
+contextUpdate state = do
+  Context _ vars <- get
+  put $ Context state vars
+
+contextNewVar :: (MonadState (Context state) m, Typeable a) => m (Symbolic a)
+contextNewVar = do
+  Context state vars <- get
+
+  let
+    var =
+      case Map.maxViewWithKey vars of
+        Nothing ->
+          Symbolic 0
+        Just ((name, _), _) ->
+          Symbolic (name + 1)
+
+  put $ Context state (insertSymbolic var vars)
+  pure var
+
 -- | Drops invalid actions from the sequence.
 --
-dropInvalid :: (forall v. state v) -> [Action m state] -> [Action m state]
-dropInvalid initial =
+dropInvalid :: [Action m state] -> State (Context state) [Action m state]
+dropInvalid =
   let
     loop step@(Action input output _execute require update _ensure) = do
-      ((state0, vars0), steps0) <- get
+      Context state0 vars0 <- get
 
-      when (require state0 input && variablesOK input vars0) $
+      if require state0 input && variablesOK input vars0 then do
         let
           state =
             update state0 input (Var output)
@@ -460,42 +496,41 @@ dropInvalid initial =
           vars =
             insertSymbolic output vars0
 
-          steps =
-            steps0 ++ [step]
-        in
-          put ((state, vars), steps)
+        put $ Context state vars
+        pure $ Just step
+      else
+        pure Nothing
   in
-    snd . flip execState ((initial, Map.empty), []) . traverse_ loop
+    fmap Maybe.catMaybes . traverse loop
 
 -- | Generates a single action from a set of possible commands.
 --
 action ::
      (Monad n, MonadTest m)
   => [Command n m state]
-  -> Gen (StateT (state Symbolic, Name) n) (Action m state)
+  -> Gen (StateT (Context state) n) (Action m state)
 action commands =
   Gen.just $ do
-    (state, name) <- get
+    Context state0 _ <- get
 
     Command mgenInput exec callbacks <-
-      Gen.element $ filter (\c -> commandGenOK c state) commands
+      Gen.element $ filter (\c -> commandGenOK c state0) commands
 
     input <-
-      case mgenInput state of
+      case mgenInput state0 of
         Nothing ->
           error "genCommand: internal error, tried to use generator with invalid state."
         Just g ->
           hoist lift g
 
-    if not $ callbackRequire callbacks state input then
+    if not $ callbackRequire callbacks state0 input then
       pure Nothing
 
     else do
-      let
-        output =
-          Symbolic name
+      output <- contextNewVar
 
-      put (callbackUpdate callbacks state input (Var output), name + 1)
+      contextUpdate $
+        callbackUpdate callbacks state0 input (Var output)
 
       pure . Just $
         Action input output exec
@@ -503,29 +538,138 @@ action commands =
           (callbackUpdate callbacks)
           (callbackEnsure callbacks)
 
+genActions ::
+     (Monad n, MonadTest m)
+  => Range Int
+  -> [Command n m state]
+  -> Context state
+  -> Gen n ([Action m state], Context state)
+genActions range commands ctx = do
+  xs <- flip evalStateT ctx . distribute $
+    Gen.list range (action commands)
+  pure $
+    runState (dropInvalid xs) ctx
+
+-- | A sequence of actions to execute.
+--
+data Sequential m state =
+  Sequential {
+      -- | The sequence of actions.
+      sequentialActions :: [Action m state]
+    }
+
+renderAction :: Action m state -> [String]
+renderAction (Action input (Symbolic (Name output)) _ _ _ _) =
+  let
+    prefix0 =
+      "Var " ++ show output ++ " = "
+
+    prefix =
+      replicate (length prefix0) ' '
+  in
+    case lines (showPretty input) of
+      [] ->
+        [prefix0 ++ "?"]
+      x : xs ->
+        (prefix0 ++ x) :
+        fmap (prefix ++) xs
+
+-- FIXME we should not abuse Show to get nice output for actions
+instance Show (Sequential m state) where
+  show (Sequential xs) =
+    unlines $ concatMap renderAction xs
+
 -- | Generates a sequence of actions from an initial model state and set of commands.
 --
-actions ::
+sequential ::
      (Monad n, MonadTest m)
   => Range Int
   -> (forall v. state v)
   -> [Command n m state]
-  -> Gen n [Action m state]
-actions range initial =
-  fmap (dropInvalid initial) .
-  Gen.shrink Shrink.list .
-  hoist (flip evalStateT (initial, 0)) .
-  Gen.list range .
-  action
+  -> Gen n (Sequential m state)
+sequential range initial commands =
+  fmap (Sequential . fst) $
+    genActions range commands (mkContext initial)
+
+-- | A sequential prefix of actions to execute, with two branches to execute in parallel.
+--
+data Parallel m state =
+  Parallel {
+      -- | The sequential prefix.
+      parallelPrefix :: [Action m state]
+
+      -- | The first branch.
+    , parallelBranch1 :: [Action m state]
+
+      -- | The second branch.
+    , parallelBranch2 :: [Action m state]
+    }
+
+-- FIXME we should not abuse Show to get nice output for actions
+instance Show (Parallel m state) where
+  show (Parallel pre xs ys) =
+    unlines $ concat [
+        ["━━━ Prefix ━━━"]
+      ,  (concatMap renderAction pre)
+      , ["", "━━━ Branch 1 ━━━"]
+      ,  (concatMap renderAction xs)
+      , ["", "━━━ Branch 2 ━━━"]
+      ,  (concatMap renderAction ys)
+      ]
+
+-- | Given the initial model state and set of commands, generates prefix
+--   actions to be run sequentially, followed by two branches to be run in
+--   parallel.
+--
+parallel ::
+     (Monad n, MonadTest m)
+  => Range Int
+  -> Range Int
+  -> (forall v. state v)
+  -> [Command n m state]
+  -> Gen n (Parallel m state)
+parallel prefixN parallelN initial commands = do
+  (prefix, ctx0) <- genActions prefixN commands (mkContext initial)
+  (branch1, ctx1) <- genActions parallelN commands ctx0
+  (branch2, _ctx2) <- genActions parallelN commands ctx1 { contextState = contextState ctx0 }
+
+  pure $ Parallel prefix branch1 branch2
+
+data ActionCheck state =
+  ActionCheck {
+      checkUpdate :: state Concrete -> state Concrete
+    , checkEnsure :: state Concrete -> state Concrete -> Test ()
+    }
+
+execute :: (MonadTest m, HasCallStack) => Action m state -> StateT Environment m (ActionCheck state)
+execute (Action sinput soutput exec _require update ensure) =
+  withFrozenCallStack $ do
+    env0 <- get
+    input <- evalEither $ reify env0 sinput
+    output <- lift $ exec input
+
+    let
+      coutput =
+        Concrete output
+
+      env =
+        insertConcrete soutput coutput env0
+
+    put env
+
+    pure $
+      ActionCheck
+        (\s0 -> update s0 input (Var coutput))
+        (\s0 s -> ensure s0 s input output)
 
 -- | Executes a single action in the given evironment.
 --
-execute ::
-     (HasCallStack, MonadTest m)
+executeUpdateEnsure ::
+     (MonadTest m, HasCallStack)
   => (state Concrete, Environment)
   -> Action m state
   -> m (state Concrete, Environment)
-execute (state0, env0) (Action sinput soutput exec _require update ensure) =
+executeUpdateEnsure (state0, env0) (Action sinput soutput exec _require update ensure) =
   withFrozenCallStack $ do
     input <- evalEither $ reify env0 sinput
     output <- exec input
@@ -540,7 +684,7 @@ execute (state0, env0) (Action sinput soutput exec _require update ensure) =
       env =
         insertConcrete soutput coutput env0
 
-    ensure state0 state input output
+    liftTest $ ensure state0 state input output
 
     pure (state, env)
 
@@ -548,14 +692,84 @@ execute (state0, env0) (Action sinput soutput exec _require update ensure) =
 --   post-conditions are met and no exceptions are thrown.
 --
 --   To generate a sequence of actions to execute, see the
---   'Hedgehog.Gen.actions' combinator in the "Hedgehog.Gen" module.
+--   'Hedgehog.Gen.sequential' combinator in the "Hedgehog.Gen" module.
 --
 executeSequential ::
-     forall m state.
-     (HasCallStack, MonadTest m, MonadCatch m)
+     (MonadTest m, MonadCatch m, HasCallStack)
   => (forall v. state v)
-  -> [Action m state]
+  -> Sequential m state
   -> m ()
-executeSequential initial commands =
+executeSequential initial (Sequential xs) =
+  withFrozenCallStack $ evalM $
+    foldM_ executeUpdateEnsure (initial, emptyEnvironment) xs
+
+successful :: Test () -> Bool
+successful x =
+  case runTest x of
+    (Left _, _) ->
+      False
+    (Right _, _) ->
+      True
+
+interleave :: [a] -> [a] -> [[a]]
+interleave xs00 ys00 =
+  case (xs00, ys00) of
+    ([], []) ->
+      []
+    (xs, []) ->
+      [xs]
+    ([], ys) ->
+      [ys]
+    (xs0@(x:xs), ys0@(y:ys)) ->
+      [ x : zs | zs <- interleave xs ys0 ] ++
+      [ y : zs | zs <- interleave xs0 ys ]
+
+checkActions :: state Concrete -> [ActionCheck state] -> Test ()
+checkActions s0 = \case
+  [] ->
+    pure ()
+  x : xs -> do
+    let
+      s =
+        checkUpdate x s0
+
+    checkEnsure x s0 s
+    checkActions s xs
+
+linearize :: MonadTest m => state Concrete -> [ActionCheck state] -> [ActionCheck state] -> m ()
+linearize initial branch1 branch2 =
   withFrozenCallStack $
-    evalM (foldM_ execute (initial, emptyEnvironment) commands)
+    let
+      ok =
+        any successful .
+        fmap (checkActions initial) $
+        interleave branch1 branch2
+    in
+      if ok then
+        pure ()
+      else
+        failWith Nothing "no valid interleaving"
+
+
+-- | Executes the prefix actions sequentially, then executes the two branches
+--   in parallel, verifying that no exceptions are thrown and that there is at
+--   least one sequential interleaving where all the post-conditions are met.
+--
+--   To generate parallel actions to execute, see the 'Hedgehog.Gen.parallel'
+--   combinator in the "Hedgehog.Gen" module.
+--
+executeParallel ::
+     (MonadTest m, MonadCatch m, MonadBaseControl IO m, HasCallStack)
+  => (forall v. state v)
+  -> Parallel m state
+  -> m ()
+executeParallel initial (Parallel prefix branch1 branch2) =
+  withFrozenCallStack $ evalM $ do
+    (s0, env0) <- foldM executeUpdateEnsure (initial, emptyEnvironment) prefix
+
+    (xs, ys) <-
+      Async.concurrently
+        (evalStateT (traverse execute branch1) env0)
+        (evalStateT (traverse execute branch2) env0)
+
+    linearize s0 xs ys

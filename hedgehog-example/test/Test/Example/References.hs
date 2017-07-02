@@ -136,8 +136,8 @@ instance HTraversable IncRef where
   htraverse f (IncRef ref) =
     IncRef <$> htraverse f ref
 
-incRef :: (Monad n, MonadIO m) => Command n m State
-incRef =
+incRef :: (Monad n, MonadIO m) => Int -> Command n m State
+incRef n =
   let
     gen s =
       case stateRefs s of
@@ -149,7 +149,7 @@ incRef =
 
     execute (IncRef ref) = do
       x <- liftIO $ IORef.readIORef (opaque ref)
-      liftIO $ IORef.writeIORef (opaque ref) (x + 2) -- deliberate bug
+      liftIO $ IORef.writeIORef (opaque ref) (x + n) -- deliberate bug
   in
     Command gen execute [
         Require $ \(State xs) (IncRef ref) ->
@@ -166,13 +166,32 @@ incRef =
 
 ------------------------------------------------------------------------
 
-prop_references :: Property
-prop_references =
+prop_references_sequential :: Property
+prop_references_sequential =
   property $ do
     actions <- forAll $
-      Gen.actions (Range.linear 1 100) initialState [newRef, readRef, writeRef, incRef]
+      Gen.sequential (Range.linear 1 100) initialState [
+          newRef
+        , readRef
+        , writeRef
+        , incRef 2
+        ]
 
     executeSequential initialState actions
+
+prop_references_parallel :: Property
+prop_references_parallel =
+  withTests 1000 . withRetries 10 . property $ do
+    actions <- forAll $
+      Gen.parallel (Range.linear 1 50) (Range.linear 1 10) initialState [
+          newRef
+        , readRef
+        , writeRef
+        , incRef 1
+        ]
+
+    test $
+      executeParallel initialState actions
 
 ------------------------------------------------------------------------
 
