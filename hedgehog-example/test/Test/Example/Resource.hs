@@ -4,6 +4,7 @@ module Test.Example.Resource where
 
 import           Control.Monad.IO.Class (MonadIO(..))
 import           Control.Monad.Trans.Except (ExceptT, throwE)
+import           Control.Monad.Trans.Resource (runResourceT)
 
 import           Hedgehog
 import qualified Hedgehog.Gen as Gen
@@ -42,14 +43,14 @@ prop_unix_sort =
       Gen.list (Range.linear 0 100) $
       Gen.string (Range.constant 1 5) Gen.alpha
 
-    withResourceT $ do
+    test . runResourceT $ do
       (_, dir) <- Temp.createTempDirectory Nothing "prop_dir"
 
       let input = dir </> "input"
           output = dir </> "output"
 
       liftIO $ writeFile input (unlines values0)
-      liftExceptT $ unixSort input output
+      evalExceptT $ unixSort input output
       values <- liftIO . fmap lines $ readFile output
 
       values0 === values

@@ -8,10 +8,11 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE UndecidableInstances #-} -- MonadBase
+{-# LANGUAGE UndecidableInstances #-} -- Distributive
 module Hedgehog.Internal.Property (
   -- * Property
     Property(..)
@@ -29,43 +30,42 @@ module Hedgehog.Internal.Property (
   , Group(..)
   , GroupName(..)
 
+  -- * TestGen
+  , TestGen(..)
+  , forAll
+  , forAllWith
+  , discard
+  , test
+
   -- * Test
+  , MonadTest(..)
   , Test(..)
   , Log(..)
   , Failure(..)
   , Diff(..)
-  , forAll
-  , forAllWith
   , annotate
   , annotateShow
   , footnote
   , footnoteShow
-  , discard
   , failure
   , success
-
   , assert
   , (===)
 
-  , evaluate
-
-  , liftCatch
-  , liftCatchIO
-  , liftEither
-  , liftExceptT
-
-  , withCatch
-  , withExceptT
-  , withResourceT
+  , eval
+  , evalM
+  , evalIO
+  , evalEither
+  , evalExceptT
 
   -- * Internal
   -- $internal
   , defaultConfig
   , mapConfig
-  , failWith
   , failDiff
   , failException
-  , writeLog
+
+  , mkTest
   , runTest
   ) where
 
@@ -81,10 +81,21 @@ import           Control.Monad.Primitive (PrimMonad(..))
 import           Control.Monad.Reader.Class (MonadReader(..))
 import           Control.Monad.State.Class (MonadState(..))
 import           Control.Monad.Trans.Class (MonadTrans(..))
+import           Control.Monad.Trans.Cont (ContT)
+import           Control.Monad.Trans.Control (ComposeSt, defaultLiftBaseWith, defaultRestoreM)
+import           Control.Monad.Trans.Control (MonadBaseControl(..), MonadTransControl(..))
 import           Control.Monad.Trans.Except (ExceptT(..), runExceptT)
-import           Control.Monad.Trans.Resource (MonadResource(..), MonadResourceBase)
-import           Control.Monad.Trans.Resource (ResourceT, runResourceT)
-import           Control.Monad.Trans.Writer.Lazy (WriterT(..))
+import           Control.Monad.Trans.Identity (IdentityT)
+import           Control.Monad.Trans.Maybe (MaybeT)
+import qualified Control.Monad.Trans.RWS.Lazy as Lazy
+import qualified Control.Monad.Trans.RWS.Strict as Strict
+import           Control.Monad.Trans.Reader (ReaderT)
+import           Control.Monad.Trans.Resource (MonadResource(..))
+import           Control.Monad.Trans.Resource (ResourceT)
+import qualified Control.Monad.Trans.State.Lazy as Lazy
+import qualified Control.Monad.Trans.State.Strict as Strict
+import qualified Control.Monad.Trans.Writer.Lazy as Lazy
+import qualified Control.Monad.Trans.Writer.Strict as Strict
 import           Control.Monad.Writer.Class (MonadWriter(..))
 
 import qualified Data.Char as Char
@@ -104,23 +115,56 @@ import           Language.Haskell.TH.Lift (deriveLift)
 
 ------------------------------------------------------------------------
 
--- | A property test to check, along with some configurable limits like how
---   many times to run the test.
+-- | A property test, along with some configurable limits like how many times
+--   to run the test.
 --
 data Property =
   Property {
       propertyConfig :: !PropertyConfig
-    , propertyTest :: Test IO ()
+    , propertyTest :: TestGen IO ()
     }
 
--- | A property test.
+-- | A test generator.
+--
+newtype TestGen m a =
+  TestGen {
+      unTestGen :: Test (Gen m) a
+    } deriving (
+      Functor
+    , Applicative
+    , Monad
+    , MonadIO
+    , MonadBase b
+    , MonadThrow
+    , MonadCatch
+    , MonadReader r
+    , MonadState s
+    , MonadError e
+    )
+
+-- | A test.
 --
 newtype Test m a =
   Test {
-      unTest :: ExceptT Failure (WriterT [Log] (Gen m)) a
-    } deriving (Functor, Applicative)
+      unTest :: ExceptT Failure (Lazy.WriterT [Log] m) a
+    } deriving (
+      Functor
+    , Applicative
+    , MonadIO
+    , MonadBase b
+    , MonadThrow
+    , MonadCatch
+    , MonadReader r
+    , MonadState s
+    )
 
 -- | The name of a property.
+--
+--   Can be constructed using `OverloadedStrings`:
+--
+-- @
+--   "apples" :: PropertyName
+-- @
 --
 newtype PropertyName =
   PropertyName {
@@ -139,17 +183,36 @@ data PropertyConfig =
 -- | The number of successful tests that need to be run before a property test
 --   is considered successful.
 --
+--   Can be constructed using numeric literals:
+--
+-- @
+--   200 :: TestLimit
+-- @
+--
 newtype TestLimit =
   TestLimit Int
   deriving (Eq, Ord, Show, Num, Enum, Real, Integral)
 
 -- | The number of shrinks to try before giving up on shrinking.
 --
+--   Can be constructed using numeric literals:
+--
+-- @
+--   1000 :: ShrinkLimit
+-- @
+--
 newtype ShrinkLimit =
   ShrinkLimit Int
   deriving (Eq, Ord, Show, Num, Enum, Real, Integral)
 
 -- | The number of discards to allow before giving up.
+--
+--   Can be constructed using numeric literals:
+--
+-- @
+--   10000 :: DiscardLimit
+-- @
+--
 --
 newtype DiscardLimit =
   DiscardLimit Int
@@ -164,6 +227,12 @@ data Group =
     }
 
 -- | The name of a group of properties.
+--
+--   Can be constructed using `OverloadedStrings`:
+--
+-- @
+--   "fruit" :: GroupName
+-- @
 --
 newtype GroupName =
   GroupName {
@@ -201,6 +270,9 @@ data Diff =
     , diffValue :: ValueDiff
     } deriving (Eq, Show)
 
+------------------------------------------------------------------------
+-- Test
+
 instance Monad m => Monad (Test m) where
   return =
     Test . return
@@ -213,45 +285,25 @@ instance Monad m => Monad (Test m) where
   fail err =
     Test . ExceptT . pure . Left $ Failure Nothing err Nothing
 
-instance Monad m => MonadPlus (Test m) where
-  mzero =
-    discard
-
-  mplus x y =
-    Test . ExceptT . WriterT $
-      mplus (runTest x) (runTest y)
-
-instance Monad m => Alternative (Test m) where
-  empty =
-    mzero
-  (<|>) =
-    mplus
-
 instance MonadTrans Test where
   lift =
-    Test . lift . lift . lift
+    Test . lift . lift
 
 instance MFunctor Test where
   hoist f =
-    Test . hoist (hoist (hoist f)) . unTest
-
-distributeTest :: Transformer t Test m => Test (t m) a -> t (Test m) a
-distributeTest =
-  hoist Test .
-  distribute .
-  hoist distribute .
-  hoist (hoist distribute) .
-  unTest
+    Test . hoist (hoist f) . unTest
 
 instance Distributive Test where
   type Transformer t Test m = (
-      Transformer t Gen m
-    , Transformer t (WriterT [Log]) (Gen m)
-    , Transformer t (ExceptT Failure) (WriterT [Log] (Gen m))
+      Transformer t (Lazy.WriterT [Log]) m
+    , Transformer t (ExceptT Failure) (Lazy.WriterT [Log] m)
     )
 
   distribute =
-    distributeTest
+    hoist Test .
+    distribute .
+    hoist distribute .
+    unTest
 
 instance PrimMonad m => PrimMonad (Test m) where
   type PrimState (Test m) =
@@ -259,40 +311,7 @@ instance PrimMonad m => PrimMonad (Test m) where
   primitive =
     lift . primitive
 
-instance MonadIO m => MonadIO (Test m) where
-  liftIO =
-    lift . liftIO
-
-instance MonadBase b m => MonadBase b (Test m) where
-  liftBase =
-    lift . liftBase
-
-instance MonadThrow m => MonadThrow (Test m) where
-  throwM =
-    lift . throwM
-
-instance MonadCatch m => MonadCatch (Test m) where
-  catch m onErr =
-    Test $
-      (unTest m) `catch`
-      (unTest . onErr)
-
-instance MonadReader r m => MonadReader r (Test m) where
-  ask =
-    lift ask
-  local f m =
-    Test $
-      local f (unTest m)
-
-instance MonadState s m => MonadState s (Test m) where
-  get =
-    lift get
-  put =
-    lift . put
-  state =
-    lift . state
-
--- FIXME instance MonadWriter Test
+-- FIXME instance MonadWriter w m => MonadWriter w (Test m)
 
 instance MonadError e m => MonadError e (Test m) where
   throwError =
@@ -305,6 +324,350 @@ instance MonadError e m => MonadError e (Test m) where
 instance MonadResource m => MonadResource (Test m) where
   liftResourceT =
     lift . liftResourceT
+
+instance MonadTransControl Test where
+  type StT Test a =
+    (Either Failure a, [Log])
+
+  liftWith f =
+    mkTest . fmap (, []) . fmap Right $ f $ runTest
+
+  restoreT =
+    mkTest
+
+instance MonadBaseControl b m => MonadBaseControl b (Test m) where
+  type StM (Test m) a =
+    ComposeSt Test m a
+
+  liftBaseWith =
+    defaultLiftBaseWith
+
+  restoreM =
+    defaultRestoreM
+
+class Monad m => MonadTest m where
+  -- | Log some information which might be relevant to a potential test failure.
+  --
+  writeLog :: Log -> m ()
+
+  -- | Fail the test with an error message, useful for building other failure
+  --   combinators.
+  --
+  failWith :: HasCallStack => Maybe Diff -> String -> m a
+
+instance Monad m => MonadTest (Test m) where
+  writeLog =
+    Test . lift . tell . pure
+
+  failWith diff msg =
+    Test . ExceptT . pure . Left $ Failure (getCaller callStack) msg diff
+
+instance MonadTest m => MonadTest (IdentityT m) where
+  writeLog =
+    lift . writeLog
+  failWith diff msg =
+    lift $ failWith diff msg
+
+instance MonadTest m => MonadTest (MaybeT m) where
+  writeLog =
+    lift . writeLog
+  failWith diff msg =
+    lift $ failWith diff msg
+
+instance MonadTest m => MonadTest (ExceptT x m) where
+  writeLog =
+    lift . writeLog
+  failWith diff msg =
+    lift $ failWith diff msg
+
+instance MonadTest m => MonadTest (ReaderT r m) where
+  writeLog =
+    lift . writeLog
+  failWith diff msg =
+    lift $ failWith diff msg
+
+instance MonadTest m => MonadTest (Lazy.StateT s m) where
+  writeLog =
+    lift . writeLog
+  failWith diff msg =
+    lift $ failWith diff msg
+
+instance MonadTest m => MonadTest (Strict.StateT s m) where
+  writeLog =
+    lift . writeLog
+  failWith diff msg =
+    lift $ failWith diff msg
+
+instance (MonadTest m, Monoid w) => MonadTest (Lazy.WriterT w m) where
+  writeLog =
+    lift . writeLog
+  failWith diff msg =
+    lift $ failWith diff msg
+
+instance (MonadTest m, Monoid w) => MonadTest (Strict.WriterT w m) where
+  writeLog =
+    lift . writeLog
+  failWith diff msg =
+    lift $ failWith diff msg
+
+instance (MonadTest m, Monoid w) => MonadTest (Lazy.RWST r w s m) where
+  writeLog =
+    lift . writeLog
+  failWith diff msg =
+    lift $ failWith diff msg
+
+instance (MonadTest m, Monoid w) => MonadTest (Strict.RWST r w s m) where
+  writeLog =
+    lift . writeLog
+  failWith diff msg =
+    lift $ failWith diff msg
+
+instance MonadTest m => MonadTest (ContT r m) where
+  writeLog =
+    lift . writeLog
+  failWith diff msg =
+    lift $ failWith diff msg
+
+instance MonadTest m => MonadTest (ResourceT m) where
+  writeLog =
+    lift . writeLog
+  failWith diff msg =
+    lift $ failWith diff msg
+
+mkTest :: m (Either Failure a, [Log]) -> Test m a
+mkTest =
+  Test . ExceptT . Lazy.WriterT
+
+runTest :: Test m a -> m (Either Failure a, [Log])
+runTest =
+  Lazy.runWriterT . runExceptT . unTest
+
+-- | Annotates the source code with a message that might be useful for
+--   debugging a test failure.
+--
+annotate :: (MonadTest m, HasCallStack) => String -> m ()
+annotate x = do
+  writeLog $ Annotation (getCaller callStack) x
+
+-- | Annotates the source code with a value that might be useful for
+--   debugging a test failure.
+--
+annotateShow :: (MonadTest m, Show a, HasCallStack) => a -> m ()
+annotateShow x = do
+  withFrozenCallStack $ annotate (showPretty x)
+
+-- | Logs a message to be displayed as additional information in the footer of
+--   the failure report.
+--
+footnote :: MonadTest m => String -> m ()
+footnote =
+  writeLog . Footnote
+
+-- | Logs a value to be displayed as additional information in the footer of
+--   the failure report.
+--
+footnoteShow :: (MonadTest m, Show a) => a -> m ()
+footnoteShow =
+  writeLog . Footnote . showPretty
+
+-- | Fails with an error which shows the difference between two values.
+--
+failDiff :: (MonadTest m, Show a, Show b, HasCallStack) => a -> b -> m ()
+failDiff x y =
+  case valueDiff <$> mkValue x <*> mkValue y of
+    Nothing ->
+      withFrozenCallStack $
+        failWith Nothing $ unlines [
+            "━━━ Not Equal ━━━"
+          , showPretty x
+          , showPretty y
+          ]
+    Just diff ->
+      withFrozenCallStack $
+        failWith (Just $ Diff "Failed (" "- lhs" "=/=" "+ rhs" ")" diff) ""
+
+-- | Fails with an error which renders the type of an exception and its error
+--   message.
+--
+failException :: (MonadTest m, HasCallStack) => SomeException -> m a
+failException (SomeException x) =
+  withFrozenCallStack $
+    failWith Nothing $ unlines [
+        "━━━ Exception: " ++ show (typeOf x) ++ " ━━━"
+      , List.dropWhileEnd Char.isSpace (displayException x)
+      ]
+
+-- | Causes a test to fail.
+--
+failure :: (MonadTest m, HasCallStack) => m a
+failure =
+  withFrozenCallStack $ failWith Nothing ""
+
+-- | Another name for @pure ()@.
+--
+success :: MonadTest m => m ()
+success =
+  pure ()
+
+-- | Fails the test if the condition provided is 'False'.
+--
+assert :: (MonadTest m, HasCallStack) => Bool -> m ()
+assert b = do
+  ok <- withFrozenCallStack $ eval b
+  if ok then
+    success
+  else
+    withFrozenCallStack failure
+
+infix 4 ===
+
+-- | Fails the test if the two arguments provided are not equal.
+--
+(===) :: (MonadTest m, Eq a, Show a, HasCallStack) => a -> a -> m ()
+(===) x y = do
+  ok <- withFrozenCallStack $ eval (x == y)
+  if ok then
+    success
+  else
+    withFrozenCallStack $ failDiff x y
+
+-- | Fails the test if the value throws an exception when evaluated to weak
+--   head normal form (WHNF).
+--
+eval :: (MonadTest m, HasCallStack) => a -> m a
+eval x =
+  either (withFrozenCallStack failException) pure (tryEvaluate x)
+
+-- | Fails the test if the action throws an exception.
+--
+--   /The benefit of using this over simply letting the exception bubble up is/
+--   /that the location of the closest 'evalM' will be shown in the output./
+--
+evalM :: (MonadTest m, MonadCatch m, HasCallStack) => m a -> m a
+evalM m =
+  either (withFrozenCallStack failException) pure =<< tryAll m
+
+-- | Fails the test if the 'IO' action throws an exception.
+--
+--   /The benefit of using this over 'liftIO' is that the location of the/
+--   /exception will be shown in the output./
+--
+evalIO :: (MonadTest m, MonadIO m, HasCallStack) => IO a -> m a
+evalIO m =
+  either (withFrozenCallStack failException) pure =<< liftIO (tryAll m)
+
+-- | Fails the test if the 'Either' is 'Left', otherwise returns the value in
+--   the 'Right'.
+--
+evalEither :: (MonadTest m, Show x, HasCallStack) => Either x a -> m a
+evalEither = \case
+  Left x ->
+    withFrozenCallStack $ failWith Nothing $ showPretty x
+  Right x ->
+    pure x
+
+-- | Fails the test if the 'ExceptT' is 'Left', otherwise returns the value in
+--   the 'Right'.
+--
+evalExceptT :: (MonadTest m, Show x, HasCallStack) => ExceptT x m a -> m a
+evalExceptT m =
+  withFrozenCallStack evalEither =<< runExceptT m
+
+------------------------------------------------------------------------
+-- TestGen
+
+instance MonadTrans TestGen where
+  lift =
+    TestGen . lift . lift
+
+instance MFunctor TestGen where
+  hoist f =
+    TestGen . hoist (hoist f) . unTestGen
+
+instance Distributive TestGen where
+  type Transformer t TestGen m = (
+      Transformer t Gen m
+    , Transformer t Test (Gen m)
+    )
+
+  distribute =
+    hoist TestGen .
+    distribute .
+    hoist distribute .
+    unTestGen
+
+instance PrimMonad m => PrimMonad (TestGen m) where
+  type PrimState (TestGen m) =
+    PrimState m
+  primitive =
+    lift . primitive
+
+---- FIXME instance MonadWriter w m => MonadWriter w (TestGen m)
+
+instance Monad m => MonadTest (TestGen m) where
+  writeLog x =
+    TestGen $ writeLog x
+  failWith diff msg =
+    TestGen $ failWith diff msg
+
+instance MonadPlus m => MonadPlus (TestGen m) where
+  mzero =
+    discard
+
+  mplus (TestGen x) (TestGen y) =
+    TestGen . mkTest $
+      mplus (runTest x) (runTest y)
+
+instance MonadPlus m => Alternative (TestGen m) where
+  empty =
+    mzero
+  (<|>) =
+    mplus
+
+-- | Generates a random input for the test by running the provided generator.
+--
+forAll :: (Monad m, Show a, HasCallStack) => Gen m a -> TestGen m a
+forAll gen =
+  withFrozenCallStack $ forAllWith showPretty gen
+
+-- | Generates a random input for the test by running the provided generator.
+--
+--   /This is a the same as 'forAll' but allows the user to provide a custom/
+--   /rendering function. This is useful for values which don't have a/
+--   /'Show' instance./
+--
+forAllWith :: (Monad m, HasCallStack) => (a -> String) -> Gen m a -> TestGen m a
+forAllWith render gen = do
+  x <- TestGen $ lift gen
+  withFrozenCallStack $ annotate (render x)
+  return x
+
+-- | Discards a generated test entirely.
+--
+discard :: Monad m => TestGen m a
+discard =
+  TestGen $ lift Gen.discard
+
+-- | Lift a test in to a test generator.
+--
+--   Because both 'Test' and 'TestGen' have 'MonadTest' instances, this
+--   function is not often required. It can however be useful for writing
+--   functions directly in 'Test' and thus gaining a 'MonadTransControl'
+--   instance at the expense of not being able to generate additional inputs
+--   using 'forAll'.
+--
+--   One use case for this is writing tests which use 'ResourceT':
+--
+-- @
+--   property $ do
+--     n <- forAll $ Gen.int64 Range.linearBounded
+--     test . runResourceT $ do
+--       -- test with resource usage here
+-- @
+--
+test :: Monad m => Test m a -> TestGen m a
+test =
+  TestGen . hoist lift
 
 ------------------------------------------------------------------------
 -- Property
@@ -349,209 +712,12 @@ withShrinks :: ShrinkLimit -> Property -> Property
 withShrinks n =
   mapConfig $ \config -> config { propertyShrinkLimit = n }
 
--- | Creates a property to check.
+-- | Creates a property from a test generator.
 --
-property :: HasCallStack => Test IO () -> Property
+property :: HasCallStack => TestGen IO () -> Property
 property m =
   Property defaultConfig $
-    either (withFrozenCallStack failException) pure =<< tryAll m
-
-------------------------------------------------------------------------
--- Test
-
-runTest :: Test m a -> Gen m (Either Failure a, [Log])
-runTest =
-  runWriterT . runExceptT . unTest
-
-writeLog :: Monad m => Log -> Test m ()
-writeLog =
-  Test . lift . tell . pure
-
--- | Generates a random input for the test by running the provided generator.
---
-forAll :: (Monad m, Show a, HasCallStack) => Gen m a -> Test m a
-forAll gen =
-  withFrozenCallStack $ forAllWith showPretty gen
-
--- | Generates a random input for the test by running the provided generator.
---
---   /This is a the same as 'forAll' but allows the user to provide a custom/
---   /rendering function. This is useful for values which don't have a/
---   /'Show' instance./
---
-forAllWith :: (Monad m, HasCallStack) => (a -> String) -> Gen m a -> Test m a
-forAllWith render gen = do
-  x <- Test . lift $ lift gen
-  withFrozenCallStack $ annotate (render x)
-  return x
-
--- | Annotates the source code with a message that might be useful for
---   debugging a test failure.
---
-annotate :: (Monad m, HasCallStack) => String -> Test m ()
-annotate x = do
-  writeLog $ Annotation (getCaller callStack) x
-
--- | Annotates the source code with a value that might be useful for
---   debugging a test failure.
---
-annotateShow :: (Monad m, Show a, HasCallStack) => a -> Test m ()
-annotateShow x = do
-  withFrozenCallStack $ annotate (showPretty x)
-
--- | Logs a message to be displayed as additional information in the footer of
---   the failure report.
---
-footnote :: Monad m => String -> Test m ()
-footnote =
-  writeLog . Footnote
-
--- | Logs a value to be displayed as additional information in the footer of
---   the failure report.
---
-footnoteShow :: (Monad m, Show a) => a -> Test m ()
-footnoteShow =
-  writeLog . Footnote . showPretty
-
--- | Discards a test entirely.
---
-discard :: Monad m => Test m a
-discard =
-  Test . lift $ lift Gen.discard
-
--- | Fail with an error message, useful for building other failure combinators.
---
-failWith :: (Monad m, HasCallStack) => Maybe Diff -> String -> Test m a
-failWith diff msg =
-  Test . ExceptT . pure . Left $ Failure (getCaller callStack) msg diff
-
--- | Fails with an error which shows the difference between two values.
---
-failDiff :: (Monad m, Show a, Show b, HasCallStack) => a -> b -> Test m ()
-failDiff x y =
-  case valueDiff <$> mkValue x <*> mkValue y of
-    Nothing ->
-      withFrozenCallStack $
-        failWith Nothing $ unlines [
-            "━━━ Not Equal ━━━"
-          , showPretty x
-          , showPretty y
-          ]
-    Just diff ->
-      withFrozenCallStack $
-        failWith (Just $ Diff "Failed (" "- lhs" "=/=" "+ rhs" ")" diff) ""
-
--- | Fails with an error which renders the type of an exception and its error
---   message.
---
-failException :: (Monad m, HasCallStack) => SomeException -> Test m a
-failException (SomeException x) =
-  withFrozenCallStack $
-    failWith Nothing $ unlines [
-        "━━━ Exception: " ++ show (typeOf x) ++ " ━━━"
-      , List.dropWhileEnd Char.isSpace (displayException x)
-      ]
-
--- | Causes a test to fail.
---
-failure :: (Monad m, HasCallStack) => Test m a
-failure =
-  withFrozenCallStack $ failWith Nothing ""
-
--- | Another name for @pure ()@.
---
-success :: Monad m => Test m ()
-success =
-  Test $ pure ()
-
--- | Fails the test if the condition provided is 'False'.
---
-assert :: (Monad m, HasCallStack) => Bool -> Test m ()
-assert b = do
-  ok <- withFrozenCallStack $ evaluate b
-  if ok then
-    success
-  else
-    withFrozenCallStack failure
-
-infix 4 ===
-
--- | Fails the test if the two arguments provided are not equal.
---
-(===) :: (MonadIO m, Eq a, Show a, HasCallStack) => a -> a -> Test m ()
-(===) x y = do
-  ok <- withFrozenCallStack $ evaluate (x == y)
-  if ok then
-    success
-  else
-    withFrozenCallStack $ failDiff x y
-
--- | Fails the test if the value throws an exception when evaluated.
---
-evaluate :: (Monad m, HasCallStack) => a -> Test m a
-evaluate x =
-  either (withFrozenCallStack failException) pure (tryEvaluate x)
-
--- | Fails the test if the 'Either' is 'Left', otherwise returns the value in
---   the 'Right'.
---
-liftEither :: (Monad m, Show x, HasCallStack) => Either x a -> Test m a
-liftEither = \case
-  Left x ->
-    withFrozenCallStack $ failWith Nothing $ showPretty x
-  Right x ->
-    pure x
-
--- | Fails the test if the 'ExceptT' is 'Left', otherwise returns the value in
---   the 'Right'.
---
-liftExceptT :: (Monad m, Show x, HasCallStack) => ExceptT x m a -> Test m a
-liftExceptT m =
-  withFrozenCallStack liftEither =<< lift (runExceptT m)
-
--- | Fails the test if the action throws an exception.
---
---   /The benefit of using this over 'lift' is that the location of the
---   exception will be shown in the output./
---
-liftCatch :: (MonadCatch m, HasCallStack) => m a -> Test m a
-liftCatch m =
-  either (withFrozenCallStack failException) pure =<< lift (tryAll m)
-
--- | Fails the test if the action throws an exception.
---
---   /The benefit of using this over 'liftIO' is that the location of the
---   exception will be shown in the output./
---
-liftCatchIO :: (MonadIO m, HasCallStack) => IO a -> Test m a
-liftCatchIO m =
-  either (withFrozenCallStack failException) pure =<< liftIO (tryAll m)
-
--- | Fails the test if the 'ExceptT' is 'Left', otherwise returns the value in
---   the 'Right'.
---
-withExceptT :: (Monad m, Show x, HasCallStack) => Test (ExceptT x m) a -> Test m a
-withExceptT m =
-  withFrozenCallStack liftEither =<< runExceptT (distribute m)
-
--- | Fails the test if the action throws an exception.
---
---   /The benefit of using this over simply letting the exception bubble up is
---   that the location of the closest 'withCatch' will be shown in the output./
---
-withCatch :: (MonadCatch m, HasCallStack) => Test m a -> Test m a
-withCatch m =
-  either (withFrozenCallStack failException) pure =<< tryAll m
-
--- | Run a computation which requires resource acquisition / release.
---
---   /Note that if you 'Control.Monad.Trans.Resource.allocate' anything before/
---   /a 'forAll' you will likely encounter unexpected behaviour, due to the way/
---   /'ResourceT' interacts with the control flow introduced by shrinking./
---
-withResourceT :: MonadResourceBase m => Test (ResourceT m) a -> Test m a
-withResourceT =
-  hoist runResourceT
+    withFrozenCallStack (evalM m)
 
 ------------------------------------------------------------------------
 -- FIXME Replace with DeriveLift when we drop 7.10 support.

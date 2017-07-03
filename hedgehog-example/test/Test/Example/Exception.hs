@@ -39,7 +39,7 @@ prop_property_exception :: Property
 prop_property_exception =
   property $ do
     _xs <- forAll $ Gen.list (Range.linear 1 100) (Gen.int Range.constantBounded)
-    _x <- error "got an error"
+    _ <- error "got an error"
     assert True
 
 return []

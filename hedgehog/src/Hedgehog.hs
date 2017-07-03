@@ -44,26 +44,13 @@
 -- >   ✓ prop_reverse passed 100 tests.
 --
 module Hedgehog (
-    Group(..)
-  , GroupName
-  , Property
+  -- * Properties
+    Property
+  , Group(..)
   , PropertyName
-  , Test
-  , TestLimit
-  , DiscardLimit
-  , ShrinkLimit
+  , GroupName
 
-  , Gen
-  , Range
-  , Size(..)
-  , Seed(..)
-
-  -- * Property
   , property
-  , withTests
-  , withDiscards
-  , withShrinks
-
   , check
   , recheck
 
@@ -71,32 +58,47 @@ module Hedgehog (
   , checkParallel
   , checkSequential
 
-  -- * Test
+  , withTests
+  , TestLimit
+
+  , withDiscards
+  , DiscardLimit
+
+  , withShrinks
+  , ShrinkLimit
+
+  -- * Generating Test Data
+  , Gen
+  , Range
+  , Size(..)
+  , Seed(..)
+
+  , TestGen
   , forAll
   , forAllWith
+  , discard
+  , test
+
+  -- * Tests
+  , Test
+  , MonadTest
   , annotate
   , annotateShow
   , footnote
   , footnoteShow
   , success
-  , discard
   , failure
   , assert
   , (===)
-
-  , evaluate
-  , liftCatch
-  , liftCatchIO
-  , liftEither
-  , liftExceptT
-
-  , withCatch
-  , withExceptT
-  , withResourceT
-
   , tripping
 
-  -- * Abstract State Machine
+  , eval
+  , evalM
+  , evalIO
+  , evalEither
+  , evalExceptT
+
+  -- * State Machine Tests
   , Command(..)
   , Callback(..)
   , Action
@@ -136,15 +138,15 @@ import           Hedgehog.Internal.Property (annotate, annotateShow)
 import           Hedgehog.Internal.Property (assert, (===))
 import           Hedgehog.Internal.Property (discard, failure, success)
 import           Hedgehog.Internal.Property (DiscardLimit, withDiscards)
-import           Hedgehog.Internal.Property (evaluate)
 import           Hedgehog.Internal.Property (footnote, footnoteShow)
 import           Hedgehog.Internal.Property (forAll, forAllWith)
-import           Hedgehog.Internal.Property (liftCatch, liftCatchIO, liftEither, liftExceptT)
+import           Hedgehog.Internal.Property (eval, evalM, evalIO)
+import           Hedgehog.Internal.Property (evalEither, evalExceptT)
+import           Hedgehog.Internal.Property (MonadTest(..))
 import           Hedgehog.Internal.Property (Property, PropertyName, Group(..), GroupName)
 import           Hedgehog.Internal.Property (ShrinkLimit, withShrinks)
-import           Hedgehog.Internal.Property (Test, property)
+import           Hedgehog.Internal.Property (Test, TestGen, property, test)
 import           Hedgehog.Internal.Property (TestLimit, withTests)
-import           Hedgehog.Internal.Property (withCatch, withExceptT, withResourceT)
 import           Hedgehog.Internal.Range (Range, Size(..))
 import           Hedgehog.Internal.Runner (check, recheck, checkSequential, checkParallel)
 import           Hedgehog.Internal.Seed (Seed(..))
