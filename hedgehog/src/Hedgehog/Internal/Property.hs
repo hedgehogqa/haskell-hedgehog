@@ -16,30 +16,31 @@
 module Hedgehog.Internal.Property (
   -- * Property
     Property(..)
+  , PropertyT(..)
   , PropertyName(..)
   , PropertyConfig(..)
   , TestLimit(..)
   , DiscardLimit(..)
   , ShrinkLimit(..)
-  , property
+  , ShrinkRetries(..)
   , withTests
   , withDiscards
   , withShrinks
+  , withRetries
+  , property
+  , test
+  , forAll
+  , forAllWith
+  , discard
 
   -- * Group
   , Group(..)
   , GroupName(..)
 
-  -- * TestGen
-  , TestGen(..)
-  , forAll
-  , forAllWith
-  , discard
-  , test
-
-  -- * Test
+  -- * TestT
   , MonadTest(..)
-  , Test(..)
+  , Test
+  , TestT(..)
   , Log(..)
   , Failure(..)
   , Diff(..)
@@ -64,9 +65,13 @@ module Hedgehog.Internal.Property (
   , mapConfig
   , failDiff
   , failException
+  , failWith
+  , writeLog
 
   , mkTest
+  , mkTestT
   , runTest
+  , runTestT
   ) where
 
 import           Control.Applicative (Alternative(..))
@@ -96,9 +101,9 @@ import qualified Control.Monad.Trans.State.Lazy as Lazy
 import qualified Control.Monad.Trans.State.Strict as Strict
 import qualified Control.Monad.Trans.Writer.Lazy as Lazy
 import qualified Control.Monad.Trans.Writer.Strict as Strict
-import           Control.Monad.Writer.Class (MonadWriter(..))
 
 import qualified Data.Char as Char
+import           Data.Functor.Identity (Identity(..))
 import qualified Data.List as List
 import           Data.Semigroup (Semigroup)
 import           Data.String (IsString)
@@ -121,14 +126,15 @@ import           Language.Haskell.TH.Lift (deriveLift)
 data Property =
   Property {
       propertyConfig :: !PropertyConfig
-    , propertyTest :: TestGen IO ()
+    , propertyTest :: PropertyT IO ()
     }
 
--- | A test generator.
+-- | The property monad transformer allows both the generation of test inputs
+--   and the assertion of expectations.
 --
-newtype TestGen m a =
-  TestGen {
-      unTestGen :: Test (Gen m) a
+newtype PropertyT m a =
+  PropertyT {
+      unPropertyT :: TestT (Gen m) a
     } deriving (
       Functor
     , Applicative
@@ -142,10 +148,15 @@ newtype TestGen m a =
     , MonadError e
     )
 
--- | A test.
+-- | A test monad allows the assertion of expectations.
 --
-newtype Test m a =
-  Test {
+type Test =
+  TestT Identity
+
+-- | A test monad transformer allows the assertion of expectations.
+--
+newtype TestT m a =
+  TestT {
       unTest :: ExceptT Failure (Lazy.WriterT [Log] m) a
     } deriving (
       Functor
@@ -178,6 +189,7 @@ data PropertyConfig =
       propertyTestLimit :: !TestLimit
     , propertyDiscardLimit :: !DiscardLimit
     , propertyShrinkLimit :: !ShrinkLimit
+    , propertyShrinkRetries :: !ShrinkRetries
     } deriving (Eq, Ord, Show)
 
 -- | The number of successful tests that need to be run before a property test
@@ -193,6 +205,19 @@ newtype TestLimit =
   TestLimit Int
   deriving (Eq, Ord, Show, Num, Enum, Real, Integral)
 
+-- | The number of discards to allow before giving up.
+--
+--   Can be constructed using numeric literals:
+--
+-- @
+--   10000 :: DiscardLimit
+-- @
+--
+--
+newtype DiscardLimit =
+  DiscardLimit Int
+  deriving (Eq, Ord, Show, Num, Enum, Real, Integral)
+
 -- | The number of shrinks to try before giving up on shrinking.
 --
 --   Can be constructed using numeric literals:
@@ -205,17 +230,23 @@ newtype ShrinkLimit =
   ShrinkLimit Int
   deriving (Eq, Ord, Show, Num, Enum, Real, Integral)
 
--- | The number of discards to allow before giving up.
+-- | The number of times to re-run a test during shrinking. This is useful if
+--   you are testing something which fails non-deterministically and you want to
+--   increase the change of getting a good shrink.
+--
+--   If you are doing parallel state machine testing, you should probably set
+--   shrink retries to something like @10@. This will mean that during
+--   shrinking, a parallel test case requires 10 successful runs before it is
+--   passes and we try a different shrink.
 --
 --   Can be constructed using numeric literals:
 --
 -- @
---   10000 :: DiscardLimit
+--   0 :: ShrinkRetries
 -- @
 --
---
-newtype DiscardLimit =
-  DiscardLimit Int
+newtype ShrinkRetries =
+  ShrinkRetries Int
   deriving (Eq, Ord, Show, Num, Enum, Real, Integral)
 
 -- | A named collection of property tests.
@@ -271,73 +302,73 @@ data Diff =
     } deriving (Eq, Show)
 
 ------------------------------------------------------------------------
--- Test
+-- TestT
 
-instance Monad m => Monad (Test m) where
+instance Monad m => Monad (TestT m) where
   return =
-    Test . return
+    TestT . return
 
   (>>=) m k =
-    Test $
+    TestT $
       unTest m >>=
       unTest . k
 
   fail err =
-    Test . ExceptT . pure . Left $ Failure Nothing err Nothing
+    TestT . ExceptT . pure . Left $ Failure Nothing err Nothing
 
-instance MonadTrans Test where
+instance MonadTrans TestT where
   lift =
-    Test . lift . lift
+    TestT . lift . lift
 
-instance MFunctor Test where
+instance MFunctor TestT where
   hoist f =
-    Test . hoist (hoist f) . unTest
+    TestT . hoist (hoist f) . unTest
 
-instance Distributive Test where
-  type Transformer t Test m = (
+instance Distributive TestT where
+  type Transformer t TestT m = (
       Transformer t (Lazy.WriterT [Log]) m
     , Transformer t (ExceptT Failure) (Lazy.WriterT [Log] m)
     )
 
   distribute =
-    hoist Test .
+    hoist TestT .
     distribute .
     hoist distribute .
     unTest
 
-instance PrimMonad m => PrimMonad (Test m) where
-  type PrimState (Test m) =
+instance PrimMonad m => PrimMonad (TestT m) where
+  type PrimState (TestT m) =
     PrimState m
   primitive =
     lift . primitive
 
--- FIXME instance MonadWriter w m => MonadWriter w (Test m)
+-- FIXME instance MonadWriter w m => MonadWriter w (TestT m)
 
-instance MonadError e m => MonadError e (Test m) where
+instance MonadError e m => MonadError e (TestT m) where
   throwError =
     lift . throwError
   catchError m onErr =
-    Test . ExceptT $
+    TestT . ExceptT $
       (runExceptT $ unTest m) `catchError`
       (runExceptT . unTest . onErr)
 
-instance MonadResource m => MonadResource (Test m) where
+instance MonadResource m => MonadResource (TestT m) where
   liftResourceT =
     lift . liftResourceT
 
-instance MonadTransControl Test where
-  type StT Test a =
+instance MonadTransControl TestT where
+  type StT TestT a =
     (Either Failure a, [Log])
 
   liftWith f =
-    mkTest . fmap (, []) . fmap Right $ f $ runTest
+    mkTestT . fmap (, []) . fmap Right $ f $ runTestT
 
   restoreT =
-    mkTest
+    mkTestT
 
-instance MonadBaseControl b m => MonadBaseControl b (Test m) where
-  type StM (Test m) a =
-    ComposeSt Test m a
+instance MonadBaseControl b m => MonadBaseControl b (TestT m) where
+  type StM (TestT m) a =
+    ComposeSt TestT m a
 
   liftBaseWith =
     defaultLiftBaseWith
@@ -346,101 +377,88 @@ instance MonadBaseControl b m => MonadBaseControl b (Test m) where
     defaultRestoreM
 
 class Monad m => MonadTest m where
-  -- | Log some information which might be relevant to a potential test failure.
-  --
-  writeLog :: Log -> m ()
+  liftTest :: Test a -> m a
 
-  -- | Fail the test with an error message, useful for building other failure
-  --   combinators.
-  --
-  failWith :: HasCallStack => Maybe Diff -> String -> m a
-
-instance Monad m => MonadTest (Test m) where
-  writeLog =
-    Test . lift . tell . pure
-
-  failWith diff msg =
-    Test . ExceptT . pure . Left $ Failure (getCaller callStack) msg diff
+instance Monad m => MonadTest (TestT m) where
+  liftTest =
+    hoist (pure . runIdentity)
 
 instance MonadTest m => MonadTest (IdentityT m) where
-  writeLog =
-    lift . writeLog
-  failWith diff msg =
-    lift $ failWith diff msg
+  liftTest =
+    lift . liftTest
 
 instance MonadTest m => MonadTest (MaybeT m) where
-  writeLog =
-    lift . writeLog
-  failWith diff msg =
-    lift $ failWith diff msg
+  liftTest =
+    lift . liftTest
 
 instance MonadTest m => MonadTest (ExceptT x m) where
-  writeLog =
-    lift . writeLog
-  failWith diff msg =
-    lift $ failWith diff msg
+  liftTest =
+    lift . liftTest
 
 instance MonadTest m => MonadTest (ReaderT r m) where
-  writeLog =
-    lift . writeLog
-  failWith diff msg =
-    lift $ failWith diff msg
+  liftTest =
+    lift . liftTest
 
 instance MonadTest m => MonadTest (Lazy.StateT s m) where
-  writeLog =
-    lift . writeLog
-  failWith diff msg =
-    lift $ failWith diff msg
+  liftTest =
+    lift . liftTest
 
 instance MonadTest m => MonadTest (Strict.StateT s m) where
-  writeLog =
-    lift . writeLog
-  failWith diff msg =
-    lift $ failWith diff msg
+  liftTest =
+    lift . liftTest
 
 instance (MonadTest m, Monoid w) => MonadTest (Lazy.WriterT w m) where
-  writeLog =
-    lift . writeLog
-  failWith diff msg =
-    lift $ failWith diff msg
+  liftTest =
+    lift . liftTest
 
 instance (MonadTest m, Monoid w) => MonadTest (Strict.WriterT w m) where
-  writeLog =
-    lift . writeLog
-  failWith diff msg =
-    lift $ failWith diff msg
+  liftTest =
+    lift . liftTest
 
 instance (MonadTest m, Monoid w) => MonadTest (Lazy.RWST r w s m) where
-  writeLog =
-    lift . writeLog
-  failWith diff msg =
-    lift $ failWith diff msg
+  liftTest =
+    lift . liftTest
 
 instance (MonadTest m, Monoid w) => MonadTest (Strict.RWST r w s m) where
-  writeLog =
-    lift . writeLog
-  failWith diff msg =
-    lift $ failWith diff msg
+  liftTest =
+    lift . liftTest
 
 instance MonadTest m => MonadTest (ContT r m) where
-  writeLog =
-    lift . writeLog
-  failWith diff msg =
-    lift $ failWith diff msg
+  liftTest =
+    lift . liftTest
 
 instance MonadTest m => MonadTest (ResourceT m) where
-  writeLog =
-    lift . writeLog
-  failWith diff msg =
-    lift $ failWith diff msg
+  liftTest =
+    lift . liftTest
 
-mkTest :: m (Either Failure a, [Log]) -> Test m a
+mkTestT :: m (Either Failure a, [Log]) -> TestT m a
+mkTestT =
+  TestT . ExceptT . Lazy.WriterT
+
+mkTest :: (Either Failure a, [Log]) -> Test a
 mkTest =
-  Test . ExceptT . Lazy.WriterT
+  mkTestT . Identity
 
-runTest :: Test m a -> m (Either Failure a, [Log])
-runTest =
+runTestT :: TestT m a -> m (Either Failure a, [Log])
+runTestT =
   Lazy.runWriterT . runExceptT . unTest
+
+runTest :: Test a -> (Either Failure a, [Log])
+runTest =
+  runIdentity . runTestT
+
+-- | Log some information which might be relevant to a potential test failure.
+--
+writeLog :: MonadTest m => Log -> m ()
+writeLog x =
+  liftTest $ mkTest (pure (), [x])
+
+-- | Fail the test with an error message, useful for building other failure
+--   combinators.
+--
+failWith :: (MonadTest m, HasCallStack) => Maybe Diff -> String -> m a
+failWith diff msg =
+  liftTest $ mkTest (Left $ Failure (getCaller callStack) msg diff, [])
 
 -- | Annotates the source code with a message that might be useful for
 --   debugging a test failure.
@@ -574,51 +592,49 @@ evalExceptT m =
   withFrozenCallStack evalEither =<< runExceptT m
 
 ------------------------------------------------------------------------
--- TestGen
+-- PropertyT
 
-instance MonadTrans TestGen where
+instance MonadTrans PropertyT where
   lift =
-    TestGen . lift . lift
+    PropertyT . lift . lift
 
-instance MFunctor TestGen where
+instance MFunctor PropertyT where
   hoist f =
-    TestGen . hoist (hoist f) . unTestGen
+    PropertyT . hoist (hoist f) . unPropertyT
 
-instance Distributive TestGen where
-  type Transformer t TestGen m = (
+instance Distributive PropertyT where
+  type Transformer t PropertyT m = (
       Transformer t Gen m
-    , Transformer t Test (Gen m)
+    , Transformer t TestT (Gen m)
     )
 
   distribute =
-    hoist TestGen .
+    hoist PropertyT .
     distribute .
     hoist distribute .
-    unTestGen
+    unPropertyT
 
-instance PrimMonad m => PrimMonad (TestGen m) where
-  type PrimState (TestGen m) =
+instance PrimMonad m => PrimMonad (PropertyT m) where
+  type PrimState (PropertyT m) =
     PrimState m
   primitive =
     lift . primitive
 
----- FIXME instance MonadWriter w m => MonadWriter w (TestGen m)
+---- FIXME instance MonadWriter w m => MonadWriter w (PropertyT m)
 
-instance Monad m => MonadTest (TestGen m) where
-  writeLog x =
-    TestGen $ writeLog x
-  failWith diff msg =
-    TestGen $ failWith diff msg
+instance Monad m => MonadTest (PropertyT m) where
+  liftTest =
+    PropertyT . hoist (pure . runIdentity)
 
-instance MonadPlus m => MonadPlus (TestGen m) where
+instance MonadPlus m => MonadPlus (PropertyT m) where
   mzero =
     discard
 
-  mplus (TestGen x) (TestGen y) =
-    TestGen . mkTest $
-      mplus (runTest x) (runTest y)
+  mplus (PropertyT x) (PropertyT y) =
+    PropertyT . mkTestT $
+      mplus (runTestT x) (runTestT y)
 
-instance MonadPlus m => Alternative (TestGen m) where
+instance MonadPlus m => Alternative (PropertyT m) where
   empty =
     mzero
   (<|>) =
@@ -626,7 +642,7 @@ instance MonadPlus m => Alternative (TestGen m) where
 
 -- | Generates a random input for the test by running the provided generator.
 --
-forAll :: (Monad m, Show a, HasCallStack) => Gen m a -> TestGen m a
+forAll :: (Monad m, Show a, HasCallStack) => Gen m a -> PropertyT m a
 forAll gen =
   withFrozenCallStack $ forAllWith showPretty gen
 
@@ -636,23 +652,23 @@ forAll gen =
 --   /rendering function. This is useful for values which don't have a/
 --   /'Show' instance./
 --
-forAllWith :: (Monad m, HasCallStack) => (a -> String) -> Gen m a -> TestGen m a
+forAllWith :: (Monad m, HasCallStack) => (a -> String) -> Gen m a -> PropertyT m a
 forAllWith render gen = do
-  x <- TestGen $ lift gen
+  x <- PropertyT $ lift gen
   withFrozenCallStack $ annotate (render x)
   return x
 
--- | Discards a generated test entirely.
+-- | Discards the current test entirely.
 --
-discard :: Monad m => TestGen m a
+discard :: Monad m => PropertyT m a
 discard =
-  TestGen $ lift Gen.discard
+  PropertyT $ lift Gen.discard
 
--- | Lift a test in to a test generator.
+-- | Lift a test in to a property.
 --
---   Because both 'Test' and 'TestGen' have 'MonadTest' instances, this
+--   Because both 'TestT' and 'PropertyT' have 'MonadTest' instances, this
 --   function is not often required. It can however be useful for writing
---   functions directly in 'Test' and thus gaining a 'MonadTransControl'
+--   functions directly in 'TestT' and thus gaining a 'MonadTransControl'
 --   instance at the expense of not being able to generate additional inputs
 --   using 'forAll'.
 --
@@ -665,9 +681,9 @@ discard =
 --       -- test with resource usage here
 -- @
 --
-test :: Monad m => Test m a -> TestGen m a
+test :: Monad m => TestT m a -> PropertyT m a
 test =
-  TestGen . hoist lift
+  PropertyT . hoist lift
 
 ------------------------------------------------------------------------
 -- Property
@@ -683,6 +699,8 @@ defaultConfig =
         100
     , propertyShrinkLimit =
         1000
+    , propertyShrinkRetries =
+        0
     }
 
 -- | Map a config modification function over a property.
@@ -712,9 +730,17 @@ withShrinks :: ShrinkLimit -> Property -> Property
 withShrinks n =
   mapConfig $ \config -> config { propertyShrinkLimit = n }
 
--- | Creates a property from a test generator.
+-- | Set the number times a property will be executed for each shrink before
+--   the test runner gives up and tries a different shrink. See 'ShrinkRetries'
+--   for more information.
 --
-property :: HasCallStack => TestGen IO () -> Property
+withRetries :: ShrinkRetries -> Property -> Property
+withRetries n =
+  mapConfig $ \config -> config { propertyShrinkRetries = n }
+
+-- | Creates a property with the default configuration.
+--
+property :: HasCallStack => PropertyT IO () -> Property
 property m =
   Property defaultConfig $
     withFrozenCallStack (evalM m)
@@ -726,8 +752,9 @@ $(deriveLift ''GroupName)
 $(deriveLift ''PropertyName)
 $(deriveLift ''PropertyConfig)
 $(deriveLift ''TestLimit)
-$(deriveLift ''ShrinkLimit)
 $(deriveLift ''DiscardLimit)
+$(deriveLift ''ShrinkLimit)
+$(deriveLift ''ShrinkRetries)
 
 ------------------------------------------------------------------------
 -- Internal

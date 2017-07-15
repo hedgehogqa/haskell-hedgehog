@@ -32,8 +32,8 @@ import           Hedgehog.Internal.Config
 import           Hedgehog.Internal.Gen (runGen, runDiscardEffect)
 import           Hedgehog.Internal.Property (Group(..), GroupName(..))
 import           Hedgehog.Internal.Property (Property(..), PropertyConfig(..), PropertyName(..))
-import           Hedgehog.Internal.Property (ShrinkLimit, withTests)
-import           Hedgehog.Internal.Property (TestGen(..), Log(..), Failure(..), runTest)
+import           Hedgehog.Internal.Property (ShrinkLimit, ShrinkRetries, withTests)
+import           Hedgehog.Internal.Property (PropertyT(..), Log(..), Failure(..), runTestT)
 import           Hedgehog.Internal.Queue
 import           Hedgehog.Internal.Region
 import           Hedgehog.Internal.Report
@@ -82,16 +82,33 @@ isFailure = \case
   _ ->
     False
 
+isSuccess :: Node m (Maybe (Either x a, b)) -> Bool
+isSuccess =
+  not . isFailure
+
+runTreeN ::
+     Monad m
+  => ShrinkRetries
+  -> Tree m (Maybe (Either x a, b))
+  -> m (Node m (Maybe (Either x a, b)))
+runTreeN n m = do
+  o <- runTree m
+  if n > 0 && isSuccess o then
+    runTreeN (n - 1) m
+  else
+    pure o
+
 takeSmallest ::
      MonadIO m
   => Size
   -> Seed
   -> ShrinkCount
   -> ShrinkLimit
+  -> ShrinkRetries
   -> (Progress -> m ())
   -> Node m (Maybe (Either Failure (), [Log]))
   -> m Result
-takeSmallest size seed shrinks slimit updateUI = \case
+takeSmallest size seed shrinks slimit retries updateUI = \case
   Node Nothing _ ->
     pure GaveUp
 
@@ -109,9 +126,9 @@ takeSmallest size seed shrinks slimit updateUI = \case
           pure $ Failed failure
         else
           findM xs (Failed failure) $ \m -> do
-            o <- runTree m
+            o <- runTreeN retries m
             if isFailure o then
-              Just <$> takeSmallest size seed (shrinks + 1) slimit updateUI o
+              Just <$> takeSmallest size seed (shrinks + 1) slimit retries updateUI o
             else
               return Nothing
 
@@ -125,7 +142,7 @@ checkReport ::
   => PropertyConfig
   -> Size
   -> Seed
-  -> TestGen m ()
+  -> PropertyT m ()
   -> (Report Progress -> m ())
   -> m (Report Result)
 checkReport cfg size0 seed0 test0 updateUI =
@@ -153,7 +170,7 @@ checkReport cfg size0 seed0 test0 updateUI =
         case Seed.split seed of
           (s0, s1) -> do
             node@(Node x _) <-
-              runTree . runDiscardEffect $ runGen size s0 . runTest $ unTestGen test
+              runTree . runDiscardEffect $ runGen size s0 . runTestT $ unPropertyT test
             case x of
               Nothing ->
                 loop tests (discards + 1) (size + 1) s1
@@ -169,6 +186,7 @@ checkReport cfg size0 seed0 test0 updateUI =
                       seed
                       0
                       (propertyShrinkLimit cfg)
+                      (propertyShrinkRetries cfg)
                       (updateUI . mkReport)
                       node
 
@@ -195,14 +213,14 @@ checkRegion region mcolor name size seed prop =
           Running ->
             setRegion region ppprogress
           Shrinking _ ->
-            forceRegion region ppprogress
+            openRegion region ppprogress
 
     ppresult <- renderResult mcolor name result
     case reportStatus result of
       Failed _ ->
-        forceRegion region ppresult
+        openRegion region ppresult
       GaveUp ->
-        forceRegion region ppresult
+        openRegion region ppresult
       OK ->
         setRegion region ppresult
 
@@ -286,7 +304,7 @@ checkGroupWith n verbosity mcolor props =
                 Quiet ->
                   newEmptyRegion
                 Normal ->
-                  newRegion
+                  newOpenRegion
 
             moveToBottom sregion
 

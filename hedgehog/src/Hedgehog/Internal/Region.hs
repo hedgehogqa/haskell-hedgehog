@@ -1,8 +1,8 @@
 module Hedgehog.Internal.Region (
     Region(..)
   , newEmptyRegion
-  , newRegion
-  , forceRegion
+  , newOpenRegion
+  , openRegion
   , setRegion
   , displayRegions
   , displayRegion
@@ -20,14 +20,14 @@ import           System.Console.Regions (ConsoleRegion, RegionLayout(..), LiftRe
 import qualified System.Console.Regions as Console
 
 
-data Content =
+data Body =
     Empty
   | Open ConsoleRegion
   | Closed
 
 newtype Region =
   Region {
-      unRegion :: TVar Content
+      unRegion :: TVar Body
     }
 
 newEmptyRegion :: LiftRegion m => m Region
@@ -36,18 +36,18 @@ newEmptyRegion =
     ref <- TVar.newTVar Empty
     pure $ Region ref
 
-newRegion :: LiftRegion m => m Region
-newRegion =
+newOpenRegion :: LiftRegion m => m Region
+newOpenRegion =
   liftRegion $ do
     region <- Console.openConsoleRegion Linear
     ref <- TVar.newTVar $ Open region
     pure $ Region ref
 
-forceRegion :: LiftRegion m => Region -> String -> m ()
-forceRegion (Region var) content =
+openRegion :: LiftRegion m => Region -> String -> m ()
+openRegion (Region var) content =
   liftRegion $ do
-    mregion <- TVar.readTVar var
-    case mregion of
+    body <- TVar.readTVar var
+    case body of
       Empty -> do
         region <- Console.openConsoleRegion Linear
         TVar.writeTVar var $ Open region
@@ -62,8 +62,8 @@ forceRegion (Region var) content =
 setRegion :: LiftRegion m => Region -> String -> m ()
 setRegion (Region var) content =
   liftRegion $ do
-    mregion <- TVar.readTVar var
-    case mregion of
+    body <- TVar.readTVar var
+    case body of
       Empty ->
         pure ()
 
@@ -84,13 +84,13 @@ displayRegion ::
   => (Region -> m a)
   -> m a
 displayRegion =
-  displayRegions . bracket newRegion finishRegion
+  displayRegions . bracket newOpenRegion finishRegion
 
 moveToBottom :: Region -> STM ()
 moveToBottom (Region var) =
   liftRegion $ do
-    mregion <- TVar.readTVar var
-    case mregion of
+    body <- TVar.readTVar var
+    case body of
       Empty ->
         pure ()
 
@@ -113,8 +113,8 @@ moveToBottom (Region var) =
 finishRegion :: LiftRegion m => Region -> m ()
 finishRegion (Region var) =
   liftRegion $ do
-    mregion <- TVar.readTVar var
-    case mregion of
+    body <- TVar.readTVar var
+    case body of
       Empty -> do
         TVar.writeTVar var Closed
 
