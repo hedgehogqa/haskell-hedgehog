@@ -79,6 +79,9 @@ module Hedgehog (
 
   -- * Generating Test Data
   , Gen
+  , GenT
+  , MonadGen(..)
+
   , Range
   , Size(..)
   , Seed(..)
@@ -139,7 +142,7 @@ module Hedgehog (
 import           Data.Functor.Classes (Eq1, eq1, Ord1, compare1, Show1, showsPrec1)
 
 import           Hedgehog.Internal.Distributive (Distributive(..))
-import           Hedgehog.Internal.Gen (Gen)
+import           Hedgehog.Internal.Gen (Gen, GenT, MonadGen(..))
 import           Hedgehog.Internal.HTraversable (HTraversable(..))
 import           Hedgehog.Internal.Opaque (Opaque(..))
 import           Hedgehog.Internal.Property (annotate, annotateShow)
@@ -151,7 +154,8 @@ import           Hedgehog.Internal.Property (evalEither, evalExceptT)
 import           Hedgehog.Internal.Property (footnote, footnoteShow)
 import           Hedgehog.Internal.Property (forAll, forAllWith)
 import           Hedgehog.Internal.Property (MonadTest(..))
-import           Hedgehog.Internal.Property (Property, PropertyT, PropertyName, Group(..), GroupName)
+import           Hedgehog.Internal.Property (Property, PropertyT, PropertyName)
+import           Hedgehog.Internal.Property (Group(..), GroupName)
 import           Hedgehog.Internal.Property (ShrinkLimit, withShrinks)
 import           Hedgehog.Internal.Property (ShrinkRetries, withRetries)
 import           Hedgehog.Internal.Property (Test, TestT, property, test)

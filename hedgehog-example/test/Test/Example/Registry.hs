@@ -123,11 +123,11 @@ instance HTraversable Register where
       <$> pure name
       <*> htraverse f pid
 
-genName :: Monad m => Gen m Name
+genName :: MonadGen m => m Name
 genName =
   Name <$> Gen.element ["a", "b", "c", "d"]
 
-register :: (Monad n, MonadIO m) => Command n m State
+register :: (MonadGen n, MonadIO m) => Command n m State
 register =
   let
     gen s =
@@ -181,7 +181,7 @@ instance HTraversable Unregister where
   htraverse _ (Unregister name) =
     Unregister <$> pure name
 
-unregister :: (Monad n, MonadIO m) => Command n m State
+unregister :: (MonadGen n, MonadIO m) => Command n m State
 unregister =
   let
     gen _ =

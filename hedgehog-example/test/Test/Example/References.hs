@@ -67,7 +67,7 @@ instance HTraversable ReadRef where
   htraverse f (ReadRef ref) =
     ReadRef <$> htraverse f ref
 
-readRef :: (Monad n, MonadIO m, MonadTest m) => Command n m State
+readRef :: (MonadGen n, MonadIO m, MonadTest m) => Command n m State
 readRef =
   let
     gen s =
@@ -100,7 +100,7 @@ instance HTraversable WriteRef where
   htraverse f (WriteRef ref x) =
     WriteRef <$> htraverse f ref <*> pure x
 
-writeRef :: (Monad n, MonadIO m) => Command n m State
+writeRef :: (MonadGen n, MonadIO m) => Command n m State
 writeRef =
   let
     gen s =
@@ -136,7 +136,7 @@ instance HTraversable IncRef where
   htraverse f (IncRef ref) =
     IncRef <$> htraverse f ref
 
-incRef :: (Monad n, MonadIO m) => Int -> Command n m State
+incRef :: (MonadGen n, MonadIO m) => Int -> Command n m State
 incRef n =
   let
     gen s =

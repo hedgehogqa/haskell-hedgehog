@@ -29,7 +29,7 @@ import           Control.Monad.IO.Class (MonadIO(..))
 import           Data.Semigroup ((<>))
 
 import           Hedgehog.Internal.Config
-import           Hedgehog.Internal.Gen (runGen, runDiscardEffect)
+import           Hedgehog.Internal.Gen (runGenT, runDiscardEffect)
 import           Hedgehog.Internal.Property (Group(..), GroupName(..))
 import           Hedgehog.Internal.Property (Property(..), PropertyConfig(..), PropertyName(..))
 import           Hedgehog.Internal.Property (ShrinkLimit, ShrinkRetries, withTests)
@@ -170,7 +170,7 @@ checkReport cfg size0 seed0 test0 updateUI =
         case Seed.split seed of
           (s0, s1) -> do
             node@(Node x _) <-
-              runTree . runDiscardEffect $ runGen size s0 . runTestT $ unPropertyT test
+              runTree . runDiscardEffect $ runGenT size s0 . runTestT $ unPropertyT test
             case x of
               Nothing ->
                 loop tests (discards + 1) (size + 1) s1

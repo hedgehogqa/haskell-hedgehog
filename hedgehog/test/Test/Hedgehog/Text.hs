@@ -12,11 +12,11 @@ import qualified Hedgehog.Range as Range
 import           Text.Read (readEither)
 
 
-genSize :: Monad m => Gen m Size
+genSize :: Gen Size
 genSize =
   Size <$> Gen.enumBounded
 
-genOdd :: Monad m => Gen m Int64
+genOdd :: Gen Int64
 genOdd =
   let
     mkOdd x =
@@ -27,19 +27,19 @@ genOdd =
   in
     mkOdd <$> Gen.int64 (Range.constant 1 maxBound)
 
-genSeed :: Monad m => Gen m Seed
+genSeed :: Gen Seed
 genSeed =
   Seed <$> Gen.enumBounded <*> genOdd
 
-genPrecedence :: Monad m => Gen m Int
+genPrecedence :: Gen Int
 genPrecedence =
   Gen.int (Range.constant 0 11)
 
-genString :: Monad m => Gen m String
+genString :: Gen String
 genString =
   Gen.string (Range.constant 0 100) Gen.alpha
 
-checkShowAppend :: (Typeable a, Show a) => Gen IO a -> Property
+checkShowAppend :: (Typeable a, Show a) => Gen a -> Property
 checkShowAppend gen =
   property $ do
     prec <- forAll genPrecedence
@@ -48,7 +48,7 @@ checkShowAppend gen =
     ysuffix <- forAll genString
     showsPrec prec x xsuffix ++ ysuffix  === showsPrec prec x (xsuffix ++ ysuffix)
 
-trippingReadShow :: (Eq a, Typeable a, Show a, Read a) => Gen IO a -> Property
+trippingReadShow :: (Eq a, Typeable a, Show a, Read a) => Gen a -> Property
 trippingReadShow gen =
   property $ do
     prec <- forAll genPrecedence

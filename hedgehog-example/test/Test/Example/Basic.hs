@@ -110,19 +110,19 @@ total :: Order -> USD
 total (Order xs) =
   sum $ fmap price xs
 
-cheap :: Monad m => Gen m Item
+cheap :: Gen Item
 cheap =
   Item
     <$> (Product <$> Gen.element ["sandwich", "noodles"])
     <*> (USD <$> Gen.integral (Range.constant 5 10))
 
-expensive :: Monad m => Gen m Item
+expensive :: Gen Item
 expensive =
   Item
     <$> (Product <$> Gen.element ["oculus", "vive"])
     <*> (USD <$> Gen.integral (Range.linear 1000 2000))
 
-order :: Monad m => Gen m Item -> Gen m Order
+order :: Gen Item -> Gen Order
 order gen =
   Order <$> Gen.list (Range.linear 0 50) gen
 
@@ -174,7 +174,7 @@ evalExp = \case
 -- sub-terms:
 --
 
-genExp1 :: Monad m => Gen m Exp
+genExp1 :: Gen Exp
 genExp1 =
   Gen.recursive Gen.choice [
       Lit <$> Gen.int (Range.linear 0 10000)
@@ -205,7 +205,7 @@ shrinkExp2 = \case
   Add x y ->
     [Lit (evalExp (Add x y))]
 
-genExp2 :: Monad m => Gen m Exp
+genExp2 :: Gen Exp
 genExp2 =
   Gen.shrink shrinkExp2 $
   Gen.recursive Gen.choice [
@@ -235,7 +235,7 @@ data SomeRecord =
     , someList :: [(Int, String)]
     } deriving (Eq, Show)
 
-genRecord :: Monad m => Gen m SomeRecord
+genRecord :: Gen SomeRecord
 genRecord =
   SomeRecord
     <$> Gen.int (Range.linearFrom 0 (-1000) 1000)
