@@ -1513,14 +1513,24 @@ shuffle = \case
 ------------------------------------------------------------------------
 -- Sampling
 
--- | Generate a random sample of data from the a generator.
+-- | Generate a sample from a generator.
 --
-sample :: MonadIO m => GenT m a -> m [a]
+sample :: MonadIO m => GenT m a -> m a
 sample gen =
-  fmap (fmap nodeValue . Maybe.catMaybes) .
-  replicateM 10 $ do
-    seed <- liftIO Seed.random
-    runMaybeT . runTree $ runGenT 30 seed gen
+  let
+    loop n =
+      if n <= 0 then
+        error "Hedgehog.Gen.sample: too many discards, could not generate a sample"
+      else do
+        seed <- liftIO Seed.random
+        mx <- runMaybeT . runTree $ runGenT 30 seed gen
+        case mx of
+          Nothing ->
+            loop (n - 1)
+          Just x ->
+            pure $ nodeValue x
+  in
+    loop (100 :: Int)
 
 -- | Print the value produced by a generator, and the first level of shrinks,
 --   for the given size and seed.
