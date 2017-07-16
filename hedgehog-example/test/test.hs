@@ -2,6 +2,7 @@ import           System.IO (BufferMode(..), hSetBuffering, stdout, stderr)
 
 import qualified Test.Example.Basic as Test.Example.Basic
 import qualified Test.Example.Exception as Test.Example.Exception
+import qualified Test.Example.QuickCheck as Test.Example.QuickCheck
 import qualified Test.Example.References as Test.Example.References
 import qualified Test.Example.Registry as Test.Example.Registry
 import qualified Test.Example.Resource as Test.Example.Resource
@@ -16,6 +17,7 @@ main = do
   _results <- sequence [
       Test.Example.Basic.tests
     , Test.Example.Exception.tests
+    , Test.Example.QuickCheck.tests
     , Test.Example.References.tests
     , Test.Example.Registry.tests
     , Test.Example.Resource.tests
