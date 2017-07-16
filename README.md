@@ -12,6 +12,7 @@ so shrinks obey the invariants of generated values by construction.
 ## Features
 
 - Integrated shrinking, shrinks obey invariants by construction.
+- Abstract state machine testing.
 - Generators allow monadic effects.
 - Range combinators for full control over the scope of generated numbers and collections.
 - Equality and roundtrip assertions show a diff instead of the two inequal values.
@@ -76,7 +77,7 @@ You can then load the module in GHCi, and run it:
 ```
 
  [hackage]: http://hackage.haskell.org/package/hedgehog
- [hackage-shield]: https://img.shields.io/badge/hackage-v0.4.1-blue.svg
+ [hackage-shield]: https://img.shields.io/badge/hackage-v0.5-blue.svg
 
  [travis]: https://travis-ci.org/hedgehogqa/haskell-hedgehog
  [travis-shield]: https://travis-ci.org/hedgehogqa/haskell-hedgehog.svg?branch=master

@@ -1,10 +1,19 @@
+## Version 0.5 (2017-07-16)
+
+- Parallel state machine testing, allows detection of commands which are not-atomic ([#98][98], [@jystic][jystic])
+- Easier to use variables for state machine testing ([#94][94], [@jystic][jystic])
+- `MonadGen` class allows the use of transformers like `ReaderT` and `StateT` on the outside of generators ([#99][99], [@jystic][jystic])
+- Better error messages for tests which throw exceptions ([#95][95], [@jystic][jystic])
+- Separated test input generation and assertions in to `PropertyT` and `TestT` respectively, this allows `TestT` to have a `MonadBaseControl` instance ([#96][96], [@jystic][jystic])
+- This document grew links to the pull requests which introduced various changes ([#93][93], [@moodmosaic][moodmosaic])
+
 ## Version 0.4.1 (2017-06-28)
 
 - Fixed runtime type error that could occur when shrinking state machine commands ([#91][91], [@jystic][jystic])
 
 ## Version 0.4 (2017-06-28)
 
-- Abstract state machine testing, check out the [process registry example](https://github.com/hedgehogqa/haskell-hedgehog/blob/master/hedgehog-example/test/Test/Example/Registry.hs) to see how it works ([#89][89], [@jystic][jystic])
+- Abstract state machine testing, check out the Tim Humphries' great [blog post](http://teh.id.au/posts/2017/07/15/state-machine-testing) or the [process registry example](https://github.com/hedgehogqa/haskell-hedgehog/blob/master/hedgehog-example/test/Test/Example/Registry.hs) to see how it works ([#89][89], [@jystic][jystic])
 - `liftCatch`, `liftCatchIO`, `withCatch` functions for isolating exceptions during tests ([#89][89], [@jystic][jystic])
 
 ## Version 0.3 (2017-06-11)
@@ -50,6 +59,18 @@
 [erikd]:
   https://github.com/erikd
 
+[99]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/99
+[98]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/98
+[96]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/96
+[95]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/95
+[94]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/94
+[93]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/93
 [91]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/91
 [89]:
