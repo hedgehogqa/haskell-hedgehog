@@ -1,8 +1,7 @@
 module Hedgehog.Gen (
-  -- * Transformer
-    Gen
-
   -- * Combinators
+    lift
+
   -- ** Shrinking
   , shrink
   , prune
@@ -82,6 +81,7 @@ module Hedgehog.Gen (
   , map
 
   -- ** Subterms
+  , freeze
   , subterm
   , subtermM
   , subterm2

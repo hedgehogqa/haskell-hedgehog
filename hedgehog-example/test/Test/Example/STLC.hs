@@ -5,7 +5,6 @@ module Test.Example.STLC where
 
 import           Control.Applicative
 import           Control.Monad
-import           Control.Monad.Morph
 import           Control.Monad.Reader
 
 import           Data.Map.Strict (Map)
@@ -154,7 +153,7 @@ typecheck' env expr =
 
 ------------------------------------------------------------------------
 
-genType :: Monad m => Gen m Type
+genType :: MonadGen m => m Type
 genType =
   Gen.recursive Gen.choice [
       pure TBool
@@ -166,11 +165,11 @@ genType =
 
 ------------------------------------------------------------------------
 
-genWellTypedExpr :: Monad m => Type -> Gen m Expr
-genWellTypedExpr want =
-  hoist (generalize . flip runReaderT mempty) (genWellTypedExpr' want)
+genWellTypedExpr :: Type -> Gen Expr
+genWellTypedExpr =
+  flip runReaderT mempty . genWellTypedExpr'
 
-genWellTypedExpr' :: Type -> Gen (Reader (Map Type [Expr])) Expr
+genWellTypedExpr' :: Type -> ReaderT (Map Type [Expr]) Gen Expr
 genWellTypedExpr' want =
   Gen.shrink shrinkExpr $
   Gen.recursive Gen.choice [
@@ -192,7 +191,7 @@ shrinkExpr expr =
     _ ->
       []
 
-genWellTypedExpr'' :: Type -> Gen (Reader (Map Type [Expr])) Expr
+genWellTypedExpr'' :: Type -> ReaderT (Map Type [Expr]) Gen Expr
 genWellTypedExpr'' want =
   case want of
     TBool ->
@@ -210,7 +209,7 @@ insertVar n typ =
   Map.insertWith (<>) typ [EVar n] .
   fmap (filter (/= EVar n))
 
-genWellTypedApp :: Type -> Gen (Reader (Map Type [Expr])) Expr
+genWellTypedApp :: Type -> ReaderT (Map Type [Expr]) Gen Expr
 genWellTypedApp want = do
   tg <- genKnownTypeMaybe
   eg <- genWellTypedExpr' tg
@@ -220,7 +219,7 @@ genWellTypedApp want = do
 
 -- | This tries to look up a known expression of the desired type from the env.
 -- It does not always succeed, throwing `empty` when unavailable.
-genWellTypedPath :: Type -> Gen (Reader (Map Type [Expr])) Expr
+genWellTypedPath :: Type -> ReaderT (Map Type [Expr]) Gen Expr
 genWellTypedPath want = do
   paths <- ask
   case fromMaybe [] (Map.lookup want paths) of
@@ -229,7 +228,7 @@ genWellTypedPath want = do
     es ->
       Gen.element es
 
-genKnownTypeMaybe :: Gen (Reader (Map Type [Expr])) Type
+genKnownTypeMaybe :: ReaderT (Map Type [Expr]) Gen Type
 genKnownTypeMaybe = do
   known <- ask
   if Map.null known then
@@ -243,7 +242,7 @@ genKnownTypeMaybe = do
 ------------------------------------------------------------------------
 
 -- Generates a term that is ill-typed at some point.
-genIllTypedExpr :: Monad m => Gen m Expr
+genIllTypedExpr :: Gen Expr
 genIllTypedExpr = do
   be <- genIllTypedApp
   Gen.recursive Gen.choice [
@@ -259,7 +258,7 @@ genIllTypedExpr = do
     ]
 
 -- Generates a term that is ill-typed at the very top.
-genIllTypedApp :: Monad m => Gen m Expr
+genIllTypedApp :: Gen Expr
 genIllTypedApp = do
   t1 <- genType
   t2 <- genType

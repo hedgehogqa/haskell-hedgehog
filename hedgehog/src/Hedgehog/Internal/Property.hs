@@ -30,7 +30,9 @@ module Hedgehog.Internal.Property (
   , property
   , test
   , forAll
+  , forAllT
   , forAllWith
+  , forAllWithT
   , discard
 
   -- * Group
@@ -111,7 +113,7 @@ import           Data.Typeable (typeOf)
 
 import           Hedgehog.Internal.Distributive
 import           Hedgehog.Internal.Exception
-import           Hedgehog.Internal.Gen (Gen)
+import           Hedgehog.Internal.Gen (Gen, GenT)
 import qualified Hedgehog.Internal.Gen as Gen
 import           Hedgehog.Internal.Show
 import           Hedgehog.Internal.Source
@@ -134,7 +136,7 @@ data Property =
 --
 newtype PropertyT m a =
   PropertyT {
-      unPropertyT :: TestT (Gen m) a
+      unPropertyT :: TestT (GenT m) a
     } deriving (
       Functor
     , Applicative
@@ -604,8 +606,8 @@ instance MFunctor PropertyT where
 
 instance Distributive PropertyT where
   type Transformer t PropertyT m = (
-      Transformer t Gen m
-    , Transformer t TestT (Gen m)
+      Transformer t GenT m
+    , Transformer t TestT (GenT m)
     )
 
   distribute =
@@ -642,9 +644,15 @@ instance MonadPlus m => Alternative (PropertyT m) where
 
 -- | Generates a random input for the test by running the provided generator.
 --
-forAll :: (Monad m, Show a, HasCallStack) => Gen m a -> PropertyT m a
-forAll gen =
-  withFrozenCallStack $ forAllWith showPretty gen
+--   /This is a the same as 'forAllT' but allows the user to provide a custom/
+--   /rendering function. This is useful for values which don't have a/
+--   /'Show' instance./
+--
+forAllWithT :: (Monad m, HasCallStack) => (a -> String) -> GenT m a -> PropertyT m a
+forAllWithT render gen = do
+  x <- PropertyT $ lift gen
+  withFrozenCallStack $ annotate (render x)
+  return x
 
 -- | Generates a random input for the test by running the provided generator.
 --
@@ -652,11 +660,21 @@ forAll gen =
 --   /rendering function. This is useful for values which don't have a/
 --   /'Show' instance./
 --
-forAllWith :: (Monad m, HasCallStack) => (a -> String) -> Gen m a -> PropertyT m a
-forAllWith render gen = do
-  x <- PropertyT $ lift gen
-  withFrozenCallStack $ annotate (render x)
-  return x
+forAllWith :: (Monad m, HasCallStack) => (a -> String) -> Gen a -> PropertyT m a
+forAllWith render gen =
+  withFrozenCallStack $ forAllWithT render $ Gen.lift gen
+
+-- | Generates a random input for the test by running the provided generator.
+--
+forAllT :: (Monad m, Show a, HasCallStack) => GenT m a -> PropertyT m a
+forAllT gen =
+  withFrozenCallStack $ forAllWithT showPretty gen
+
+-- | Generates a random input for the test by running the provided generator.
+--
+forAll :: (Monad m, Show a, HasCallStack) => Gen a -> PropertyT m a
+forAll gen =
+  withFrozenCallStack $ forAllWith showPretty gen
 
 -- | Discards the current test entirely.
 --

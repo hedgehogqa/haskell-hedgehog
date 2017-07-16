@@ -121,7 +121,7 @@ parse =
 
 ------------------------------------------------------------------------
 
-genTokens :: Monad m => Gen m [Token]
+genTokens :: Gen [Token]
 genTokens =
   Gen.list (Range.linear 0 100) genToken
 
@@ -129,7 +129,7 @@ round6 :: Double -> Double
 round6 x =
   fromInteger (round (x * (10 ^ (6 :: Int)))) / 10.0 ^^ (6 :: Int)
 
-genToken :: Monad m => Gen m Token
+genToken :: Gen Token
 genToken =
   Gen.choice [
       TInt <$> Gen.int (Range.linear 0 maxBound)
