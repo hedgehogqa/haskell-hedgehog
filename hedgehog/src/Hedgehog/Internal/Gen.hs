@@ -1513,39 +1513,56 @@ shuffle = \case
 ------------------------------------------------------------------------
 -- Sampling
 
--- | Generate a random sample of data from the a generator.
+-- | Generate a sample from a generator.
 --
-sample :: MonadIO m => GenT m a -> m [a]
+sample :: MonadIO m => Gen a -> m a
 sample gen =
-  fmap (fmap nodeValue . Maybe.catMaybes) .
-  replicateM 10 $ do
-    seed <- liftIO Seed.random
-    runMaybeT . runTree $ runGenT 30 seed gen
+  liftIO $
+    let
+      loop n =
+        if n <= 0 then
+          error "Hedgehog.Gen.sample: too many discards, could not generate a sample"
+        else do
+          seed <- Seed.random
+          case runIdentity . runMaybeT . runTree $ runGenT 30 seed gen of
+            Nothing ->
+              loop (n - 1)
+            Just x ->
+              pure $ nodeValue x
+    in
+      loop (100 :: Int)
 
 -- | Print the value produced by a generator, and the first level of shrinks,
 --   for the given size and seed.
 --
 --   Use 'print' to generate a value from a random seed.
 --
-printWith :: (MonadIO m, Show a) => Size -> Seed -> GenT m a -> m ()
-printWith size seed gen = do
-  Node x ss <- runTree $ renderNodes size seed gen
-  liftIO $ putStrLn "=== Outcome ==="
-  liftIO $ putStrLn x
-  liftIO $ putStrLn "=== Shrinks ==="
-  for_ ss $ \s -> do
-    Node y _ <- runTree s
-    liftIO $ putStrLn y
+printWith :: (MonadIO m, Show a) => Size -> Seed -> Gen a -> m ()
+printWith size seed gen =
+  liftIO $ do
+    let
+      Node x ss =
+        runIdentity . runTree $ renderNodes size seed gen
+
+    putStrLn "=== Outcome ==="
+    putStrLn x
+    putStrLn "=== Shrinks ==="
+
+    for_ ss $ \s ->
+      let
+        Node y _ =
+          runIdentity $ runTree s
+      in
+        putStrLn y
 
 -- | Print the shrink tree produced by a generator, for the given size and
 --   seed.
 --
 --   Use 'printTree' to generate a value from a random seed.
 --
-printTreeWith :: (MonadIO m, Show a) => Size -> Seed -> GenT m a -> m ()
+printTreeWith :: (MonadIO m, Show a) => Size -> Seed -> Gen a -> m ()
 printTreeWith size seed gen = do
-  s <- Tree.render $ renderNodes size seed gen
-  liftIO $ putStr s
+  liftIO . putStr . runIdentity . Tree.render $ renderNodes size seed gen
 
 -- | Run a generator with a random seed and print the outcome, and the first
 --   level of shrinks.
@@ -1561,7 +1578,7 @@ printTreeWith size seed gen = do
 --   > 'b'
 --   > 'c'
 --
-print :: (MonadIO m, Show a) => GenT m a -> m ()
+print :: (MonadIO m, Show a) => Gen a -> m ()
 print gen = do
   seed <- liftIO Seed.random
   printWith 30 seed gen
@@ -1583,16 +1600,16 @@ print gen = do
 --
 --   /This may not terminate when the tree is very large./
 --
-printTree :: (MonadIO m, Show a) => GenT m a -> m ()
+printTree :: (MonadIO m, Show a) => Gen a -> m ()
 printTree gen = do
   seed <- liftIO Seed.random
   printTreeWith 30 seed gen
 
 -- | Render a generator as a tree of strings.
 --
-renderNodes :: (Monad m, Show a) => Size -> Seed -> GenT m a -> Tree m String
+renderNodes :: (Monad m, Show a) => Size -> Seed -> Gen a -> Tree m String
 renderNodes size seed =
-  fmap (Maybe.maybe "<discard>" show) . runDiscardEffect . runGenT size seed
+  fmap (Maybe.maybe "<discard>" show) . runDiscardEffect . runGenT size seed . lift
 
 ------------------------------------------------------------------------
 -- Internal
