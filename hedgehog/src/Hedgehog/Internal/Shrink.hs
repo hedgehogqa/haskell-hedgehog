@@ -1,3 +1,4 @@
+{-# OPTIONS_HADDOCK not-home #-}
 module Hedgehog.Internal.Shrink (
     towards
   , towardsFloat

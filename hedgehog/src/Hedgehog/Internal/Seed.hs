@@ -1,3 +1,4 @@
+{-# OPTIONS_HADDOCK not-home #-}
 {-# LANGUAGE CPP #-}
 -- |
 -- This is a port of "Fast Splittable Pseudorandom Number Generators" by Steele

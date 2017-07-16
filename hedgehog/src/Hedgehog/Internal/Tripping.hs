@@ -1,3 +1,4 @@
+{-# OPTIONS_HADDOCK not-home #-}
 module Hedgehog.Internal.Tripping (
     tripping
   ) where
