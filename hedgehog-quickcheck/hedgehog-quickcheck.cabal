@@ -2,8 +2,6 @@ version: 0.1
 
 name:
   hedgehog-quickcheck
-license:
-  BSD3
 author:
   Jacob Stanley
 maintainer:
