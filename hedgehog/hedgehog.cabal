@@ -2,8 +2,6 @@ version: 0.5
 
 name:
   hedgehog
-license:
-  BSD3
 author:
   Jacob Stanley
 maintainer:

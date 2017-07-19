@@ -2,8 +2,6 @@ version: 0
 
 name:
   hedgehog-example
-license:
-  BSD3
 author:
   Jacob Stanley
 maintainer:
