@@ -55,6 +55,8 @@ module Hedgehog.Internal.Property (
   , success
   , assert
   , (===)
+  , (/==)
+  , compareWith
 
   , eval
   , evalM
@@ -545,8 +547,20 @@ infix 4 ===
 -- | Fails the test if the two arguments provided are not equal.
 --
 (===) :: (MonadTest m, Eq a, Show a, HasCallStack) => a -> a -> m ()
-(===) x y = do
-  ok <- withFrozenCallStack $ eval (x == y)
+(===) = compareWith (==)
+
+infix 4 /==
+
+-- | Fails the test if the two arguments provided are equal.
+--
+(/==) :: (MonadTest m, Eq a, Show a, HasCallStack) => a -> a -> m ()
+(/==) = compareWith (/=)
+
+-- | Fails the test if the two arguments provided do not satisfy the given comparison function.
+--
+compareWith :: (MonadTest m, Eq a, Show a, HasCallStack) => (a -> a -> Bool) -> a -> a -> m ()
+compareWith f x y = do
+  ok <- withFrozenCallStack $ eval (x `f` y)
   if ok then
     success
   else
