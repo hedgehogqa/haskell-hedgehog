@@ -56,6 +56,7 @@ module Hedgehog.Internal.Property (
   , assert
   , (===)
   , (/==)
+  , (?==)
   , compareWith
 
   , eval
@@ -71,6 +72,7 @@ module Hedgehog.Internal.Property (
   , failDiff
   , failException
   , failWith
+  , failValue
   , writeLog
 
   , mkTest
@@ -520,6 +522,14 @@ failException (SomeException x) =
       , List.dropWhileEnd Char.isSpace (displayException x)
       ]
 
+-- | Fails with an error which shows the value that failed.
+--
+failValue :: (MonadTest m, Show a, HasCallStack) => a -> m ()
+failValue x = failWith Nothing $ unlines
+  [ "━━━ Invalid result ━━━"
+  , showPretty x
+  ]
+
 -- | Causes a test to fail.
 --
 failure :: (MonadTest m, HasCallStack) => m a
@@ -565,6 +575,17 @@ compareWith f x y = do
     success
   else
     withFrozenCallStack $ failDiff x y
+
+infix 4 ?==
+
+-- | Fails the test if the argument provided does not satisfy the given predicate.
+--
+(?==) :: (MonadTest m, Eq a, Show a, HasCallStack) => a -> (a -> Bool) -> m ()
+(?==) x p = do
+  r <- withFrozenCallStack $ eval x
+  if p r
+    then success
+    else withFrozenCallStack $ failValue x
 
 -- | Fails the test if the value throws an exception when evaluated to weak
 --   head normal form (WHNF).
