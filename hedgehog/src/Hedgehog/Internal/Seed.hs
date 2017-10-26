@@ -192,7 +192,7 @@ mixGamma x =
     y = mix64variant13 x .|. 1
     n = popCount $ y `xor` (y `shiftR` 1)
   in
-    if n < 24 then
+    if n >= 24 then
       y `xor` (-6148914691236517206)
     else
       y
