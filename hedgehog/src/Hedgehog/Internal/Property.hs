@@ -75,6 +75,7 @@ module Hedgehog.Internal.Property (
   , mkTestT
   , runTest
   , runTestT
+  , mapTestT
   ) where
 
 import           Control.Applicative (Alternative(..))
@@ -449,6 +450,10 @@ runTestT =
 runTest :: Test a -> (Either Failure a, [Log])
 runTest =
   runIdentity . runTestT
+
+mapTestT :: (forall b. m b -> n b) -> TestT m a -> TestT n a
+mapTestT f =
+  mkTestT . f . runTestT
 
 -- | Log some information which might be relevant to a potential test failure.
 --
