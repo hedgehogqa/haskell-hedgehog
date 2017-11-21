@@ -14,6 +14,7 @@ module Hedgehog.Internal.Queue (
   , updateNumCapabilities
   ) where
 
+import           Control.Concurrent (rtsSupportsBoundThreads)
 import           Control.Concurrent.Async (forConcurrently)
 import           Control.Concurrent.MVar (MVar)
 import qualified Control.Concurrent.MVar as MVar
@@ -112,6 +113,6 @@ finalizeTask mvar ix finalize = do
 --   is.
 --
 updateNumCapabilities :: WorkerCount -> IO ()
-updateNumCapabilities (WorkerCount n) = do
+updateNumCapabilities (WorkerCount n) = when rtsSupportsBoundThreads $ do
   ncaps <- Conc.getNumCapabilities
   Conc.setNumCapabilities (max n ncaps)
