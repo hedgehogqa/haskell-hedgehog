@@ -451,9 +451,9 @@ runTest :: Test a -> (Either Failure a, [Log])
 runTest =
   runIdentity . runTestT
 
-mapTestT :: (forall b. m b -> n b) -> TestT m a -> TestT n a
+mapTestT :: Monad m => (b -> m a) -> TestT m b -> TestT m a
 mapTestT f =
-  mkTestT . f . runTestT
+  mkTestT . (=<<) (\(e, l) -> fmap (flip (,) l) $ traverse f e) . runTestT
 
 -- | Log some information which might be relevant to a potential test failure.
 --
