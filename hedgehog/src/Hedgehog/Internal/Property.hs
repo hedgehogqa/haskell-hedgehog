@@ -731,6 +731,10 @@ mapConfig f (Property cfg t) =
 -- | Set the number times a property should be executed before it is considered
 --   successful.
 --
+--   If you have a test that does not involve any generators and thus does not
+--   need to run repeatedly, you can use @withTests 1@ to define a property that
+--   will only be checked once.
+--
 withTests :: TestLimit -> Property -> Property
 withTests n =
   mapConfig $ \config -> config { propertyTestLimit = n }
