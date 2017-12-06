@@ -713,7 +713,7 @@ prune =
 -- | Construct a generator that depends on the size parameter.
 --
 sized :: MonadGen m => (Size -> m a) -> m a
-sized f = do
+sized f =
   f =<< generate (\size _ -> size)
 
 -- | Override the size parameter. Returns a generator which uses the given size
@@ -1562,7 +1562,7 @@ printWith size seed gen =
 --   Use 'printTree' to generate a value from a random seed.
 --
 printTreeWith :: (MonadIO m, Show a) => Size -> Seed -> Gen a -> m ()
-printTreeWith size seed gen = do
+printTreeWith size seed gen =
   liftIO . putStr . runIdentity . Tree.render $ renderNodes size seed gen
 
 -- | Run a generator with a random seed and print the outcome, and the first

@@ -467,14 +467,14 @@ failWith diff msg =
 --   debugging a test failure.
 --
 annotate :: (MonadTest m, HasCallStack) => String -> m ()
-annotate x = do
+annotate x =
   writeLog $ Annotation (getCaller callStack) x
 
 -- | Annotates the source code with a value that might be useful for
 --   debugging a test failure.
 --
 annotateShow :: (MonadTest m, Show a, HasCallStack) => a -> m ()
-annotateShow x = do
+annotateShow x =
   withFrozenCallStack $ annotate (showPretty x)
 
 -- | Logs a message to be displayed as additional information in the footer of
