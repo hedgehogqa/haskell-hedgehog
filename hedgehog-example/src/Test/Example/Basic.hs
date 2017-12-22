@@ -253,6 +253,12 @@ prop_record =
     y <- forAll genRecord
     x === y
 
+prop_different_record :: Property
+prop_different_record =
+  property $ do
+    x <- forAll genRecord
+    x /== x
+
 ------------------------------------------------------------------------
 -- Example 6 - Text.takeEnd
 

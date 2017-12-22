@@ -55,6 +55,7 @@ module Hedgehog.Internal.Property (
   , success
   , assert
   , (===)
+  , (/==)
 
   , eval
   , evalM
@@ -551,6 +552,22 @@ infix 4 ===
     success
   else
     withFrozenCallStack $ failDiff x y
+
+infix 4 /==
+
+-- | Fails the test if the two arguments provided are equal.
+--
+(/==) :: (MonadTest m, Eq a, Show a, HasCallStack) => a -> a -> m ()
+(/==) x y = do
+  ok <- withFrozenCallStack $ eval (x /= y)
+  if ok then
+    success
+  else
+    withFrozenCallStack $
+      failWith Nothing $ unlines [
+          "━━━ Both equal to ━━━"
+        , showPretty x
+        ]
 
 -- | Fails the test if the value throws an exception when evaluated to weak
 --   head normal form (WHNF).
