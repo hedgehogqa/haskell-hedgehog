@@ -1,3 +1,8 @@
+## Version 0.5.1 (2017-12-06)
+
+- Only invoke `setNumCapabilities` when using the `-threaded` runtime ([#130][130], [@ekmett][ekmett])
+- Correct `mixGamma` oddness check ([#124][124], [@markhibberd][markhibberd])
+
 ## Version 0.5 (2017-07-16)
 
 - Parallel state machine testing, allows detection of commands which are not-atomic ([#98][98], [@jystic][jystic])
@@ -58,7 +63,15 @@
   https://github.com/amarpotghan
 [erikd]:
   https://github.com/erikd
+[ekmett]:
+  https://github.com/ekmett
+[markhibberd]:
+  https://github.com/markhibberd
 
+[130]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/130
+[124]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/124
 [99]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/99
 [98]:
