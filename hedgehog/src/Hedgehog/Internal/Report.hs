@@ -162,7 +162,8 @@ instance Monoid Summary where
       (x4 + y4)
       (x5 + y5)
 
-instance Semigroup Summary
+instance Semigroup Summary where
+  (<>) = mappend
 
 -- | Construct a summary from a single result.
 --
