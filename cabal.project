@@ -1,0 +1,4 @@
+packages:
+  hedgehog
+  hedgehog-example
+  hedgehog-quickcheck
