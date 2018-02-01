@@ -14,6 +14,14 @@ synopsis:
   Use QuickCheck generators in Hedgehog and vice versa.
 description:
   Use QuickCheck generators in Hedgehog and vice versa.
+  .
+  Hedgehog is a modern property-based testing system, in the spirit of
+  QuickCheck. Hedgehog uses integrated shrinking, so shrinks obey the
+  invariants of generated values by construction.
+  .
+  To get started quickly, see the examples:
+  <https://github.com/hedgehogqa/haskell-hedgehog/tree/master/hedgehog-
+
 category:
   Testing
 license:
