@@ -29,6 +29,10 @@ matrix:
       addons: {apt: {packages: [ghc-ppa-tools,cabal-install-1.24,ghc-8.0.2], sources: [hvr-ghc]}}
     - compiler: "ghc-8.2.2"
       addons: {apt: {packages: [ghc-ppa-tools,cabal-install-1.24,ghc-8.2.2], sources: [hvr-ghc]}}
+    - compiler: "ghc-8.4.1"
+      addons: {apt: {packages: [ghc-ppa-tools,cabal-install-2.0,ghc-8.4.1], sources: [hvr-ghc]}}
+  allow_failures:
+    - compiler: "ghc-8.4.1"
 
 before_install:
  - unset CC
