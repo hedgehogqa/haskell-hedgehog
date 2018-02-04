@@ -11,7 +11,7 @@ homepage:
 synopsis:
   Hedgehog example project.
 description:
-  Hedgehog example project.
+  This is the hedgehog example project. It contains useful tests.
 category:
   Testing
 license:
@@ -22,28 +22,35 @@ cabal-version:
   >= 1.8
 build-type:
   Simple
+tested-with:
+    GHC == 7.10.2
+  , GHC == 7.10.3
+  , GHC == 8.0.1
+  , GHC == 8.0.2
+  , GHC == 8.2.1
+  , GHC == 8.2.2
+  , GHC == 8.4.1
 
 library
-
-test-suite test
-  type:
-    exitcode-stdio-1.0
-
-  main-is:
-    test.hs
-
-  ghc-options:
-    -Wall -threaded -O2
-
   hs-source-dirs:
-    test
+    src
+
+  exposed-modules:
+      Test.Example.Basic
+    , Test.Example.Exception
+    , Test.Example.QuickCheck
+    , Test.Example.References
+    , Test.Example.Registry
+    , Test.Example.Resource
+    , Test.Example.Roundtrip
+    , Test.Example.STLC
 
   build-depends:
       hedgehog
     , hedgehog-quickcheck
     , base                            >= 3          && < 5
     , containers                      >= 0.4        && < 0.6
-    , filepath                        >= 1.3        && < 1.4
+    , filepath                        >= 1.3        && < 1.5
     , hashtables                      >= 1.2        && < 1.3
     , mmorph                          >= 1.0        && < 1.1
     , mtl                             >= 2.1        && < 2.3
@@ -55,3 +62,22 @@ test-suite test
     , temporary-resourcet             >= 0.1        && < 0.2
     , text                            >= 1.1        && < 1.3
     , transformers                    >= 0.5        && < 0.6
+
+test-suite test
+  type:
+    exitcode-stdio-1.0
+
+  main-is:
+    test.hs
+
+  build-depends:
+      hedgehog-example
+    , hedgehog
+    , hedgehog-quickcheck
+    , base
+
+  ghc-options:
+    -Wall -threaded -O2
+
+  hs-source-dirs:
+    test
