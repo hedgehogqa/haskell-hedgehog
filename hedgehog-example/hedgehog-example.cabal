@@ -23,21 +23,27 @@ cabal-version:
 build-type:
   Simple
 tested-with:
-  GHC == 7.10.3, GHC == 8.0.2, GHC == 8.2.2, GHC == 8.4.1
+    GHC == 7.10.2
+  , GHC == 7.10.3
+  , GHC == 8.0.1
+  , GHC == 8.0.2
+  , GHC == 8.2.1
+  , GHC == 8.2.2
+  , GHC == 8.4.1
 
 library
   hs-source-dirs:
     src
 
   exposed-modules:
-    Test.Example.Basic,
-    Test.Example.Exception,
-    Test.Example.QuickCheck,
-    Test.Example.References,
-    Test.Example.Registry,
-    Test.Example.Resource,
-    Test.Example.Roundtrip,
-    Test.Example.STLC
+      Test.Example.Basic
+    , Test.Example.Exception
+    , Test.Example.QuickCheck
+    , Test.Example.References
+    , Test.Example.Registry
+    , Test.Example.Resource
+    , Test.Example.Roundtrip
+    , Test.Example.STLC
 
   build-depends:
       hedgehog

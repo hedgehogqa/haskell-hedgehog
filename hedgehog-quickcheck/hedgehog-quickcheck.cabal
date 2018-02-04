@@ -33,8 +33,11 @@ cabal-version:
 build-type:
   Simple
 tested-with:
-    GHC == 7.10.3
+    GHC == 7.10.2
+  , GHC == 7.10.3
+  , GHC == 8.0.1
   , GHC == 8.0.2
+  , GHC == 8.2.1
   , GHC == 8.2.2
   , GHC == 8.4.1
 extra-source-files:
