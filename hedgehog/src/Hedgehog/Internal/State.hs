@@ -1,4 +1,5 @@
 {-# OPTIONS_HADDOCK not-home #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveTraversable #-}
@@ -63,7 +64,9 @@ import           Control.Monad.Trans.State (StateT(..), evalStateT)
 import           Data.Dynamic (Dynamic, toDyn, fromDynamic, dynTypeRep)
 import           Data.Foldable (traverse_)
 import           Data.Functor.Classes (Eq1(..), Ord1(..), Show1(..))
+#if MIN_VERSION_transformers(0,5,0)
 import           Data.Functor.Classes (eq1, compare1, showsPrec1)
+#endif
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Maybe as Maybe
@@ -101,6 +104,7 @@ instance Show (Symbolic a) where
   showsPrec p (Symbolic x) =
     showsPrec p x
 
+#if MIN_VERSION_transformers(0,5,0)
 instance Show1 Symbolic where
   liftShowsPrec _ _ p (Symbolic x) =
     showsPrec p x
@@ -112,6 +116,19 @@ instance Eq1 Symbolic where
 instance Ord1 Symbolic where
   liftCompare _ (Symbolic x) (Symbolic y) =
     compare x y
+#else
+instance Show1 Symbolic where
+  showsPrec1 p (Symbolic x) =
+    showsPrec p x
+
+instance Eq1 Symbolic where
+  eq1 (Symbolic x) (Symbolic y) =
+    x == y
+
+instance Ord1 Symbolic where
+  compare1 (Symbolic x) (Symbolic y) =
+    compare x y
+#endif
 
 -- | Concrete values.
 --
@@ -123,6 +140,7 @@ instance Show a => Show (Concrete a) where
   showsPrec =
     showsPrec1
 
+#if MIN_VERSION_transformers(0,5,0)
 instance Show1 Concrete where
   liftShowsPrec sp _ p (Concrete x) =
     sp p x
@@ -134,6 +152,19 @@ instance Eq1 Concrete where
 instance Ord1 Concrete where
   liftCompare comp (Concrete x) (Concrete y) =
     comp x y
+#else
+instance Show1 Concrete where
+  showsPrec1 p (Concrete x) =
+    showsPrec p x
+
+instance Eq1 Concrete where
+  eq1 (Concrete x) (Concrete y) =
+    x == y
+
+instance Ord1 Concrete where
+  compare1 (Concrete x) (Concrete y) =
+    compare x y
+#endif
 
 ------------------------------------------------------------------------
 
