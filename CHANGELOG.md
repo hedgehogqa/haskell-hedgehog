@@ -1,3 +1,10 @@
+## Version 0.5.2 (2018-02-05)
+
+- Add doc explaining use of `withTests 1` ([#134][134], [@chris-martin][chris-martin])
+- Explicitly define `Semigroup` instance for `Summary` ([#142][142], [@gwils][gwils])
+- Depend on `semigroups` ([#140][140], [@LightAndLight][LightAndLight])
+- Support `transformers-0.4` ([#150][150], [@gwils][gwils])
+
 ## Version 0.5.1 (2017-12-06)
 
 - Only invoke `setNumCapabilities` when using the `-threaded` runtime ([#130][130], [@ekmett][ekmett])
@@ -67,7 +74,19 @@
   https://github.com/ekmett
 [markhibberd]:
   https://github.com/markhibberd
+[gwils]:
+  https://github.com/gwils
+[LightAndLight]:
+  https://github.com/LightAndLight
 
+[150]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/150
+[142]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/142
+[140]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/140
+[134]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/134
 [130]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/130
 [124]:
