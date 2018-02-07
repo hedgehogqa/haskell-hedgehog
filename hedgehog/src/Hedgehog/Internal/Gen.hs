@@ -142,6 +142,7 @@ module Hedgehog.Internal.Gen (
 
   -- ** Characters
   , isSurrogate
+  , isNoncharacter
 
   -- ** Subterms
   , Vec(..)
@@ -1048,13 +1049,19 @@ unicode =
 --
 unicodeAll :: MonadGen m => m Char
 unicodeAll =
-  enumBounded
+  filter (not . isNoncharacter) enumBounded
 
 -- | Check if a character is in the surrogate category.
 --
 isSurrogate :: Char -> Bool
 isSurrogate x =
   x >= '\55296' && x <= '\57343'
+
+-- | Check if a character is one of the noncharacters '\65534', '\65535'.
+--
+isNoncharacter :: Char -> Bool
+isNoncharacter x =
+  x == '\65534' || x == '\65535'
 
 ------------------------------------------------------------------------
 -- Combinators - Strings
