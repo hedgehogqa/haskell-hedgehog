@@ -142,6 +142,7 @@ module Hedgehog.Internal.Gen (
 
   -- ** Characters
   , isSurrogate
+  , isNoncharacter
 
   -- ** Subterms
   , Vec(..)
@@ -1036,14 +1037,14 @@ latin1 :: MonadGen m => m Char
 latin1 =
   enum '\0' '\255'
 
--- | Generates a Unicode character, excluding invalid standalone surrogates:
+-- | Generates a Unicode character, excluding noncharacters and invalid standalone surrogates:
 --   @'\0'..'\1114111' (excluding '\55296'..'\57343')@
 --
 unicode :: MonadGen m => m Char
 unicode =
-  filter (not . isSurrogate) unicodeAll
+  filter (not . isNoncharacter) $ filter (not . isSurrogate) unicodeAll
 
--- | Generates a Unicode character, including invalid standalone surrogates:
+-- | Generates a Unicode character, including noncharacters and invalid standalone surrogates:
 --   @'\0'..'\1114111'@
 --
 unicodeAll :: MonadGen m => m Char
@@ -1055,6 +1056,12 @@ unicodeAll =
 isSurrogate :: Char -> Bool
 isSurrogate x =
   x >= '\55296' && x <= '\57343'
+
+-- | Check if a character is one of the noncharacters '\65534', '\65535'.
+--
+isNoncharacter :: Char -> Bool
+isNoncharacter x =
+  x == '\65534' || x == '\65535'
 
 ------------------------------------------------------------------------
 -- Combinators - Strings
