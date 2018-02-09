@@ -153,7 +153,7 @@ module Hedgehog.Internal.Gen (
   , renderNodes
   ) where
 
-import           Control.Applicative (Alternative(..))
+import           Control.Applicative (Alternative(..),liftA2)
 import           Control.Monad (MonadPlus(..), filterM, replicateM, ap, join)
 import           Control.Monad.Base (MonadBase(..))
 import           Control.Monad.Catch (MonadThrow(..), MonadCatch(..))
@@ -190,6 +190,8 @@ import qualified Data.List.NonEmpty as NonEmpty
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Maybe as Maybe
+import           Data.Semigroup (Semigroup)
+import qualified Data.Semigroup as Semigroup
 import           Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
 import           Data.Set (Set)
@@ -521,6 +523,16 @@ instance (MonadGen m, Monoid w) => MonadGen (Strict.RWST r w s m) where
 
 ------------------------------------------------------------------------
 -- GenT instances
+
+-- technically, the Monoid constraint on @a@ could be weakened
+-- to Semigroup, but this would be annoying for older GHCs
+-- where Semigroup is not a superclass of Monoid.
+instance (Monad m, Monoid a) => Semigroup (GenT m a) where
+  (<>) = liftA2 mappend
+
+instance (Monad m, Monoid a) => Monoid (GenT m a) where
+  mappend = (Semigroup.<>)
+  mempty = return mempty
 
 instance Functor m => Functor (GenT m) where
   fmap f gen =
