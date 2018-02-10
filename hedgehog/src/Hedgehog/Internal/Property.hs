@@ -728,7 +728,7 @@ mapConfig :: (PropertyConfig -> PropertyConfig) -> Property -> Property
 mapConfig f (Property cfg t) =
   Property (f cfg) t
 
--- | Set the number times a property should be executed before it is considered
+-- | Set the number of times a property should be executed before it is considered
 --   successful.
 --
 --   If you have a test that does not involve any generators and thus does not
@@ -739,21 +739,21 @@ withTests :: TestLimit -> Property -> Property
 withTests n =
   mapConfig $ \config -> config { propertyTestLimit = n }
 
--- | Set the number times a property is allowed to discard before the test
+-- | Set the number of times a property is allowed to discard before the test
 --   runner gives up.
 --
 withDiscards :: DiscardLimit -> Property -> Property
 withDiscards n =
   mapConfig $ \config -> config { propertyDiscardLimit = n }
 
--- | Set the number times a property is allowed to shrink before the test
+-- | Set the number of times a property is allowed to shrink before the test
 --   runner gives up and prints the counterexample.
 --
 withShrinks :: ShrinkLimit -> Property -> Property
 withShrinks n =
   mapConfig $ \config -> config { propertyShrinkLimit = n }
 
--- | Set the number times a property will be executed for each shrink before
+-- | Set the number of times a property will be executed for each shrink before
 --   the test runner gives up and tries a different shrink. See 'ShrinkRetries'
 --   for more information.
 --
