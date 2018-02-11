@@ -524,14 +524,11 @@ instance (MonadGen m, Monoid w) => MonadGen (Strict.RWST r w s m) where
 ------------------------------------------------------------------------
 -- GenT instances
 
--- technically, the Monoid constraint on @a@ could be weakened
--- to Semigroup, but this would be annoying for older GHCs
--- where Semigroup is not a superclass of Monoid.
-instance (Monad m, Monoid a) => Semigroup (GenT m a) where
-  (<>) = liftA2 mappend
+instance (Monad m, Semigroup a) => Semigroup (GenT m a) where
+  (<>) = liftA2 (Semigroup.<>)
 
 instance (Monad m, Monoid a) => Monoid (GenT m a) where
-  mappend = (Semigroup.<>)
+  mappend = liftA2 mappend
   mempty = return mempty
 
 instance Functor m => Functor (GenT m) where
