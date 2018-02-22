@@ -73,7 +73,8 @@ instance Read Size where
 --   be dependent on a 'Size'.
 --
 data Range a =
-  Range !a (Size -> (a, a))
+  Range !a  -- ^ Value to shrink toward (the value produced when the size parameter is zero)
+        (Size -> (a, a))
 
 instance Functor Range where
   fmap f (Range z g) =
@@ -210,7 +211,11 @@ linear x y =
 --   >>> bounds 99 $ linearFrom 0 (-10) 20
 --   (-10,20)
 --
-linearFrom :: Integral a => a -> a -> a -> Range a
+linearFrom :: Integral a
+  => a -- ^ Value to shrink toward (the value produced when the size parameter is 0)
+  -> a -- ^ Lower bound (the bottom of the range when the size parameter is 99)
+  -> a -- ^ Upper bound (the top of the range when the size parameter is 99)
+  -> Range a
 linearFrom z x y =
   Range z $ \sz ->
     let
