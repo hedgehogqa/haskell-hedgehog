@@ -215,9 +215,9 @@ linear x y =
 --   (-10,20)
 --
 linearFrom :: Integral a
-  => a -- ^ Value to shrink toward (the value produced when the size parameter is 0)
-  -> a -- ^ Lower bound (the bottom of the range when the size parameter is 99)
-  -> a -- ^ Upper bound (the top of the range when the size parameter is 99)
+  => a -- ^ Value to shrink toward (the value produced when the size parameter is 0).
+  -> a -- ^ Lower bound (the bottom of the range when the size parameter is 99).
+  -> a -- ^ Upper bound (the top of the range when the size parameter is 99).
   -> Range a
 linearFrom z x y =
   Range z $ \sz ->
