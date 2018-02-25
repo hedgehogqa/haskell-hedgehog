@@ -72,9 +72,12 @@ instance Read Size where
 -- | A range describes the bounds of a number to generate, which may or may not
 --   be dependent on a 'Size'.
 --
+--   The constructor takes an origin between the lower and upper bound, and a
+--   function from 'Size' to bounds.  As the size goes towards @0@, the values
+--   go towards the origin.
+--
 data Range a =
-  Range !a  -- ^ Value to shrink toward (the value produced when the size parameter is zero)
-        (Size -> (a, a))
+  Range !a (Size -> (a, a))
 
 instance Functor Range where
   fmap f (Range z g) =
