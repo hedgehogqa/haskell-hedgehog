@@ -168,7 +168,11 @@ constant x y =
 --   >>> origin $ constantFrom 2000 1970 2100
 --   2000
 --
-constantFrom :: a -> a -> a -> Range a
+constantFrom ::
+     a -- ^ Origin (the value produced when the size parameter is 0).
+  -> a -- ^ Lower bound (the bottom of the range when the size parameter is 99).
+  -> a -- ^ Upper bound (the top of the range when the size parameter is 99).
+  -> Range a
 constantFrom z x y =
   Range z $ \_ -> (x, y)
 
@@ -215,7 +219,7 @@ linear x y =
 --   (-10,20)
 --
 linearFrom :: Integral a
-  => a -- ^ Value to shrink toward (the value produced when the size parameter is 0).
+  => a -- ^ Origin (the value produced when the size parameter is 0).
   -> a -- ^ Lower bound (the bottom of the range when the size parameter is 99).
   -> a -- ^ Upper bound (the top of the range when the size parameter is 99).
   -> Range a
@@ -361,7 +365,11 @@ exponential x y =
 --   >>> bounds 99 $ exponentialFrom x (-128) 512
 --   (-128,512)
 --
-exponentialFrom :: Integral a => a -> a -> a -> Range a
+exponentialFrom :: Integral a
+  => a -- ^ Origin (the value produced when the size parameter is 0).
+  -> a -- ^ Lower bound (the bottom of the range when the size parameter is 99).
+  -> a -- ^ Upper bound (the top of the range when the size parameter is 99).
+  -> Range a
 exponentialFrom z x y =
   Range z $ \sz ->
     let
