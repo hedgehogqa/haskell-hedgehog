@@ -60,6 +60,10 @@ module Hedgehog.Gen (
   , utf8
   , bytes
 
+  -- ** Time
+  , genUTCTime
+  , genZonedTime
+
   -- ** Choice
   , constant
   , element
