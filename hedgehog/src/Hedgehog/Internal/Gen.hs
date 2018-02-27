@@ -83,6 +83,10 @@ module Hedgehog.Internal.Gen (
   , utf8
   , bytes
 
+  -- ** Time
+  , genUTCTime
+  , genZonedTime
+
   -- ** Choice
   , constant
   , element
@@ -197,6 +201,11 @@ import           Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
 import           Data.Word (Word8, Word16, Word32, Word64)
+import           Data.Time.Clock
+import           Data.Time.Clock.POSIX
+import           Data.Time.LocalTime
+import           Data.Time.Zones
+import           Data.Time.Zones.All
 
 import           Hedgehog.Internal.Distributive (Distributive(..))
 import           Hedgehog.Internal.Seed (Seed)
@@ -1101,6 +1110,27 @@ bytes range =
     , list range . word8 $
         Range.constant minBound maxBound
     ]
+
+------------------------------------------------------------------------
+-- Combinators - Time
+
+--- | Generates a random 'UTCTime' in the given @[inclusive,inclusive]@ range of 'POSIXTime'.
+--
+--   /This generator does not shrink./
+--
+genUTCTime :: Range POSIXTime -> Gen UTCTime
+genUTCTime r = posixSecondsToUTCTime <$> realFrac_ r
+
+-- | Generates a random 'ZonedTime' in the given @[inclusive,inclusive]@ range of 'POSIXTime'.
+--
+--   /This generator does not shrink./
+--
+genZonedTime :: Range POSIXTime -> Gen ZonedTime
+genZonedTime r = do
+  tz <- tzByLabel <$> enumBounded
+  t <- genUTCTime r
+  let timezone = timeZoneForUTCTime tz t
+  pure $ utcToZonedTime timezone t
 
 ------------------------------------------------------------------------
 -- Combinators - Choice
