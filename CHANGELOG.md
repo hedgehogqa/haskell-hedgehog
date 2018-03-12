@@ -1,3 +1,10 @@
+## Version 0.5.3 (2018-03-12)
+
+- Add `Semigroup` and `Monoid` instances for `GenT` that lift the inner `Monoid` ([#156][156], [@andrewthad][andrewthad])
+- `Gen.unicode` no longer generates non-characters ([#154][154], [@johnchandlerburnham][johnchandlerburnham])
+- Documentation improvements ([#162][162], [@fisx][fisx])
+- Documentation fixes ([#157][157], [@dredozubov][dredozubov])
+
 ## Version 0.5.2 (2018-02-05)
 
 - Add doc explaining use of `withTests 1` ([#134][134], [@chris-martin][chris-martin])
@@ -78,7 +85,23 @@
   https://github.com/gwils
 [LightAndLight]:
   https://github.com/LightAndLight
+[johnchandlerburnham]:
+  https://github.com/johnchandlerburnham
+[andrewthad]:
+  https://github.com/andrewthad
+[dredozubov]:
+  https://github.com/dredozubov
+[fisx]:
+  https://github.com/fisx
 
+[162]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/162
+[157]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/157
+[156]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/156
+[154]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/154
 [150]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/150
 [142]:
