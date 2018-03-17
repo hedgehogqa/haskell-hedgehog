@@ -154,7 +154,7 @@ module Hedgehog.Internal.Gen (
   ) where
 
 import           Control.Applicative (Alternative(..),liftA2)
-import           Control.Monad (MonadPlus(..), filterM, replicateM, ap, join)
+import           Control.Monad (MonadPlus(..), filterM, replicateM, join)
 import           Control.Monad.Base (MonadBase(..))
 import           Control.Monad.Catch (MonadThrow(..), MonadCatch(..))
 import           Control.Monad.Error.Class (MonadError(..))
@@ -540,13 +540,16 @@ instance Functor m => Functor (GenT m) where
 
 instance Monad m => Applicative (GenT m) where
   pure =
-    return
-  (<*>) =
-    ap
+    liftTree . pure
+  (<*>) f m =
+    GenT $ \ size seed ->
+      case Seed.split seed of
+        (sf, sm) ->
+          runGenT size sf f <*> runGenT size sm m
 
 instance Monad m => Monad (GenT m) where
   return =
-    liftTree . pure
+    pure
 
   (>>=) m k =
     GenT $ \size seed ->

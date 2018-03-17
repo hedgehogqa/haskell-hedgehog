@@ -21,8 +21,8 @@ module Hedgehog.Internal.Tree (
   , render
   ) where
 
-import           Control.Applicative (Alternative(..))
-import           Control.Monad (MonadPlus(..), ap, join)
+import           Control.Applicative (Alternative(..), liftA2)
+import           Control.Monad (MonadPlus(..), join)
 import           Control.Monad.Base (MonadBase(..))
 import           Control.Monad.Catch (MonadThrow(..), MonadCatch(..), Exception)
 import           Control.Monad.Error.Class (MonadError(..))
@@ -34,6 +34,7 @@ import           Control.Monad.State.Class (MonadState(..))
 import           Control.Monad.Trans.Class (MonadTrans(..))
 import           Control.Monad.Trans.Resource (MonadResource(..))
 import           Control.Monad.Writer.Class (MonadWriter(..))
+import           Data.Functor.Classes (Eq1(..))
 
 #if MIN_VERSION_base(4,9,0)
 import           Data.Functor.Classes (Show1(..), showsPrec1)
@@ -58,7 +59,7 @@ data Node m a =
   Node {
       nodeValue :: a
     , nodeChildren :: [Tree m a]
-    }
+    } deriving Eq
 
 -- | Create a 'Tree' from a 'Node'
 --
@@ -99,6 +100,14 @@ prune m =
 ------------------------------------------------------------------------
 -- Node/Tree instances
 
+instance (Eq1 m, Eq a) => Eq (Tree m a) where
+  Tree m0 == Tree m1 =
+#if MIN_VERSION_base(4,9,0)
+    liftEq (==) m0 m1
+#else
+    eq1 m0 m1
+#endif
+
 instance Functor m => Functor (Node m) where
   fmap f (Node x xs) =
     Node (f x) (fmap (fmap f) xs)
@@ -107,21 +116,23 @@ instance Functor m => Functor (Tree m) where
   fmap f =
     Tree . fmap (fmap f) . runTree
 
-instance Monad m => Applicative (Node m) where
-  pure =
-    return
-  (<*>) =
-    ap
+instance Applicative m => Applicative (Node m) where
+  pure x =
+    Node x []
+  (<*>) (Node ab tabs) na@(Node a tas) =
+    Node (ab a) $
+      map (<*> (fromNode na)) tabs ++ map (fmap ab) tas
 
-instance Monad m => Applicative (Tree m) where
+instance Applicative m => Applicative (Tree m) where
   pure =
-    return
-  (<*>) =
-    ap
+    Tree . pure . pure
+  (<*>) (Tree mab) (Tree ma) =
+    Tree $
+      liftA2 (<*>) mab ma
 
 instance Monad m => Monad (Node m) where
-  return x =
-    Node x []
+  return =
+    pure
 
   (>>=) (Node x xs) k =
     case k x of
@@ -130,8 +141,8 @@ instance Monad m => Monad (Node m) where
           fmap (Tree . fmap (>>= k) . runTree) xs ++ ys
 
 instance Monad m => Monad (Tree m) where
-  return x =
-    Tree . pure $ Node x []
+  return =
+    pure
 
   (>>=) m k =
     Tree $ do
