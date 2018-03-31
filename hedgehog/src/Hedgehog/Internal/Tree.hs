@@ -102,7 +102,7 @@ prune m =
 
 instance (Eq1 m, Eq a) => Eq (Tree m a) where
   Tree m0 == Tree m1 =
-#if MIN_VERSION_base(4,9,0)
+#if MIN_VERSION_base(4,9,0) || MIN_VERSION_transformers(0,5,0)
     liftEq (==) m0 m1
 #else
     eq1 m0 m1
