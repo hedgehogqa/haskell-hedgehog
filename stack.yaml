@@ -1,0 +1,10 @@
+resolver: lts-11.5
+
+packages:
+  - hedgehog
+  - hedgehog-example
+  - hedgehog-quickcheck
+
+extra-deps:
+  - resourcet-1.1.11
+  - temporary-resourcet-0.1.0.0
