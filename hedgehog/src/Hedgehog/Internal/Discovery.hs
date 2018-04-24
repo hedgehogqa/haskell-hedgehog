@@ -1,6 +1,7 @@
 {-# OPTIONS_HADDOCK not-home #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 module Hedgehog.Internal.Discovery (
     PropertySource(..)
   , readProperties
@@ -11,6 +12,8 @@ module Hedgehog.Internal.Discovery (
   , Position(..)
   ) where
 
+import           Control.Exception (IOException, handle)
+import           Control.Monad (join)
 import           Control.Monad.IO.Class (MonadIO(..))
 
 import qualified Data.Char as Char
@@ -19,6 +22,7 @@ import           Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Ord as Ord
 import           Data.Semigroup (Semigroup(..))
+import           Data.Traversable (for)
 
 import           Hedgehog.Internal.Property (PropertyName(..))
 import           Hedgehog.Internal.Source (LineNo(..), ColumnNo(..))
@@ -37,12 +41,17 @@ readProperties path =
 
 readDeclaration :: MonadIO m => FilePath -> LineNo -> m (Maybe (String, Pos String))
 readDeclaration path line = do
-  decls <- findDeclarations path <$> liftIO (readFile path)
-  pure .
+  mfile <- liftIO $ readFileSafe path
+  pure . join . for mfile $ \file ->
     takeHead .
     List.sortBy (Ord.comparing $ Ord.Down . posLine . posPostion . snd) .
     filter ((<= line) . posLine . posPostion . snd) $
-    Map.toList decls
+    Map.toList (findDeclarations path file)
+
+readFileSafe :: MonadIO m => FilePath -> m (Maybe String)
+readFileSafe path =
+  liftIO $
+    handle (\(_ :: IOException) -> pure Nothing) (Just <$> readFile path)
 
 takeHead :: [a] -> Maybe a
 takeHead = \case
