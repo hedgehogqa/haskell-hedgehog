@@ -112,7 +112,7 @@ from x =
 --
 goldenGamma :: Word64
 goldenGamma =
-  -7046029254386353131
+  0x9e3779b97f4a7c15
 
 -- | Get the next value in the SplitMix sequence.
 --
@@ -166,24 +166,24 @@ nextDouble lo hi =
 mix64 :: Word64 -> Word64
 mix64 x =
   let
-    y = (x `xor` (x `shiftR` 33)) * (-49064778989728563)
-    z = (y `xor` (y `shiftR` 33)) * (-4265267296055464877)
+    y = (x `xor` (x `shiftR` 33)) * 0xff51afd7ed558ccd
+    z = (y `xor` (y `shiftR` 33)) * 0xc4ceb9fe1a85ec53
   in
     z `xor` (z `shiftR` 33)
 
 mix32 :: Word64 -> Word32
 mix32 x =
   let
-    y = (x `xor` (x `shiftR` 33)) * (-49064778989728563)
-    z = (y `xor` (y `shiftR` 33)) * (-4265267296055464877)
+    y = (x `xor` (x `shiftR` 33)) * 0xff51afd7ed558ccd
+    z = (y `xor` (y `shiftR` 33)) * 0xc4ceb9fe1a85ec53
   in
     fromIntegral (z `shiftR` 32)
 
 mix64variant13 :: Word64 -> Word64
 mix64variant13 x =
   let
-    y = (x `xor` (x `shiftR` 30)) * (-4658895280553007687)
-    z = (y `xor` (y `shiftR` 27)) * (-7723592293110705685)
+    y = (x `xor` (x `shiftR` 30)) * 0xbf58476d1ce4e5b9
+    z = (y `xor` (y `shiftR` 27)) * 0x94d049bb133111eb
   in
     z `xor` (z `shiftR` 31)
 
@@ -194,7 +194,7 @@ mixGamma x =
     n = popCount $ y `xor` (y `shiftR` 1)
   in
     if n >= 24 then
-      y `xor` (-6148914691236517206)
+      y `xor` 0xaaaaaaaaaaaaaaaa
     else
       y
 
