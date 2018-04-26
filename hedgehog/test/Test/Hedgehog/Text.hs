@@ -29,7 +29,7 @@ genOdd =
 
 genSeed :: Gen Seed
 genSeed =
-  Seed <$> Gen.enumBounded <*> genOdd
+  Seed <$> Gen.word64 Range.constantBounded <*> fmap fromIntegral genOdd
 
 genPrecedence :: Gen Int
 genPrecedence =

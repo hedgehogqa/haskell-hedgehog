@@ -37,8 +37,8 @@ module Hedgehog.Internal.Seed (
   -- * Internal
   -- $internal
   , goldenGamma
-  , nextInt64
-  , nextInt32
+  , nextWord64
+  , nextWord32
   , mix64
   , mix64variant13
   , mix32
@@ -53,6 +53,7 @@ import           Data.Int (Int32, Int64)
 import           Data.Time.Clock.POSIX (getPOSIXTime)
 import           Data.IORef (IORef)
 import qualified Data.IORef as IORef
+import           Data.Word (Word32, Word64)
 
 import           System.IO.Unsafe (unsafePerformIO)
 import           System.Random (RandomGen)
@@ -62,8 +63,8 @@ import qualified System.Random as Random
 --
 data Seed =
   Seed {
-      seedValue :: !Int64
-    , seedGamma :: !Int64 -- ^ must be an odd number
+      seedValue :: !Word64
+    , seedGamma :: !Word64 -- ^ must be an odd number
     } deriving (Eq, Ord)
 
 instance Show Seed where
@@ -96,9 +97,9 @@ random :: MonadIO m => m Seed
 random =
   liftIO $ IORef.atomicModifyIORef' global split
 
--- | Create a 'Seed' using an 'Int64'.
+-- | Create a 'Seed' using a 'Word64'.
 --
-from :: Int64 -> Seed
+from :: Word64 -> Seed
 from x =
   Seed x goldenGamma
 
@@ -109,13 +110,13 @@ from x =
 --   We choose: the odd integer closest to @2^64/φ@, where @φ = (1 + √5)/2@ is
 --   the golden ratio.
 --
-goldenGamma :: Int64
+goldenGamma :: Word64
 goldenGamma =
   -7046029254386353131
 
 -- | Get the next value in the SplitMix sequence.
 --
-next :: Seed -> (Int64, Seed)
+next :: Seed -> (Word64, Seed)
 next (Seed v0 g) =
   let
     v = v0 + g
@@ -132,19 +133,19 @@ split s0 =
   in
     (s2, Seed (mix64 v0) (mixGamma g0))
 
--- | Generate a random 'Int64'.
+-- | Generate a random 'Word64'.
 --
-nextInt64 :: Seed -> (Int64, Seed)
-nextInt64 s0 =
+nextWord64 :: Seed -> (Word64, Seed)
+nextWord64 s0 =
   let
     (v0, s1) = next s0
   in
     (mix64 v0, s1)
 
--- | Generate a random 'Int32'.
+-- | Generate a random 'Word32'.
 --
-nextInt32 :: Seed -> (Int32, Seed)
-nextInt32 s0 =
+nextWord32 :: Seed -> (Word32, Seed)
+nextWord32 s0 =
   let
     (v0, s1) = next s0
   in
@@ -162,7 +163,7 @@ nextDouble :: Double -> Double -> Seed -> (Double, Seed)
 nextDouble lo hi =
   Random.randomR (lo, hi)
 
-mix64 :: Int64 -> Int64
+mix64 :: Word64 -> Word64
 mix64 x =
   let
     y = (x `xor` (x `shiftR` 33)) * (-49064778989728563)
@@ -170,7 +171,7 @@ mix64 x =
   in
     z `xor` (z `shiftR` 33)
 
-mix32 :: Int64 -> Int32
+mix32 :: Word64 -> Word32
 mix32 x =
   let
     y = (x `xor` (x `shiftR` 33)) * (-49064778989728563)
@@ -178,7 +179,7 @@ mix32 x =
   in
     fromIntegral (z `shiftR` 32)
 
-mix64variant13 :: Int64 -> Int64
+mix64variant13 :: Word64 -> Word64
 mix64variant13 x =
   let
     y = (x `xor` (x `shiftR` 30)) * (-4658895280553007687)
@@ -186,7 +187,7 @@ mix64variant13 x =
   in
     z `xor` (z `shiftR` 31)
 
-mixGamma :: Int64 -> Int64
+mixGamma :: Word64 -> Word64
 mixGamma x =
   let
     y = mix64variant13 x .|. 1
@@ -205,7 +206,7 @@ mixGamma x =
 #if (SIZEOF_HSINT == 8)
 instance RandomGen Seed where
   next =
-    first fromIntegral . nextInt64
+    first fromIntegral . nextWord64
   genRange _ =
     (fromIntegral (minBound :: Int64), fromIntegral (maxBound :: Int64))
   split =
@@ -213,7 +214,7 @@ instance RandomGen Seed where
 #else
 instance RandomGen Seed where
   next =
-    first fromIntegral . nextInt32
+    first fromIntegral . nextWord32
   genRange _ =
     (fromIntegral (minBound :: Int32), fromIntegral (maxBound :: Int32))
   split =
