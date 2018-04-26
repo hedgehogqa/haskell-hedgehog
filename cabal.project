@@ -1,5 +1,6 @@
 packages:
   hedgehog
+  hedgehog-dieharder
   hedgehog-example
   hedgehog-quickcheck
 

@@ -1,0 +1,49 @@
+version: 0
+
+name:
+  hedgehog-dieharder
+author:
+  Nikos Baxevanis
+maintainer:
+  Nikos Baxevanis <nikos.baxevanis@gmail.com>
+homepage:
+  https://github.com/hedgehogqa/haskell-hedgehog
+synopsis:
+  Hedgehog dieharder project.
+description:
+  This is the hedgehog dieharder project. It contains diehard tests.
+  The diehard tests are a battery of statistical tests for measuring
+  the quality of our random number generator.
+category:
+  Testing
+license:
+  BSD3
+license-file:
+  LICENSE
+cabal-version:
+  >= 1.8
+build-type:
+  Simple
+tested-with:
+    GHC == 7.10.2
+  , GHC == 7.10.3
+  , GHC == 8.0.1
+  , GHC == 8.0.2
+  , GHC == 8.2.1
+  , GHC == 8.2.2
+  , GHC == 8.4.1
+
+executable dieharder-input
+  main-is:
+    Dieharder.hs
+
+  ghc-options:
+    -Wall -threaded -O2
+
+  hs-source-dirs:
+    test
+
+  build-depends:
+      hedgehog
+    , base                            >= 3          && < 5
+    , bytestring                      >= 0.10.4.0   && < 0.11

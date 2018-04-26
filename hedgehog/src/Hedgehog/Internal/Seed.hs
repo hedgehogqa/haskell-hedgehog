@@ -16,8 +16,7 @@
 -- overlay (kernel) v113.33.03, and Random.fs in FsCheck v3.
 --
 -- Other than the choice of initial seed for 'from' this port should be
--- faithful. Currently, we have not rerun the DieHarder, or BigCrush tests on
--- this implementation.
+-- faithful.
 --
 -- 1. Guy L. Steele, Jr., Doug Lea, Christine H. Flood
 --    Fast splittable pseudorandom number generators
