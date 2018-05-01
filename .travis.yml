@@ -86,10 +86,13 @@ install:
       cabal new-update head.hackage -v
     fi
   - grep -Ev -- '^\s*--' ${HOME}/.cabal/config | grep -Ev '^\s*$'
-  - "printf 'packages: \"hedgehog\" \"hedgehog-example\" \"hedgehog-quickcheck\"\\n' > cabal.project"
+  - "printf 'packages: \"hedgehog\" \"hedgehog-dieharder\" \"hedgehog-example\" \"hedgehog-quickcheck\"\\n' > cabal.project"
   - cat cabal.project
   - if [ -f "hedgehog/configure.ac" ]; then
       (cd "hedgehog" && autoreconf -i);
+    fi
+  - if [ -f "hedgehog-dieharder/configure.ac" ]; then
+      (cd "hedgehog-dieharder" && autoreconf -i);
     fi
   - if [ -f "hedgehog-example/configure.ac" ]; then
       (cd "hedgehog-example" && autoreconf -i);
@@ -100,7 +103,7 @@ install:
   - rm -f cabal.project.freeze
   - cabal new-build -w ${HC} ${TEST} ${BENCH} --project-file="cabal.project" --dep -j2 all
   - cabal new-build -w ${HC} --disable-tests --disable-benchmarks --project-file="cabal.project" --dep -j2 all
-  - rm -rf "hedgehog"/.ghc.environment.* "hedgehog-example"/.ghc.environment.* "hedgehog-quickcheck"/.ghc.environment.* "hedgehog"/dist "hedgehog-example"/dist "hedgehog-quickcheck"/dist
+  - rm -rf "hedgehog"/.ghc.environment.* "hedgehog-dieharder"/.ghc.environment.* "hedgehog-example"/.ghc.environment.* "hedgehog-quickcheck"/.ghc.environment.* "hedgehog"/dist "hedgehog-dieharder"/dist "hedgehog-example"/dist "hedgehog-quickcheck"/dist
   - DISTDIR=$(mktemp -d /tmp/dist-test.XXXX)
 
 # Here starts the actual work to be performed for the package under test;
@@ -108,12 +111,13 @@ install:
 script:
   # test that source-distributions can be generated
   - (cd "hedgehog" && cabal sdist)
+  - (cd "hedgehog-dieharder" && cabal sdist)
   - (cd "hedgehog-example" && cabal sdist)
   - (cd "hedgehog-quickcheck" && cabal sdist)
-  - mv "hedgehog"/dist/hedgehog-*.tar.gz "hedgehog-example"/dist/hedgehog-example-*.tar.gz "hedgehog-quickcheck"/dist/hedgehog-quickcheck-*.tar.gz ${DISTDIR}/
+  - mv "hedgehog"/dist/hedgehog-*.tar.gz "hedgehog-dieharder"/dist/hedgehog-dieharder-*.tar.gz "hedgehog-example"/dist/hedgehog-example-*.tar.gz "hedgehog-quickcheck"/dist/hedgehog-quickcheck-*.tar.gz ${DISTDIR}/
   - cd ${DISTDIR} || false
   - find . -maxdepth 1 -name '*.tar.gz' -exec tar -xvf '{}' \;
-  - "printf 'packages: hedgehog-*/*.cabal hedgehog-example-*/*.cabal hedgehog-quickcheck-*/*.cabal\\n' > cabal.project"
+  - "printf 'packages: hedgehog-*/*.cabal hedgehog-dieharder-*/*.cabal hedgehog-example-*/*.cabal hedgehog-quickcheck-*/*.cabal\\n' > cabal.project"
   - cat cabal.project
   # this builds all libraries and executables (without tests/benchmarks)
   - cabal new-build -w ${HC} --disable-tests --disable-benchmarks all
@@ -127,6 +131,7 @@ script:
 
   # cabal check
   - (cd hedgehog-* && cabal check)
+  - (cd hedgehog-dieharder-* && cabal check)
   - (cd hedgehog-example-* && cabal check)
   - (cd hedgehog-quickcheck-* && cabal check)
 
