@@ -1,3 +1,8 @@
+## Version 0.6 (2018-05-14)
+
+- Pass [Dieharder][Dieharder] statistical/randomness tests ([#185][185], [@moodmosaic][moodmosaic])
+- Catch `readFile` exceptions on the repl ([#184][184], [@thumphries][thumphries])
+
 ## Version 0.5.3 (2018-03-12)
 
 - Add `Semigroup` and `Monoid` instances for `GenT` that lift the inner `Monoid` ([#156][156], [@andrewthad][andrewthad])
@@ -32,7 +37,7 @@
 
 ## Version 0.4 (2017-06-28)
 
-- Abstract state machine testing, check out the Tim Humphries' great [blog post](http://teh.id.au/posts/2017/07/15/state-machine-testing) or the [process registry example](https://github.com/hedgehogqa/haskell-hedgehog/blob/master/hedgehog-example/test/Test/Example/Registry.hs) to see how it works ([#89][89], [@jystic][jystic])
+- Abstract state machine testing, check out Tim Humphries' great [blog post](http://teh.id.au/posts/2017/07/15/state-machine-testing) or the [process registry example](https://github.com/hedgehogqa/haskell-hedgehog/blob/master/hedgehog-example/test/Test/Example/Registry.hs) to see how it works ([#89][89], [@jystic][jystic])
 - `liftCatch`, `liftCatchIO`, `withCatch` functions for isolating exceptions during tests ([#89][89], [@jystic][jystic])
 
 ## Version 0.3 (2017-06-11)
@@ -65,6 +70,9 @@
 - `forAllWith` can be used to generate values without a `Show` instance ([@jystic][jystic])
 - Removed uses of `Typeable` to allow for generating types which cannot implement it ([@jystic][jystic])
 
+[Dieharder]:
+  https://webhome.phy.duke.edu/~rgb/General/dieharder.php
+
 [jystic]:
   https://github.com/jystic
 [chris-martin]:
@@ -94,6 +102,10 @@
 [fisx]:
   https://github.com/fisx
 
+[185]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/185
+[184]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/184
 [162]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/162
 [157]:
