@@ -56,6 +56,10 @@ module Hedgehog.Internal.Property (
   , assert
   , (===)
   , (/==)
+  , (<==)
+  , (>==)
+  , (<<<)
+  , (>>>)
 
   , eval
   , evalM
@@ -577,6 +581,50 @@ infix 4 /==
           "━━━ Both equal to ━━━"
         , showPretty x
         ]
+
+infix 4 <==
+
+-- | Fails the test if the right argument is less than the left.
+--
+(<==) :: (MonadTest m, Ord a, Show a, HasCallStack) => a -> a -> m ()
+(<==) x y = do
+  ok <- withFrozenCallStack $ eval (x <= y)
+  if ok then
+    success
+  else
+    withFrozenCallStack $ failDiff x y
+
+infix 4 >==
+
+-- | Fails the test if the right argument is greater than the left.
+(>==) :: (MonadTest m, Ord a, Show a, HasCallStack) => a -> a -> m ()
+(>==) x y = do
+  ok <- withFrozenCallStack $ eval (x >= y)
+  if ok then
+    success
+  else
+    withFrozenCallStack $ failDiff x y
+
+infix 4 <<<
+
+-- | Fails the test if the right argument is less than or equal to the left.
+(<<<) :: (MonadTest m, Ord a, Show a, HasCallStack) => a -> a -> m ()
+(<<<) x y = do
+  ok <- withFrozenCallStack $ eval (x < y)
+  if ok then
+    success
+  else
+    withFrozenCallStack $ failDiff x y
+
+infix 4 >>>
+
+(>>>) :: (MonadTest m, Ord a, Show a, HasCallStack) => a -> a -> m ()
+(>>>) x y = do
+  ok <- withFrozenCallStack $ eval (x > y)
+  if ok then
+    success
+  else
+    withFrozenCallStack $ failDiff x y
 
 -- | Fails the test if the value throws an exception when evaluated to weak
 --   head normal form (WHNF).
