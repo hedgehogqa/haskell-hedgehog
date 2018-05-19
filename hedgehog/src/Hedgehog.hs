@@ -105,7 +105,9 @@ module Hedgehog (
   , evalM
   , evalIO
   , evalEither
+  , evalLeft
   , evalExceptT
+  , isLeft
 
   -- * State Machine Tests
   , Command(..)
@@ -151,7 +153,7 @@ import           Hedgehog.Internal.Property (assert, (===), (/==))
 import           Hedgehog.Internal.Property (discard, failure, success)
 import           Hedgehog.Internal.Property (DiscardLimit, withDiscards)
 import           Hedgehog.Internal.Property (eval, evalM, evalIO)
-import           Hedgehog.Internal.Property (evalEither, evalExceptT)
+import           Hedgehog.Internal.Property (evalEither, evalLeft, evalExceptT, isLeft)
 import           Hedgehog.Internal.Property (footnote, footnoteShow)
 import           Hedgehog.Internal.Property (forAll, forAllWith)
 import           Hedgehog.Internal.Property (MonadTest(..))
