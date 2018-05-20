@@ -25,6 +25,9 @@
 -- 2. Nikos Baxevanis
 --    https://github.com/moodmosaic/SplitMix/blob/master/SplitMix.hs
 --
+
+#include "MachDeps.h"
+
 module Hedgehog.Internal.Seed (
     Seed(..)
   , random
@@ -48,7 +51,11 @@ import           Control.Monad.IO.Class (MonadIO(..))
 
 import           Data.Bifunctor (first)
 import           Data.Bits ((.|.), xor, shiftR, popCount)
-import           Data.Int (Int32, Int64)
+#if (SIZEOF_HSINT == 8)
+import           Data.Int (Int64)
+#else
+import           Data.Int (Int32)
+#endif
 import           Data.Time.Clock.POSIX (getPOSIXTime)
 import           Data.IORef (IORef)
 import qualified Data.IORef as IORef
@@ -199,8 +206,6 @@ mixGamma x =
 
 ------------------------------------------------------------------------
 -- RandomGen instances
-
-#include "MachDeps.h"
 
 #if (SIZEOF_HSINT == 8)
 instance RandomGen Seed where
