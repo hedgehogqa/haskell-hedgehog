@@ -107,7 +107,7 @@ random =
 --
 from :: Word64 -> Seed
 from x =
-  Seed x goldenGamma
+  Seed (mix64 x) (mixGamma (x + goldenGamma))
 
 -- | A predefined gamma value's needed for initializing the "root" instances of
 --   'Seed'. That is, instances not produced by splitting an already existing
@@ -199,7 +199,7 @@ mixGamma x =
     y = mix64variant13 x .|. 1
     n = popCount $ y `xor` (y `shiftR` 1)
   in
-    if n >= 24 then
+    if n < 24 then
       y `xor` 0xaaaaaaaaaaaaaaaa
     else
       y
