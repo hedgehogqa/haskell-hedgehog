@@ -61,7 +61,9 @@ module Hedgehog.Internal.Property (
   , evalM
   , evalIO
   , evalEither
+  , evalLeft
   , evalExceptT
+  , isLeft
 
   -- * Internal
   -- $internal
@@ -79,7 +81,7 @@ module Hedgehog.Internal.Property (
   ) where
 
 import           Control.Applicative (Alternative(..))
-import           Control.Monad (MonadPlus(..))
+import           Control.Monad (MonadPlus(..), void)
 import           Control.Monad.Base (MonadBase(..))
 import           Control.Monad.Catch (MonadThrow(..), MonadCatch(..))
 import           Control.Monad.Catch (SomeException(..), displayException)
@@ -603,6 +605,21 @@ evalEither = \case
     withFrozenCallStack $ failWith Nothing $ showPretty x
   Right x ->
     pure x
+
+-- | Fails the test if the 'Either' is 'Right', otherwise returns the value in
+--   the 'Left'.
+--
+evalLeft :: (MonadTest m, Show a, HasCallStack) => Either x a -> m x
+evalLeft =
+  evalEither . either Right Left
+
+-- | Fails the test if the 'Either' is 'Right'.
+-- An example use case would be testing that a parser the returns an 'Either'
+-- fails on all invalid inputs.
+--
+isLeft :: (MonadTest m, Show a, HasCallStack) => Either x a -> m ()
+isLeft =
+  void . evalLeft
 
 -- | Fails the test if the 'ExceptT' is 'Left', otherwise returns the value in
 --   the 'Right'.
