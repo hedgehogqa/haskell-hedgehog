@@ -957,6 +957,8 @@ enum lo hi =
 -- enumBounded :: 'Gen' 'Bool'
 -- @
 --
+--   /This is implemented in terms of the 'Enum' class, and thus may be
+--    partial for integral types larger than 'Int', e.g. 'Word64'./
 enumBounded :: (MonadGen m, Enum a, Bounded a) => m a
 enumBounded =
   enum minBound maxBound
