@@ -30,6 +30,8 @@ tested-with:
   , GHC == 8.2.1
   , GHC == 8.2.2
   , GHC == 8.4.1
+  , GHC == 8.4.2
+  , GHC == 8.4.3
 
 library
   hs-source-dirs:
