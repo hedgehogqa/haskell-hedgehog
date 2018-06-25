@@ -55,7 +55,9 @@ module Hedgehog (
   , test
 
   , forAll
+  , forAllT
   , forAllWith
+  , forAllWithT
   , discard
 
   , check
@@ -153,7 +155,7 @@ import           Hedgehog.Internal.Property (DiscardLimit, withDiscards)
 import           Hedgehog.Internal.Property (eval, evalM, evalIO)
 import           Hedgehog.Internal.Property (evalEither, evalExceptT)
 import           Hedgehog.Internal.Property (footnote, footnoteShow)
-import           Hedgehog.Internal.Property (forAll, forAllWith)
+import           Hedgehog.Internal.Property (forAll, forAllT, forAllWith, forAllWithT)
 import           Hedgehog.Internal.Property (MonadTest(..))
 import           Hedgehog.Internal.Property (Property, PropertyT, PropertyName)
 import           Hedgehog.Internal.Property (Group(..), GroupName)
