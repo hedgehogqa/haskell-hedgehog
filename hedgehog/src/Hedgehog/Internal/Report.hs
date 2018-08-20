@@ -1,4 +1,5 @@
 {-# OPTIONS_HADDOCK not-home #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveTraversable #-}
@@ -63,6 +64,9 @@ import           System.Console.ANSI (ColorIntensity(..), Color(..))
 import           System.Console.ANSI (ConsoleLayer(..), ConsoleIntensity(..))
 import           System.Console.ANSI (SGR(..), setSGRCode)
 import           System.Directory (makeRelativeToCurrentDirectory)
+#if mingw32_HOST_OS
+import           System.IO (hSetEncoding, stdout, stderr, utf8)
+#endif
 
 import           Text.PrettyPrint.Annotated.WL (Doc, (<+>))
 import qualified Text.PrettyPrint.Annotated.WL as WL
@@ -885,6 +889,11 @@ renderDoc mcolor doc = do
         DisableColor ->
           WL.display
 
+#if mingw32_HOST_OS
+  liftIO $ do
+    hSetEncoding stdout utf8
+    hSetEncoding stderr utf8
+#endif
   pure .
     display .
     WL.renderSmart 100 $
