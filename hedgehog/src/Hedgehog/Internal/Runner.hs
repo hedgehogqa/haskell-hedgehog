@@ -26,6 +26,7 @@ import           Control.Concurrent.STM (TVar, atomically)
 import qualified Control.Concurrent.STM.TVar as TVar
 import           Control.Monad.Catch (MonadCatch(..), catchAll)
 import           Control.Monad.IO.Class (MonadIO(..))
+import           Control.Monad (void)
 
 import           Data.Semigroup ((<>))
 
@@ -203,12 +204,12 @@ checkRegion ::
   -> Maybe PropertyName
   -> Size
   -> Seed
-  -> Property
+  -> Property a
   -> m (Report Result)
 checkRegion region mcolor name size seed prop =
   liftIO $ do
     result <-
-      checkReport (propertyConfig prop) size seed (propertyTest prop) $ \progress -> do
+      checkReport (propertyConfig prop) size seed (void $ propertyTest prop) $ \progress -> do
         ppprogress <- renderProgress mcolor name progress
         case reportStatus progress of
           Running ->
@@ -232,7 +233,7 @@ checkNamed ::
   => Region
   -> Maybe UseColor
   -> Maybe PropertyName
-  -> Property
+  -> Property a
   -> m (Report Result)
 checkNamed region mcolor name prop = do
   seed <- liftIO Seed.random
@@ -240,14 +241,14 @@ checkNamed region mcolor name prop = do
 
 -- | Check a property.
 --
-check :: MonadIO m => Property -> m Bool
+check :: MonadIO m => Property a -> m Bool
 check prop =
   liftIO . displayRegion $ \region ->
     (== OK) . reportStatus <$> checkNamed region Nothing Nothing prop
 
 -- | Check a property using a specific size and seed.
 --
-recheck :: MonadIO m => Size -> Seed -> Property -> m ()
+recheck :: MonadIO m => Size -> Seed -> Property a -> m ()
 recheck size seed prop0 = do
   let prop = withTests 1 prop0
   _ <- liftIO . displayRegion $ \region ->
@@ -256,7 +257,7 @@ recheck size seed prop0 = do
 
 -- | Check a group of properties using the specified runner config.
 --
-checkGroup :: MonadIO m => RunnerConfig -> Group -> m Bool
+checkGroup :: MonadIO m => RunnerConfig -> Group a -> m Bool
 checkGroup config (Group group props) =
   liftIO $ do
     n <- resolveWorkers (runnerWorkers config)
@@ -283,7 +284,7 @@ checkGroupWith ::
      WorkerCount
   -> Verbosity
   -> Maybe UseColor
-  -> [(PropertyName, Property)]
+  -> [(PropertyName, Property a)]
   -> IO Summary
 checkGroupWith n verbosity mcolor props =
   displayRegion $ \sregion -> do
@@ -348,7 +349,7 @@ checkGroupWith n verbosity mcolor props =
 -- >     ]
 --
 --
-checkSequential :: MonadIO m => Group -> m Bool
+checkSequential :: MonadIO m => Group a -> m Bool
 checkSequential =
   checkGroup
     RunnerConfig {
@@ -382,7 +383,7 @@ checkSequential =
 -- >       ("prop_reverse", prop_reverse)
 -- >     ]
 --
-checkParallel :: MonadIO m => Group -> m Bool
+checkParallel :: MonadIO m => Group a -> m Bool
 checkParallel =
   checkGroup
     RunnerConfig {

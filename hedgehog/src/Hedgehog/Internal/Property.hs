@@ -127,10 +127,10 @@ import           Language.Haskell.TH.Lift (deriveLift)
 -- | A property test, along with some configurable limits like how many times
 --   to run the test.
 --
-data Property =
+data Property a =
   Property {
       propertyConfig :: !PropertyConfig
-    , propertyTest :: PropertyT IO ()
+    , propertyTest :: PropertyT IO a
     }
 
 -- | The property monad transformer allows both the generation of test inputs
@@ -255,10 +255,10 @@ newtype ShrinkRetries =
 
 -- | A named collection of property tests.
 --
-data Group =
+data Group a =
   Group {
       groupName :: !GroupName
-    , groupProperties :: ![(PropertyName, Property)]
+    , groupProperties :: ![(PropertyName, Property a)]
     }
 
 -- | The name of a group of properties.
@@ -741,7 +741,7 @@ defaultConfig =
 
 -- | Map a config modification function over a property.
 --
-mapConfig :: (PropertyConfig -> PropertyConfig) -> Property -> Property
+mapConfig :: (PropertyConfig -> PropertyConfig) -> Property a -> Property a
 mapConfig f (Property cfg t) =
   Property (f cfg) t
 
@@ -752,21 +752,21 @@ mapConfig f (Property cfg t) =
 --   need to run repeatedly, you can use @withTests 1@ to define a property that
 --   will only be checked once.
 --
-withTests :: TestLimit -> Property -> Property
+withTests :: TestLimit -> Property a -> Property a
 withTests n =
   mapConfig $ \config -> config { propertyTestLimit = n }
 
 -- | Set the number of times a property is allowed to discard before the test
 --   runner gives up.
 --
-withDiscards :: DiscardLimit -> Property -> Property
+withDiscards :: DiscardLimit -> Property a -> Property a
 withDiscards n =
   mapConfig $ \config -> config { propertyDiscardLimit = n }
 
 -- | Set the number of times a property is allowed to shrink before the test
 --   runner gives up and prints the counterexample.
 --
-withShrinks :: ShrinkLimit -> Property -> Property
+withShrinks :: ShrinkLimit -> Property a -> Property a
 withShrinks n =
   mapConfig $ \config -> config { propertyShrinkLimit = n }
 
@@ -774,13 +774,13 @@ withShrinks n =
 --   the test runner gives up and tries a different shrink. See 'ShrinkRetries'
 --   for more information.
 --
-withRetries :: ShrinkRetries -> Property -> Property
+withRetries :: ShrinkRetries -> Property a -> Property a
 withRetries n =
   mapConfig $ \config -> config { propertyShrinkRetries = n }
 
 -- | Creates a property with the default configuration.
 --
-property :: HasCallStack => PropertyT IO () -> Property
+property :: HasCallStack => PropertyT IO a -> Property a
 property m =
   Property defaultConfig $
     withFrozenCallStack (evalM m)

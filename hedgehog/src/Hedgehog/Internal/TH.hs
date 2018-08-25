@@ -23,7 +23,7 @@ type TExpQ a =
 --
 --   Functions starting with `prop_` are assumed to be properties.
 --
-discover :: TExpQ Group
+discover :: TExpQ (Group a)
 discover = do
   file <- getCurrentFile
   properties <- Map.toList <$> runIO (readProperties file)
@@ -42,11 +42,11 @@ discover = do
 
   [|| Group $$(moduleName) $$(listTE names) ||]
 
-mkNamedProperty :: PropertyName -> TExpQ (PropertyName, Property)
+mkNamedProperty :: PropertyName -> TExpQ (PropertyName, Property a)
 mkNamedProperty name = do
   [|| (name, $$(unsafeProperty name)) ||]
 
-unsafeProperty :: PropertyName -> TExpQ Property
+unsafeProperty :: PropertyName -> TExpQ (Property a)
 unsafeProperty =
   unsafeTExpCoerce . pure . VarE . mkName . unPropertyName
 
