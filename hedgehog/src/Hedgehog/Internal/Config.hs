@@ -15,7 +15,6 @@ module Hedgehog.Internal.Config (
   , WorkerCount(..)
   , resolveWorkers
 
-  , detectMark
   , detectColor
   , detectVerbosity
   , detectWorkers
@@ -30,10 +29,6 @@ import           Language.Haskell.TH.Lift (deriveLift)
 import           System.Console.ANSI (hSupportsANSI)
 import           System.Environment (lookupEnv)
 import           System.IO (stdout)
-
-#if !mingw32_HOST_OS
-import           System.Posix.User (getEffectiveUserName)
-#endif
 
 import           Text.Read (readMaybe)
 
@@ -61,15 +56,6 @@ data Verbosity =
 newtype WorkerCount =
   WorkerCount Int
   deriving (Eq, Ord, Show, Num, Enum, Real, Integral)
-
-detectMark :: MonadIO m => m Bool
-detectMark = do
-#if mingw32_HOST_OS
-   pure False
-#else
-   user <- liftIO getEffectiveUserName
-   pure $ user == "mth"
-#endif
 
 lookupBool :: MonadIO m => String -> m (Maybe Bool)
 lookupBool key =
@@ -105,15 +91,11 @@ detectColor =
         pure EnableColor
 
       Nothing -> do
-        mth <- detectMark
-        if mth then
-          pure DisableColor -- avoid getting fired :)
-        else do
-          enable <- hSupportsANSI stdout
-          if enable then
-            pure EnableColor
-          else
-            pure DisableColor
+        enable <- hSupportsANSI stdout
+        if enable then
+          pure EnableColor
+        else
+          pure DisableColor
 
 detectVerbosity :: MonadIO m => m Verbosity
 detectVerbosity =
@@ -127,11 +109,7 @@ detectVerbosity =
         pure Normal
 
       _ -> do
-        mth <- detectMark
-        if mth then
-          pure Quiet
-        else
-          pure Normal
+        pure Normal
 
 detectWorkers :: MonadIO m => m WorkerCount
 detectWorkers = do
