@@ -1,5 +1,6 @@
 {-# OPTIONS_HADDOCK not-home #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DoAndIfThenElse #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
@@ -45,6 +46,9 @@ import           Hedgehog.Range (Size)
 
 import           Language.Haskell.TH.Lift (deriveLift)
 
+#if mingw32_HOST_OS
+import           System.IO (hSetEncoding, stdout, stderr, utf8)
+#endif
 
 -- | Configuration for a property test run.
 --
@@ -265,6 +269,10 @@ checkGroup config (Group group props) =
     -- our tests will saturate all the capabilities they're given.
     updateNumCapabilities (n + 2)
 
+#if mingw32_HOST_OS
+    hSetEncoding stdout utf8
+    hSetEncoding stderr utf8
+#endif
     putStrLn $ "━━━ " ++ unGroupName group ++ " ━━━"
 
     verbosity <- resolveVerbosity (runnerVerbosity config)
