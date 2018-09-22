@@ -106,6 +106,8 @@
 [fisx]:
   https://github.com/fisx
 
+[218]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/218
 [185]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/185
 [184]:
