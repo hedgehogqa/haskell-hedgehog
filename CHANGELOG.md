@@ -1,3 +1,7 @@
+## Version 0.6.1 (2018-09-22)
+
+- Set stdout/stderr encoding to UTF-8 on Windows ([#218][218], [@moodmosaic][moodmosaic])
+
 ## Version 0.6 (2018-05-14)
 
 - Pass [Dieharder][Dieharder] statistical/randomness tests ([#185][185], [@moodmosaic][moodmosaic])
@@ -102,6 +106,8 @@
 [fisx]:
   https://github.com/fisx
 
+[218]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/218
 [185]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/185
 [184]:
