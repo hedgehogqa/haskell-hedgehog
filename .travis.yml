@@ -2,7 +2,7 @@
 #
 #   runghc make_travis_yml_2.hs 'cabal.project'
 #
-# For more information, see https://github.com/hvr/multi-ghc-travis
+# For more information, see https://github.com/haskell-CI/haskell-ci
 #
 language: c
 sudo: false
@@ -28,6 +28,9 @@ before_cache:
 
 matrix:
   include:
+    - compiler: "ghc-8.6.1"
+    # env: TEST=--disable-tests BENCH=--disable-benchmarks
+      addons: {apt: {packages: [ghc-ppa-tools,cabal-install-head,ghc-8.6.1], sources: [hvr-ghc]}}
     - compiler: "ghc-8.4.3"
     # env: TEST=--disable-tests BENCH=--disable-benchmarks
       addons: {apt: {packages: [ghc-ppa-tools,cabal-install-2.2,ghc-8.4.3], sources: [hvr-ghc]}}
@@ -81,7 +84,7 @@ install:
   - grep -Ev -- '^\s*--' ${HOME}/.cabal/config | grep -Ev '^\s*$'
   - "printf 'packages: \"hedgehog\" \"hedgehog-dieharder\" \"hedgehog-example\" \"hedgehog-quickcheck\"\\n' > cabal.project"
   - touch cabal.project.local
-  - "if ! $NOINSTALLEDCONSTRAINTS; then for pkg in $($HCPKG list --simple-output); do echo $pkg | sed 's/^/constraints: /' | sed 's/-[^-]*$/ installed/' >> cabal.project.local; done; fi"
+  - "if ! $NOINSTALLEDCONSTRAINTS; then for pkg in $($HCPKG list --simple-output); do echo $pkg  | grep -vw -- hedgehog | grep -vw -- hedgehog-dieharder | grep -vw -- hedgehog-example | grep -vw -- hedgehog-quickcheck | sed 's/^/constraints: /' | sed 's/-[^-]*$/ installed/' >> cabal.project.local; done; fi"
   - cat cabal.project || true
   - cat cabal.project.local || true
   - if [ -f "hedgehog/configure.ac" ]; then
@@ -115,7 +118,7 @@ script:
   - find . -maxdepth 1 -name '*.tar.gz' -exec tar -xvf '{}' \;
   - "printf 'packages: hedgehog-*/*.cabal hedgehog-dieharder-*/*.cabal hedgehog-example-*/*.cabal hedgehog-quickcheck-*/*.cabal\\n' > cabal.project"
   - touch cabal.project.local
-  - "if ! $NOINSTALLEDCONSTRAINTS; then for pkg in $($HCPKG list --simple-output); do echo $pkg | sed 's/^/constraints: /' | sed 's/-[^-]*$/ installed/' >> cabal.project.local; done; fi"
+  - "if ! $NOINSTALLEDCONSTRAINTS; then for pkg in $($HCPKG list --simple-output); do echo $pkg  | grep -vw -- hedgehog | grep -vw -- hedgehog-dieharder | grep -vw -- hedgehog-example | grep -vw -- hedgehog-quickcheck | sed 's/^/constraints: /' | sed 's/-[^-]*$/ installed/' >> cabal.project.local; done; fi"
   - cat cabal.project || true
   - cat cabal.project.local || true
   # this builds all libraries and executables (without tests/benchmarks)
@@ -123,7 +126,7 @@ script:
 
   # build & run tests, build benchmarks
   - cabal new-build -w ${HC} ${TEST} ${BENCH} all
-  - if [ "x$TEST" = "x--enable-tests" ]; then travis_wait 30 cabal new-test -w ${HC} ${TEST} ${BENCH} all; fi
+  - if [ "x$TEST" = "x--enable-tests" ]; then cabal new-test -w ${HC} ${TEST} ${BENCH} all; fi
 
   # cabal check
   - (cd hedgehog-* && cabal check)
