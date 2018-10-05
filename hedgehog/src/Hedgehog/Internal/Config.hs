@@ -1,5 +1,4 @@
 {-# OPTIONS_HADDOCK not-home #-}
-{-# LANGUAGE CPP #-}
 {-# LANGUAGE DoAndIfThenElse #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
@@ -31,10 +30,6 @@ import           System.Console.ANSI (hSupportsANSI)
 import           System.Environment (lookupEnv)
 import           System.IO (stdout)
 
-#if !mingw32_HOST_OS
-import           System.Posix.User (getEffectiveUserName)
-#endif
-
 import           Text.Read (readMaybe)
 
 
@@ -64,12 +59,8 @@ newtype WorkerCount =
 
 detectMark :: MonadIO m => m Bool
 detectMark = do
-#if mingw32_HOST_OS
-   pure False
-#else
-   user <- liftIO getEffectiveUserName
-   pure $ user == "mth"
-#endif
+  user <- liftIO $ lookupEnv "USER"
+  pure $ user == Just "mth"
 
 lookupBool :: MonadIO m => String -> m (Maybe Bool)
 lookupBool key =
