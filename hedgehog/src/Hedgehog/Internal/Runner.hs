@@ -233,21 +233,24 @@ checkRegion region mcolor name size seed prop =
 
 checkNamed ::
      MonadIO m
-  => Region
+  => Maybe Seed
+  -> Region
   -> Maybe UseColor
   -> Maybe PropertyName
   -> Property
   -> m (Report Result)
-checkNamed region mcolor name prop = do
-  seed <- liftIO Seed.random
+checkNamed mbSeed region mcolor name prop = do
+  seed <- case mbSeed of
+    Nothing -> liftIO Seed.random
+    Just sd -> pure sd
   checkRegion region mcolor name 0 seed prop
 
 -- | Check a property.
 --
-check :: MonadIO m => Property -> m Bool
-check prop =
+check :: MonadIO m => Maybe Seed -> Property -> m Bool
+check mbSeed prop =
   liftIO . displayRegion $ \region ->
-    (== OK) . reportStatus <$> checkNamed region Nothing Nothing prop
+    (== OK) . reportStatus <$> checkNamed mbSeed region Nothing Nothing prop
 
 -- | Check a property using a specific size and seed.
 --
@@ -276,7 +279,7 @@ checkGroup config (Group group props) =
     putStrLn $ "━━━ " ++ unGroupName group ++ " ━━━"
 
     verbosity <- resolveVerbosity (runnerVerbosity config)
-    summary <- checkGroupWith n verbosity (runnerColor config) props
+    summary <- checkGroupWith n verbosity Nothing (runnerColor config) props
 
     pure $
       summaryFailed summary == 0 &&
@@ -290,15 +293,22 @@ updateSummary sregion svar mcolor f = do
 checkGroupWith ::
      WorkerCount
   -> Verbosity
+  -> Maybe Seed
   -> Maybe UseColor
   -> [(PropertyName, Property)]
   -> IO Summary
-checkGroupWith n verbosity mcolor props =
+checkGroupWith n verbosity mbSeed mcolor props =
   displayRegion $ \sregion -> do
     svar <- atomically . TVar.newTVar $ mempty { summaryWaiting = PropertyCount (length props) }
 
     let
-      start (TasksRemaining tasks) _ix (name, prop) =
+      maybeSplitSeed (name, prop) (sd, acc) =
+        let sp = fmap Seed.split sd in
+          (fmap fst sp, (name, prop, fmap snd sp) : acc)
+
+      seededProps = snd $ foldr maybeSplitSeed (mbSeed, []) props
+
+      start (TasksRemaining tasks) _ix (name, prop, seed) =
         liftIO $ do
           updateSummary sregion svar mcolor $ \x -> x {
               summaryWaiting =
@@ -317,21 +327,21 @@ checkGroupWith n verbosity mcolor props =
 
             moveToBottom sregion
 
-            pure (name, prop, region)
+            pure (name, prop, region, seed)
 
-      finish (_name, _prop, _region) =
+      finish (_name, _prop, _region, _seed) =
         updateSummary sregion svar mcolor $ \x -> x {
             summaryRunning =
               summaryRunning x - 1
           }
 
-      finalize (_name, _prop, region) =
+      finalize (_name, _prop, region, _seed) =
         finishRegion region
 
     summary <-
       fmap (mconcat . fmap (fromResult . reportStatus)) $
-        runTasks n props start finish finalize $ \(name, prop, region) -> do
-          result <- checkNamed region mcolor (Just name) prop
+        runTasks n seededProps start finish finalize $ \(name, prop, region, seed) -> do
+          result <- checkNamed seed region mcolor (Just name) prop
           updateSummary sregion svar mcolor
             (<> fromResult (reportStatus result))
           pure result
