@@ -158,6 +158,8 @@ import           Control.Monad (MonadPlus(..), filterM, replicateM, ap, join)
 import           Control.Monad.Base (MonadBase(..))
 import           Control.Monad.Catch (MonadThrow(..), MonadCatch(..))
 import           Control.Monad.Error.Class (MonadError(..))
+import           Control.Monad.Fail (MonadFail (..))
+import qualified Control.Monad.Fail as Fail
 import           Control.Monad.IO.Class (MonadIO(..))
 import           Control.Monad.Morph (MFunctor(..), MMonad(..), generalize)
 import           Control.Monad.Primitive (PrimMonad(..))
@@ -552,6 +554,13 @@ instance Monad m => Monad (GenT m) where
         (sk, sm) ->
           runGenT size sk . k =<<
           runGenT size sm m
+
+  fail =
+    Fail.fail
+
+instance Monad m => MonadFail (GenT m) where
+  fail =
+    error
 
 instance Monad m => Alternative (GenT m) where
   empty =
