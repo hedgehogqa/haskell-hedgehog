@@ -15,6 +15,8 @@ module Hedgehog.Internal.Runner (
   , RunnerConfig(..)
   , checkParallel
   , checkSequential
+  , checkParallelSeed
+  , checkSequentialSeed
   , checkGroup
 
   -- * Internal
@@ -65,6 +67,10 @@ data RunnerConfig =
       -- | How verbose to be in the runner output. 'Nothing' means detect from
       --   the environment.
     , runnerVerbosity :: !(Maybe Verbosity)
+
+      -- | If this is not `Nothing`, it specifies the seed used for random value
+      -- generation.  This can be used to get repeatable test runs.
+    , runnerSeed :: !(Maybe Seed)
     } deriving (Eq, Ord, Show)
 
 findM :: Monad m => [a] -> b -> (a -> m (Maybe b)) -> m b
@@ -279,7 +285,7 @@ checkGroup config (Group group props) =
     putStrLn $ "━━━ " ++ unGroupName group ++ " ━━━"
 
     verbosity <- resolveVerbosity (runnerVerbosity config)
-    summary <- checkGroupWith n verbosity Nothing (runnerColor config) props
+    summary <- checkGroupWith n verbosity (runnerSeed config) (runnerColor config) props
 
     pure $
       summaryFailed summary == 0 &&
@@ -376,6 +382,24 @@ checkSequential =
           Nothing
       , runnerVerbosity =
           Nothing
+      , runnerSeed =
+          Nothing
+      }
+
+-- | This is 'checkSequential', but it allows you to specify the seed used for
+-- random value generation.
+checkSequentialSeed :: MonadIO m => Seed -> Group -> m Bool
+checkSequentialSeed seed =
+  checkGroup
+    RunnerConfig {
+        runnerWorkers =
+          Just 1
+      , runnerColor =
+          Nothing
+      , runnerVerbosity =
+          Nothing
+      , runnerSeed =
+          Just seed
       }
 
 -- | Check a group of properties in parallel.
@@ -410,6 +434,22 @@ checkParallel =
           Nothing
       , runnerVerbosity =
           Nothing
+      , runnerSeed =
+          Nothing
+      }
+
+checkParallelSeed :: MonadIO m => Seed -> Group -> m Bool
+checkParallelSeed seed =
+  checkGroup
+    RunnerConfig {
+        runnerWorkers =
+          Nothing
+      , runnerColor =
+          Nothing
+      , runnerVerbosity =
+          Nothing
+      , runnerSeed =
+          Just seed
       }
 
 ------------------------------------------------------------------------

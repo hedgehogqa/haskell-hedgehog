@@ -1,5 +1,6 @@
 {-# OPTIONS_HADDOCK not-home #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE TemplateHaskell #-}
 -- |
 -- This is a port of "Fast Splittable Pseudorandom Number Generators" by Steele
 -- et. al. [1].
@@ -61,6 +62,8 @@ import           Data.IORef (IORef)
 import qualified Data.IORef as IORef
 import           Data.Word (Word32, Word64)
 
+import           Language.Haskell.TH.Lift (deriveLift)
+
 import           System.IO.Unsafe (unsafePerformIO)
 import           System.Random (RandomGen)
 import qualified System.Random as Random
@@ -72,6 +75,8 @@ data Seed =
       seedValue :: !Word64
     , seedGamma :: !Word64 -- ^ must be an odd number
     } deriving (Eq, Ord)
+
+$(deriveLift ''Seed)
 
 instance Show Seed where
   showsPrec p (Seed v g) =
