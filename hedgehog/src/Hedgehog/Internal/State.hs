@@ -616,8 +616,11 @@ renderActionResult env (Action _ output@(Symbolic (Name name)) _ _ _ _) =
     prefix =
       replicate (length prefix0) ' '
 
-    unfound _ =
-      "<<not in environment>>"
+    unfound = \case
+      EnvironmentValueNotFound _
+        -> "<<not found in environment>>"
+      EnvironmentTypeError _ _
+        -> "<<type representation in environment unexpected>>"
 
     actual =
       either unfound showPretty
