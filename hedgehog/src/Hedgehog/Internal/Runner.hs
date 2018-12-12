@@ -189,18 +189,18 @@ checkRegion ::
   -> Seed
   -> Property
   -> m (Report Result)
-checkRegion region mcolor name size seed prop =
+checkRegion region color name size seed prop =
   liftIO $ do
     result <-
       checkReport (propertyConfig prop) size seed (propertyTest prop) $ \progress -> do
-        ppprogress <- renderProgress mcolor name progress
+        ppprogress <- renderProgress color name progress
         case reportStatus progress of
           Running ->
             setRegion region ppprogress
           Shrinking _ ->
             openRegion region ppprogress
 
-    ppresult <- renderResult mcolor name result
+    ppresult <- renderResult color name result
     case reportStatus result of
       Failed _ ->
         openRegion region ppresult
@@ -218,26 +218,26 @@ checkNamed ::
   -> Maybe PropertyName
   -> Property
   -> m (Report Result)
-checkNamed region mcolor name prop = do
+checkNamed region color name prop = do
   seed <- liftIO Seed.random
-  checkRegion region mcolor name 0 seed prop
+  checkRegion region color name 0 seed prop
 
 -- | Check a property.
 --
 check :: MonadIO m => Property -> m Bool
 check prop = do
-  mcolor <- detectColor
+  color <- detectColor
   liftIO . displayRegion $ \region ->
-    (== OK) . reportStatus <$> checkNamed region mcolor Nothing prop
+    (== OK) . reportStatus <$> checkNamed region color Nothing prop
 
 -- | Check a property using a specific size and seed.
 --
 recheck :: MonadIO m => Size -> Seed -> Property -> m ()
 recheck size seed prop0 = do
-  mcolor <- detectColor
+  color <- detectColor
   let prop = withTests 1 prop0
   _ <- liftIO . displayRegion $ \region ->
-    checkRegion region mcolor Nothing size seed prop
+    checkRegion region color Nothing size seed prop
   pure ()
 
 data Parallelism =
@@ -250,8 +250,10 @@ checkGroup :: MonadIO m => Parallelism -> Group -> m Bool
 checkGroup parallelism (Group group props) =
   liftIO $ do
     n <- case parallelism of
-        UseParallelism -> detectWorkers
-        NoParallelism -> pure 1
+           UseParallelism ->
+             detectWorkers
+           NoParallelism ->
+             pure 1
 
     -- ensure few spare capabilities for concurrent-output, it's likely that
     -- our tests will saturate all the capabilities they're given.
@@ -272,9 +274,9 @@ checkGroup parallelism (Group group props) =
       summaryGaveUp summary == 0
 
 updateSummary :: Region -> TVar Summary -> UseColor -> (Summary -> Summary) -> IO ()
-updateSummary sregion svar mcolor f = do
+updateSummary sregion svar color f = do
   summary <- atomically (TVar.modifyTVar' svar f >> TVar.readTVar svar)
-  setRegion sregion =<< renderSummary mcolor summary
+  setRegion sregion =<< renderSummary color summary
 
 checkGroupWith ::
      WorkerCount
@@ -282,14 +284,14 @@ checkGroupWith ::
   -> UseColor
   -> [(PropertyName, Property)]
   -> IO Summary
-checkGroupWith n verbosity mcolor props =
+checkGroupWith n verbosity color props =
   displayRegion $ \sregion -> do
     svar <- atomically . TVar.newTVar $ mempty { summaryWaiting = PropertyCount (length props) }
 
     let
       start (TasksRemaining tasks) _ix (name, prop) =
         liftIO $ do
-          updateSummary sregion svar mcolor $ \x -> x {
+          updateSummary sregion svar color $ \x -> x {
               summaryWaiting =
                 PropertyCount tasks
             , summaryRunning =
@@ -309,7 +311,7 @@ checkGroupWith n verbosity mcolor props =
             pure (name, prop, region)
 
       finish (_name, _prop, _region) =
-        updateSummary sregion svar mcolor $ \x -> x {
+        updateSummary sregion svar color $ \x -> x {
             summaryRunning =
               summaryRunning x - 1
           }
@@ -320,12 +322,12 @@ checkGroupWith n verbosity mcolor props =
     summary <-
       fmap (mconcat . fmap (fromResult . reportStatus)) $
         runTasks n props start finish finalize $ \(name, prop, region) -> do
-          result <- checkNamed region mcolor (Just name) prop
-          updateSummary sregion svar mcolor
+          result <- checkNamed region color (Just name) prop
+          updateSummary sregion svar color
             (<> fromResult (reportStatus result))
           pure result
 
-    updateSummary sregion svar mcolor (const summary)
+    updateSummary sregion svar color (const summary)
     pure summary
 
 -- | Check a group of properties sequentially.
