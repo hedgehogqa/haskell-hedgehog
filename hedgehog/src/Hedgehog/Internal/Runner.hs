@@ -240,12 +240,16 @@ recheck size seed prop0 = do
     checkRegion region mcolor Nothing size seed prop
   pure ()
 
+data Parallelism = UseParallelism | NoParallelism
+
 -- | Check a group of properties using the specified runner config.
 --
-checkGroup :: MonadIO m => Bool -> Group -> m Bool
-checkGroup useParallelism (Group group props) =
+checkGroup :: MonadIO m => Parallelism -> Group -> m Bool
+checkGroup parallelism (Group group props) =
   liftIO $ do
-    n <- if useParallelism then detectWorkers else pure 1
+    n <- case parallelism of
+        UseParallelism -> detectWorkers
+        NoParallelism -> pure 1
 
     -- ensure few spare capabilities for concurrent-output, it's likely that
     -- our tests will saturate all the capabilities they're given.
@@ -340,7 +344,7 @@ checkGroupWith n verbosity mcolor props =
 --
 --
 checkSequential :: MonadIO m => Group -> m Bool
-checkSequential = checkGroup False
+checkSequential = checkGroup NoParallelism
 
 
 -- | Check a group of properties in parallel.
@@ -366,4 +370,4 @@ checkSequential = checkGroup False
 -- >     ]
 --
 checkParallel :: MonadIO m => Group -> m Bool
-checkParallel = checkGroup True
+checkParallel = checkGroup UseParallelism

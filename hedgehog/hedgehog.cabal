@@ -78,7 +78,6 @@ library
 
   ghc-options:
     -Wall
-    -Werror
 
   hs-source-dirs:
     src
