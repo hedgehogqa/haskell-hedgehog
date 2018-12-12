@@ -244,15 +244,17 @@ checkNamed region mcolor name prop = do
 
 -- | Check a property.
 --
-check :: MonadIO m => UseColor -> Property -> m Bool
-check mcolor prop =
+check :: MonadIO m => Property -> m Bool
+check prop = do
+  mcolor <- detectColor
   liftIO . displayRegion $ \region ->
     (== OK) . reportStatus <$> checkNamed region mcolor Nothing prop
 
 -- | Check a property using a specific size and seed.
 --
-recheck :: MonadIO m => UseColor -> Size -> Seed -> Property -> m ()
-recheck mcolor size seed prop0 = do
+recheck :: MonadIO m => Size -> Seed -> Property -> m ()
+recheck size seed prop0 = do
+  mcolor <- detectColor
   let prop = withTests 1 prop0
   _ <- liftIO . displayRegion $ \region ->
     checkRegion region mcolor Nothing size seed prop
