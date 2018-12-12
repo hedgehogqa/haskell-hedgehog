@@ -240,7 +240,9 @@ recheck size seed prop0 = do
     checkRegion region mcolor Nothing size seed prop
   pure ()
 
-data Parallelism = UseParallelism | NoParallelism
+data Parallelism =
+    UseParallelism
+  | NoParallelism
 
 -- | Check a group of properties using the specified runner config.
 --
