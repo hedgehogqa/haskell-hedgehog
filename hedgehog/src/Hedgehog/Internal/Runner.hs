@@ -56,15 +56,15 @@ data RunnerConfig =
   RunnerConfig {
       -- | The number of property tests to run concurrently. 'Nothing' means
       --   use one worker per processor.
-      runnerWorkers :: !(Maybe WorkerCount)
+      runnerWorkers :: !WorkerCount
 
       -- | Whether to use colored output or not. 'Nothing' means detect from
       --   the environment.
-    , runnerColor :: !(Maybe UseColor)
+    , runnerColor :: !UseColor
 
       -- | How verbose to be in the runner output. 'Nothing' means detect from
       --   the environment.
-    , runnerVerbosity :: !(Maybe Verbosity)
+    , runnerVerbosity :: !Verbosity
     } deriving (Eq, Ord, Show)
 
 findM :: Monad m => [a] -> b -> (a -> m (Maybe b)) -> m b
@@ -203,7 +203,7 @@ checkReport cfg size0 seed0 test0 updateUI =
 checkRegion ::
      MonadIO m
   => Region
-  -> Maybe UseColor
+  -> UseColor
   -> Maybe PropertyName
   -> Size
   -> Seed
@@ -234,7 +234,7 @@ checkRegion region mcolor name size seed prop =
 checkNamed ::
      MonadIO m
   => Region
-  -> Maybe UseColor
+  -> UseColor
   -> Maybe PropertyName
   -> Property
   -> m (Report Result)
@@ -244,26 +244,26 @@ checkNamed region mcolor name prop = do
 
 -- | Check a property.
 --
-check :: MonadIO m => Property -> m Bool
-check prop =
+check :: MonadIO m => UseColor -> Property -> m Bool
+check mcolor prop =
   liftIO . displayRegion $ \region ->
-    (== OK) . reportStatus <$> checkNamed region Nothing Nothing prop
+    (== OK) . reportStatus <$> checkNamed region mcolor Nothing prop
 
 -- | Check a property using a specific size and seed.
 --
-recheck :: MonadIO m => Size -> Seed -> Property -> m ()
-recheck size seed prop0 = do
+recheck :: MonadIO m => UseColor -> Size -> Seed -> Property -> m ()
+recheck mcolor size seed prop0 = do
   let prop = withTests 1 prop0
   _ <- liftIO . displayRegion $ \region ->
-    checkRegion region Nothing Nothing size seed prop
+    checkRegion region mcolor Nothing size seed prop
   pure ()
 
 -- | Check a group of properties using the specified runner config.
 --
-checkGroup :: MonadIO m => RunnerConfig -> Group -> m Bool
-checkGroup config (Group group props) =
+checkGroup :: MonadIO m => Bool -> Group -> m Bool
+checkGroup useParallelism (Group group props) =
   liftIO $ do
-    n <- resolveWorkers (runnerWorkers config)
+    n <- if useParallelism then detectWorkers else pure 1
 
     -- ensure few spare capabilities for concurrent-output, it's likely that
     -- our tests will saturate all the capabilities they're given.
@@ -275,14 +275,15 @@ checkGroup config (Group group props) =
 #endif
     putStrLn $ "━━━ " ++ unGroupName group ++ " ━━━"
 
-    verbosity <- resolveVerbosity (runnerVerbosity config)
-    summary <- checkGroupWith n verbosity (runnerColor config) props
+    verbosity <- detectVerbosity
+    color <- detectColor
+    summary <- checkGroupWith n verbosity color props
 
     pure $
       summaryFailed summary == 0 &&
       summaryGaveUp summary == 0
 
-updateSummary :: Region -> TVar Summary -> Maybe UseColor -> (Summary -> Summary) -> IO ()
+updateSummary :: Region -> TVar Summary -> UseColor -> (Summary -> Summary) -> IO ()
 updateSummary sregion svar mcolor f = do
   summary <- atomically (TVar.modifyTVar' svar f >> TVar.readTVar svar)
   setRegion sregion =<< renderSummary mcolor summary
@@ -290,7 +291,7 @@ updateSummary sregion svar mcolor f = do
 checkGroupWith ::
      WorkerCount
   -> Verbosity
-  -> Maybe UseColor
+  -> UseColor
   -> [(PropertyName, Property)]
   -> IO Summary
 checkGroupWith n verbosity mcolor props =
@@ -357,16 +358,8 @@ checkGroupWith n verbosity mcolor props =
 --
 --
 checkSequential :: MonadIO m => Group -> m Bool
-checkSequential =
-  checkGroup
-    RunnerConfig {
-        runnerWorkers =
-          Just 1
-      , runnerColor =
-          Nothing
-      , runnerVerbosity =
-          Nothing
-      }
+checkSequential = checkGroup False
+
 
 -- | Check a group of properties in parallel.
 --
@@ -391,16 +384,7 @@ checkSequential =
 -- >     ]
 --
 checkParallel :: MonadIO m => Group -> m Bool
-checkParallel =
-  checkGroup
-    RunnerConfig {
-        runnerWorkers =
-          Nothing
-      , runnerColor =
-          Nothing
-      , runnerVerbosity =
-          Nothing
-      }
+checkParallel = checkGroup True
 
 ------------------------------------------------------------------------
 -- FIXME Replace with DeriveLift when we drop 7.10 support.

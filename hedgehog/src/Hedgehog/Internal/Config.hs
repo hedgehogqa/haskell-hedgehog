@@ -6,13 +6,8 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Hedgehog.Internal.Config (
     UseColor(..)
-  , resolveColor
-
   , Verbosity(..)
-  , resolveVerbosity
-
   , WorkerCount(..)
-  , resolveWorkers
 
   , detectMark
   , detectColor
@@ -133,27 +128,6 @@ detectWorkers = do
         WorkerCount <$> Conc.getNumProcessors
       Just env ->
         pure $ WorkerCount env
-
-resolveColor :: MonadIO m => Maybe UseColor -> m UseColor
-resolveColor = \case
-  Nothing ->
-    detectColor
-  Just x ->
-    pure x
-
-resolveVerbosity :: MonadIO m => Maybe Verbosity -> m Verbosity
-resolveVerbosity = \case
-  Nothing ->
-    detectVerbosity
-  Just x ->
-    pure x
-
-resolveWorkers :: MonadIO m => Maybe WorkerCount -> m WorkerCount
-resolveWorkers = \case
-  Nothing ->
-    detectWorkers
-  Just x ->
-    pure x
 
 ------------------------------------------------------------------------
 -- FIXME Replace with DeriveLift when we drop 7.10 support.
