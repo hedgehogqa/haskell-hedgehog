@@ -12,7 +12,6 @@ module Hedgehog.Internal.Runner (
   , recheck
 
   -- * Running Groups of Properties
-  , RunnerConfig(..)
   , checkParallel
   , checkSequential
   , checkGroup
@@ -44,28 +43,9 @@ import qualified Hedgehog.Internal.Seed as Seed
 import           Hedgehog.Internal.Tree (Tree(..), Node(..))
 import           Hedgehog.Range (Size)
 
-import           Language.Haskell.TH.Lift (deriveLift)
-
 #if mingw32_HOST_OS
 import           System.IO (hSetEncoding, stdout, stderr, utf8)
 #endif
-
--- | Configuration for a property test run.
---
-data RunnerConfig =
-  RunnerConfig {
-      -- | The number of property tests to run concurrently. 'Nothing' means
-      --   use one worker per processor.
-      runnerWorkers :: !WorkerCount
-
-      -- | Whether to use colored output or not. 'Nothing' means detect from
-      --   the environment.
-    , runnerColor :: !UseColor
-
-      -- | How verbose to be in the runner output. 'Nothing' means detect from
-      --   the environment.
-    , runnerVerbosity :: !Verbosity
-    } deriving (Eq, Ord, Show)
 
 findM :: Monad m => [a] -> b -> (a -> m (Maybe b)) -> m b
 findM xs0 def p =
@@ -387,8 +367,3 @@ checkSequential = checkGroup False
 --
 checkParallel :: MonadIO m => Group -> m Bool
 checkParallel = checkGroup True
-
-------------------------------------------------------------------------
--- FIXME Replace with DeriveLift when we drop 7.10 support.
-
-$(deriveLift ''RunnerConfig)
