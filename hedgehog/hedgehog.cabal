@@ -40,6 +40,7 @@ tested-with:
   , GHC == 8.4.2
   , GHC == 8.4.3
   , GHC == 8.6.1
+  , GHC == 8.6.3
 extra-source-files:
   README.md
   CHANGELOG.md
@@ -62,7 +63,7 @@ library
     , mmorph                          >= 1.0        && < 1.2
     , monad-control                   >= 1.0        && < 1.1
     , mtl                             >= 2.1        && < 2.3
-    , pretty-show                     >= 1.6        && < 1.9
+    , pretty-show                     >= 1.6        && < 1.10
     , primitive                       >= 0.6        && < 0.7
     , random                          >= 1.1        && < 1.2
     , resourcet                       >= 1.1        && < 1.3
@@ -130,7 +131,7 @@ test-suite test
       hedgehog
     , base                            >= 3          && < 5
     , containers                      >= 0.4        && < 0.7
-    , pretty-show                     >= 1.6        && < 1.9
+    , pretty-show                     >= 1.6        && < 1.10
     , semigroups                      >= 0.16       && < 0.19
     , text                            >= 1.1        && < 1.3
     , transformers                    >= 0.3        && < 0.6
