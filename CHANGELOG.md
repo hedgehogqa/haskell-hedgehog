@@ -1,5 +1,12 @@
+## Version 0.6.2 (2018-12-27)
+
+- Update upper bounds to support GHC 8.6.3 ([#241][241], [@vrom911][vrom911])
+- Documentation improvements ([#239][239], [@HuwCampbell][HuwCampbell])
+- Remove use of unix package and replace with lookupEnv ([#226][226], [@puffnfresh][puffnfresh])
+
 ## Version 0.6.1 (2018-09-22)
 
+- Update upper bounds to support GHC 8.6.1 ([#224][224], [@gwils][gwils])
 - Set stdout/stderr encoding to UTF-8 on Windows ([#218][218], [@moodmosaic][moodmosaic])
 
 ## Version 0.6 (2018-05-14)
@@ -105,7 +112,21 @@
   https://github.com/dredozubov
 [fisx]:
   https://github.com/fisx
+[puffnfresh]:
+  https://github.com/puffnfresh
+[HuwCampbell]:
+  https://github.com/HuwCampbell
+[vrom911]:
+  https://github.com/vrom911
 
+[241]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/241
+[239]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/239
+[226]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/226
+[224]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/224
 [218]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/218
 [185]:
