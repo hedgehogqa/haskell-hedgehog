@@ -40,7 +40,7 @@ import           Hedgehog.Internal.Property (Property(..), PropertyConfig(..), P
 import           Hedgehog.Internal.Property (PropertyT(..), Failure(..), runTestT)
 import           Hedgehog.Internal.Property (ShrinkLimit, ShrinkRetries, withTests)
 import           Hedgehog.Internal.Property (TestCount(..), PropertyCount(..))
-import           Hedgehog.Internal.Property (coverageSuccess)
+import           Hedgehog.Internal.Property (coverageSuccess, collectLogLabels)
 import           Hedgehog.Internal.Queue
 import           Hedgehog.Internal.Region
 import           Hedgehog.Internal.Report
@@ -163,19 +163,20 @@ checkReport cfg size0 seed0 test0 updateUI =
       -> Size
       -> Seed
       -> Coverage CoverCount
+      -> [[String]]
       -> m (Report Result)
-    loop !tests !discards !size !seed !coverage0 = do
+    loop !tests !discards !size !seed !coverage0 !labels0 = do
       updateUI $ Report tests discards coverage0 Running
 
       if size > 99 then
         -- size has reached limit, reset to 0
-        loop tests discards 0 seed coverage0
+        loop tests discards 0 seed coverage0 labels0
 
       else if tests >= fromIntegral (propertyTestLimit cfg) then
         -- we've hit the test limit
         if coverageSuccess tests coverage0 then
           -- all classifiers satisfied, test was successful
-          pure $ Report tests discards coverage0 OK
+          pure $ Report tests discards coverage0 labels0 OK
         else
           -- some classifiers unsatisfied, test was successful
           let
@@ -188,7 +189,7 @@ checkReport cfg size0 seed0 test0 updateUI =
 
       else if discards >= fromIntegral (propertyDiscardLimit cfg) then
         -- we've hit the discard limit, give up
-        pure $ Report tests discards coverage0 GaveUp
+        pure $ Report tests discards coverage0 labels0 GaveUp
 
       else
         case Seed.split seed of
@@ -197,12 +198,12 @@ checkReport cfg size0 seed0 test0 updateUI =
               runTree . runDiscardEffect $ runGenT size s0 . runTestT $ unPropertyT test
             case x of
               Nothing ->
-                loop tests (discards + 1) (size + 1) s1 coverage0
+                loop tests (discards + 1) (size + 1) s1 coverage0 labels0
 
               Just (Left _, _) ->
                 let
                   mkReport =
-                    Report (tests + 1) discards coverage0
+                    Report (tests + 1) discards coverage0 labels0
                 in
                   fmap mkReport $
                     takeSmallest
@@ -214,14 +215,17 @@ checkReport cfg size0 seed0 test0 updateUI =
                       (updateUI . mkReport)
                       node
 
-              Just (Right (), (Journal coverage1 _)) ->
+              Just (Right (), (Journal coverage1 logs)) ->
                 let
                   coverage =
                     fmap toCoverCount coverage1 <> coverage0
+
+                  labels =
+                    collectLogLabels logs : labels0
                 in
-                  loop (tests + 1) discards (size + 1) s1 coverage
+                  loop (tests + 1) discards (size + 1) s1 coverage labels
   in
-    loop 0 0 size0 seed0 mempty
+    loop 0 0 size0 seed0 mempty mempty
 
 checkRegion ::
      MonadIO m

@@ -111,6 +111,10 @@ module Hedgehog (
   , evalEither
   , evalExceptT
 
+  -- * Coverage
+  , label
+  , collect
+
   -- * State Machine Tests
   , Command(..)
   , Callback(..)
@@ -166,6 +170,7 @@ import           Hedgehog.Internal.Property (ShrinkLimit, withShrinks)
 import           Hedgehog.Internal.Property (ShrinkRetries, withRetries)
 import           Hedgehog.Internal.Property (Test, TestT, property, test)
 import           Hedgehog.Internal.Property (TestLimit, withTests)
+import           Hedgehog.Internal.Property (collect, label)
 import           Hedgehog.Internal.Range (Range, Size(..))
 import           Hedgehog.Internal.Runner (check, recheck, checkSequential, checkParallel)
 

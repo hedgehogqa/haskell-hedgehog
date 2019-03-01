@@ -122,6 +122,7 @@ data Report a =
       reportTests :: !TestCount
     , reportDiscards :: !DiscardCount
     , reportCoverage :: !(Coverage CoverCount)
+    , reportLabels :: ![[String]]
     , reportStatus :: !a
     } deriving (Show, Functor, Foldable, Traversable)
 
@@ -683,7 +684,7 @@ ppName = \case
     WL.text name
 
 ppProgress :: MonadIO m => Maybe PropertyName -> Report Progress -> m (Doc Markup)
-ppProgress name (Report tests discards coverage status) =
+ppProgress name (Report tests discards coverage _ status) =
   case status of
     Running ->
       pure . WL.vsep $ [
@@ -704,8 +705,28 @@ ppProgress name (Report tests discards coverage status) =
         ppShrinkDiscard (failureShrinks failure) discards <+>
         "(shrinking)"
 
+ppLabelMap :: Map String Double -> Doc Markup
+ppLabelMap m =
+  WL.vsep $ WL.text "Labels:" : (ppLabel <$> Map.toList m) ++ [mempty]
+ where
+  ppLabel (label, percentage) =
+    WL.fill 12 (WL.text (showsPrec 6 percentage "") <+> WL.char '%')
+      <> WL.text label
+
+ppLabels :: TestCount -> [[String]] -> Doc Markup
+ppLabels (TestCount tests) labels = WL.vsep
+  (ppLabelMap <$> (buildLabelMap <$> labels'))
+ where
+  labels' = List.transpose labels
+  buildLabelMap =
+    fmap (mkPercentage tests) . foldr (\k -> Map.insertWith (+) k 1) mempty
+
+  mkPercentage :: Int -> Int -> Double
+  mkPercentage denominator numerator =
+    100 * fromIntegral numerator / fromIntegral denominator
+
 ppResult :: MonadIO m => Maybe PropertyName -> Report Result -> m (Doc Markup)
-ppResult name (Report tests discards coverage result) = do
+ppResult name (Report tests discards coverage labels result) = do
   case result of
     Failed failure -> do
       pfailure <- ppFailureReport name tests failure
@@ -741,6 +762,7 @@ ppResult name (Report tests discards coverage result) = do
             ppTestCount tests <>
             "."
         ] ++
+        ppLabels tests labels ++
         ppCoverage tests coverage
 
 ppCoverage :: TestCount -> Coverage CoverCount -> [Doc Markup]

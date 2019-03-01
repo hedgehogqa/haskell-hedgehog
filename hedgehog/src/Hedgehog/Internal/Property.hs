@@ -65,6 +65,10 @@ module Hedgehog.Internal.Property (
   , (===)
   , (/==)
 
+  , label
+  , collect
+  , collectLogLabels
+
   , eval
   , evalM
   , evalIO
@@ -339,6 +343,7 @@ newtype PropertyCount =
 data Log =
     Annotation (Maybe Span) String
   | Footnote String
+  | Label String
     deriving (Eq, Show)
 
 -- | A record containing the details of a test run.
@@ -640,8 +645,26 @@ footnoteShow :: (MonadTest m, Show a) => a -> m ()
 footnoteShow =
   writeLog . Footnote . showPretty
 
--- | Fails with an error that shows the difference between two values.
+-- | Add a label for each test run. It produces a table showing the percentage
+--   of test runs that produced each label.
 --
+label :: MonadTest m => String -> m ()
+label =
+  writeLog . Label
+
+-- | Like 'label', but uses the 'Show'n value as the label
+collect :: (MonadTest m, Show a) => a -> m ()
+collect =
+  writeLog . Label . show
+
+-- | Collect 'Label' values from the 'Log's
+collectLogLabels :: [Log] -> [String]
+collectLogLabels = foldr step []
+  where
+    step (Label s) b = s : b
+    step _ b = b
+
+-- | Fails with an error that shows the difference between two values.
 failDiff :: (MonadTest m, Show a, Show b, HasCallStack) => a -> b -> m ()
 failDiff x y =
   case valueDiff <$> mkValue x <*> mkValue y of
