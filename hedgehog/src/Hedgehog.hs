@@ -62,6 +62,7 @@ module Hedgehog (
   , recheck
 
   , discover
+  , discoverPrefix
   , checkParallel
   , checkSequential
 
@@ -168,5 +169,5 @@ import           Hedgehog.Internal.State (Command(..), Callback(..))
 import           Hedgehog.Internal.State (Action, Sequential(..), Parallel(..))
 import           Hedgehog.Internal.State (executeSequential, executeParallel)
 import           Hedgehog.Internal.State (Var(..), Symbolic, Concrete(..), concrete, opaque)
-import           Hedgehog.Internal.TH (discover)
+import           Hedgehog.Internal.TH (discover, discoverPrefix)
 import           Hedgehog.Internal.Tripping (tripping)

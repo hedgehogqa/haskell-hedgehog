@@ -4,6 +4,7 @@
 module Hedgehog.Internal.TH (
     TExpQ
   , discover
+  , discoverPrefix
   ) where
 
 import qualified Data.List as List
@@ -24,9 +25,12 @@ type TExpQ a =
 --   Functions starting with `prop_` are assumed to be properties.
 --
 discover :: TExpQ Group
-discover = do
+discover = discoverPrefix "prop_"
+
+discoverPrefix :: String -> TExpQ Group
+discoverPrefix prefix = do
   file <- getCurrentFile
-  properties <- Map.toList <$> runIO (readProperties file)
+  properties <- Map.toList <$> runIO (readProperties prefix file)
 
   let
     startLine =

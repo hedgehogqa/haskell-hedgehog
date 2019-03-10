@@ -33,9 +33,9 @@ newtype PropertySource =
       propertySource :: Pos String
     } deriving (Eq, Ord, Show)
 
-readProperties :: MonadIO m => FilePath -> m (Map PropertyName PropertySource)
-readProperties path =
-  findProperties path <$> liftIO (readFile path)
+readProperties :: MonadIO m => String -> FilePath -> m (Map PropertyName PropertySource)
+readProperties prefix path =
+  findProperties prefix path <$> liftIO (readFile path)
 
 readDeclaration :: MonadIO m => FilePath -> LineNo -> m (Maybe (String, Pos String))
 readDeclaration path line = do
@@ -59,11 +59,11 @@ takeHead = \case
   x : _ ->
     Just x
 
-findProperties :: FilePath -> String -> Map PropertyName PropertySource
-findProperties path =
+findProperties :: String -> FilePath -> String -> Map PropertyName PropertySource
+findProperties prefix path =
   Map.map PropertySource .
   Map.mapKeysMonotonic PropertyName .
-  Map.filterWithKey (\k _ -> isProperty k) .
+  Map.filterWithKey (\k _ -> List.isPrefixOf prefix k) .
   findDeclarations path
 
 findDeclarations :: FilePath -> String -> Map String (Pos String)
@@ -71,10 +71,6 @@ findDeclarations path =
   declarations .
   classified .
   positioned path
-
-isProperty :: String -> Bool
-isProperty =
-  List.isPrefixOf "prop_"
 
 ------------------------------------------------------------------------
 -- Declaration Identification
