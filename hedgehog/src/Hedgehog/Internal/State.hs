@@ -59,7 +59,7 @@ import           Control.Monad.State.Class (MonadState, get, put, modify)
 import           Control.Monad.Trans.Class (lift)
 import           Control.Monad.Trans.Control (MonadBaseControl)
 import           Control.Monad.Trans.State (State, runState, execState)
-import           Control.Monad.Trans.State (StateT(..), evalStateT)
+import           Control.Monad.Trans.State (StateT(..), evalStateT, runStateT)
 
 import           Data.Dynamic (Dynamic, toDyn, fromDynamic, dynTypeRep)
 import           Data.Foldable (traverse_)
@@ -76,7 +76,7 @@ import           Hedgehog.Internal.Gen (MonadGen)
 import qualified Hedgehog.Internal.Gen as Gen
 import           Hedgehog.Internal.HTraversable (HTraversable(..))
 import           Hedgehog.Internal.Opaque (Opaque(..))
-import           Hedgehog.Internal.Property (MonadTest(..), Test, evalEither, evalM, success, runTest, failWith)
+import           Hedgehog.Internal.Property (MonadTest(..), Test, evalEither, evalM, success, runTest, failWith, annotate)
 import           Hedgehog.Internal.Range (Range)
 import           Hedgehog.Internal.Show (showPretty)
 import           Hedgehog.Internal.Source (HasCallStack, withFrozenCallStack)
@@ -185,7 +185,7 @@ instance Ord1 Concrete where
 --   type of variable because it is used in both the generation and the
 --   execution phase.
 --
-data Var a v =
+newtype Var a v =
   Var (v a)
 
 -- | Take the value from a concrete variable.
@@ -240,6 +240,10 @@ data EnvironmentError =
 emptyEnvironment :: Environment
 emptyEnvironment =
   Environment Map.empty
+
+unionsEnvironment :: [Environment] -> Environment
+unionsEnvironment =
+  Environment . Map.unions . fmap unEnvironment
 
 -- | Insert a symbolic / concrete pairing in to the environment.
 --
@@ -379,7 +383,7 @@ callbackEnsure callbacks s0 s i o =
 --
 data Command n m (state :: (* -> *) -> *) =
   forall input output.
-  (HTraversable input, Show (input Symbolic), Typeable output) =>
+  (HTraversable input, Show (input Symbolic), Show output, Typeable output) =>
   Command {
     -- | A generator which provides random arguments for a command. If the
     --   command cannot be executed in the current state, it should return
@@ -411,7 +415,7 @@ commandGenOK (Command inputGen _ _) state =
 --
 data Action m (state :: (* -> *) -> *) =
   forall input output.
-  (HTraversable input, Show (input Symbolic)) =>
+  (HTraversable input, Show (input Symbolic), Show output) =>
   Action {
       actionInput ::
         input Symbolic
@@ -603,6 +607,33 @@ renderAction (Action input (Symbolic (Name output)) _ _ _ _) =
         (prefix0 ++ x) :
         fmap (prefix ++) xs
 
+renderActionResult :: Environment -> Action m state -> [String]
+renderActionResult env (Action _ output@(Symbolic (Name name)) _ _ _ _) =
+  let
+    prefix0 =
+      "Var " ++ show name ++ " = "
+
+    prefix =
+      replicate (length prefix0) ' '
+
+    unfound = \case
+      EnvironmentValueNotFound _
+        -> "<<not found in environment>>"
+      EnvironmentTypeError _ _
+        -> "<<type representation in environment unexpected>>"
+
+    actual =
+      either unfound showPretty
+        $ reifyEnvironment env output
+
+  in
+    case lines actual of
+      [] ->
+        [prefix0 ++ "?"]
+      x : xs ->
+        (prefix0 ++ x) :
+        fmap (prefix ++) xs
+
 -- FIXME we should not abuse Show to get nice output for actions
 instance Show (Sequential m state) where
   show (Sequential xs) =
@@ -636,15 +667,20 @@ data Parallel m state =
 
 -- FIXME we should not abuse Show to get nice output for actions
 instance Show (Parallel m state) where
-  show (Parallel pre xs ys) =
-    unlines $ concat [
-        ["━━━ Prefix ━━━"]
-      ,  (concatMap renderAction pre)
-      , ["", "━━━ Branch 1 ━━━"]
-      ,  (concatMap renderAction xs)
-      , ["", "━━━ Branch 2 ━━━"]
-      ,  (concatMap renderAction ys)
-      ]
+  show =
+    renderParallel renderAction
+
+renderParallel :: (Action m state -> [String]) -> Parallel m state -> String
+renderParallel render (Parallel pre xs ys) =
+  unlines $ concat [
+      ["━━━ Prefix ━━━"]
+    , concatMap render pre
+    , ["", "━━━ Branch 1 ━━━"]
+    , concatMap render xs
+    , ["", "━━━ Branch 2 ━━━"]
+    , concatMap render ys
+    ]
+
 
 -- | Given the initial model state and set of commands, generates prefix
 --   actions to be run sequentially, followed by two branches to be run in
@@ -792,13 +828,17 @@ executeParallel ::
   => (forall v. state v)
   -> Parallel m state
   -> m ()
-executeParallel initial (Parallel prefix branch1 branch2) =
+executeParallel initial p@(Parallel prefix branch1 branch2) =
   withFrozenCallStack $ evalM $ do
     (s0, env0) <- foldM executeUpdateEnsure (initial, emptyEnvironment) prefix
 
-    (xs, ys) <-
+    ((xs, env1), (ys, env2)) <-
       Async.concurrently
-        (evalStateT (traverse execute branch1) env0)
-        (evalStateT (traverse execute branch2) env0)
+        (runStateT (traverse execute branch1) env0)
+        (runStateT (traverse execute branch2) env0)
 
+    let
+      env = unionsEnvironment [env0, env1, env2]
+
+    annotate $ renderParallel (renderActionResult env) p
     linearize s0 xs ys
