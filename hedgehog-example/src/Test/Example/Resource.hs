@@ -1,8 +1,9 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell #-}
+
 module Test.Example.Resource where
 
 import           Control.Monad.IO.Class (MonadIO(..))
+import           Control.Monad.Morph (hoist)
 import           Control.Monad.Trans.Except (ExceptT, throwE)
 import           Control.Monad.Trans.Resource (runResourceT)
 
@@ -15,8 +16,8 @@ import           System.FilePath ((</>))
 import qualified System.IO.Temp as Temp
 import           System.Process
 
-data ProcessFailed =
-  ProcessFailed !Int
+newtype ProcessFailed =
+  ProcessFailed Int
   deriving (Show)
 
 unixSort :: MonadIO m => FilePath -> FilePath -> ExceptT ProcessFailed m ()
@@ -43,7 +44,7 @@ prop_unix_sort =
       Gen.list (Range.linear 0 100) $
       Gen.string (Range.constant 1 5) Gen.alpha
 
-    test . runResourceT $ do
+    test . hoist runResourceT $ do
       (_, dir) <- Temp.createTempDirectory Nothing "prop_dir"
 
       let input = dir </> "input"
