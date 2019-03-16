@@ -33,9 +33,13 @@ import           Control.Monad.Catch (MonadCatch(..), catchAll)
 import           Control.Monad.IO.Class (MonadIO(..))
 
 import           Data.Semigroup ((<>))
+import           Data.Map (Map)
+import qualified Data.Map.Strict as Map
 
 import           Hedgehog.Internal.Config
 import           Hedgehog.Internal.Gen (runGenT, runDiscardEffect)
+import           Hedgehog.Internal.Property (Classifier(..), Classification(..))
+import           Hedgehog.Internal.Property (ClassifierName)
 import           Hedgehog.Internal.Property (Group(..), GroupName(..))
 import           Hedgehog.Internal.Property (Property(..), PropertyConfig(..), PropertyName(..))
 import           Hedgehog.Internal.Property (ShrinkLimit, ShrinkRetries, withTests)
@@ -118,17 +122,18 @@ takeSmallest ::
   -> ShrinkLimit
   -> ShrinkRetries
   -> (Progress -> m ())
-  -> Node m (Maybe (Either Failure (), [Log]))
+  -> Node m (Maybe (Either Failure (), (Classification, [Log])))
   -> m Result
 takeSmallest size seed shrinks slimit retries updateUI = \case
   Node Nothing _ ->
     pure GaveUp
 
-  Node (Just (x, w)) xs ->
+  Node (Just (x, (_, w))) xs ->
     case x of
       Left (Failure loc err mdiff) -> do
         let
           failure =
+            -- FIXME: maybe add classifier to failure?
             mkFailure size seed shrinks loc err mdiff (reverse w)
 
         updateUI $ Shrinking failure
@@ -162,21 +167,30 @@ checkReport cfg size0 seed0 test0 updateUI =
     test =
       catchAll test0 (fail . show)
 
-    loop :: TestCount -> DiscardCount -> Size -> Seed -> m (Report Result)
-    loop !tests !discards !size !seed = do
-      updateUI $ Report tests discards Running
+    consolidate (Classification c) classifiers =
+      Map.foldrWithKey combine classifiers c
+    combine k v@(Classifier _ True) =
+      Map.insertWith insertion k (v, 1)
+    combine k v@(Classifier _ False) =
+      Map.insertWith insertion k (v, 0)
+    insertion (_, tot) (c, count) =
+      (c, tot + count)
+
+    loop :: TestCount -> DiscardCount -> Size -> Seed -> Map ClassifierName (Classifier, Int) -> m (Report Result)
+    loop !tests !discards !size !seed !classifiers0 = do
+      updateUI $ Report tests discards classifiers0 Running
 
       if size > 99 then
         -- size has reached limit, reset to 0
-        loop tests discards 0 seed
+        loop tests discards 0 seed classifiers0
 
       else if tests >= fromIntegral (propertyTestLimit cfg) then
         -- we've hit the test limit, test was successful
-        pure $ Report tests discards OK
+        pure $ Report tests discards classifiers0 OK
 
       else if discards >= fromIntegral (propertyDiscardLimit cfg) then
         -- we've hit the discard limit, give up
-        pure $ Report tests discards GaveUp
+        pure $ Report tests discards classifiers0 GaveUp
 
       else
         case Seed.split seed of
@@ -185,12 +199,13 @@ checkReport cfg size0 seed0 test0 updateUI =
               runTree . runDiscardEffect $ runGenT size s0 . runTestT $ unPropertyT test
             case x of
               Nothing ->
-                loop tests (discards + 1) (size + 1) s1
+                loop tests (discards + 1) (size + 1) s1 classifiers0
 
-              Just (Left _, _) ->
+              Just (Left _, (classification, _)) ->
                 let
+                  classifiers = consolidate classification classifiers0
                   mkReport =
-                    Report (tests + 1) discards
+                    Report (tests + 1) discards classifiers
                 in
                   fmap mkReport $
                     takeSmallest
@@ -202,10 +217,13 @@ checkReport cfg size0 seed0 test0 updateUI =
                       (updateUI . mkReport)
                       node
 
-              Just (Right (), _) ->
-                loop (tests + 1) discards (size + 1) s1
+              Just (Right (), (classification, _)) ->
+                let
+                  classifiers = consolidate classification classifiers0
+                in
+                  loop (tests + 1) discards (size + 1) s1 classifiers
   in
-    loop 0 0 size0 seed0
+    loop 0 0 size0 seed0 mempty
 
 checkRegion ::
      MonadIO m

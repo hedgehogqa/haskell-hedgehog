@@ -21,6 +21,9 @@ module Hedgehog.Internal.Property (
   , PropertyName(..)
   , PropertyConfig(..)
   , TestLimit(..)
+  , Classifier(..)
+  , ClassifierName(..)
+  , Classification(..)
   , DiscardLimit(..)
   , ShrinkLimit(..)
   , ShrinkRetries(..)
@@ -34,6 +37,8 @@ module Hedgehog.Internal.Property (
   , forAllT
   , forAllWith
   , forAllWithT
+  , classify
+  , cover
   , discard
 
   -- * Group
@@ -111,8 +116,10 @@ import qualified Control.Monad.Trans.Writer.Strict as Strict
 
 import qualified Data.Char as Char
 import           Data.Functor.Identity (Identity(..))
+import           Data.Map (Map)
+import qualified Data.Map.Strict as Map
 import qualified Data.List as List
-import           Data.Semigroup (Semigroup)
+import           Data.Semigroup (Semigroup(..))
 import           Data.String (IsString)
 import           Data.Typeable (typeOf)
 
@@ -157,6 +164,57 @@ newtype PropertyT m a =
 -- NOTE: Move this to the deriving list above when we drop 7.10
 deriving instance MonadResource m => MonadResource (PropertyT m)
 
+-- | Classifiers use strings as labels
+--
+newtype ClassifierName =
+  ClassifierName {
+      unClassifierName :: String
+    } deriving (Show, Eq, Ord)
+
+-- | A classifier can be attached to a property conditionally
+--
+--   When the amount of occurrences don't exceed the minimum percentage, a
+--   warning will be issued.
+data Classifier =
+  Classifier {
+      classifierPercentage :: !Double
+    , classifierMatched :: !Bool
+    } deriving (Show)
+
+-- | This semigroup is right biased, the percentage from the rightmost
+--   `Classifier` will be kept. This shouldn't be a problem since the library
+--   doesn't allow setting multiple classifiers with the same label.
+instance Semigroup Classifier where
+  (Classifier _ m1) <> (Classifier percentage m2) =
+    Classifier percentage (m1 || m2)
+
+-- | Classification are a count of how many times a property has ocurred
+--   during a test run
+--
+newtype Classification =
+  Classification {
+      classificationClassifiers :: Map ClassifierName Classifier
+    } deriving (Show)
+
+instance Semigroup Classification where
+  (Classification c1) <> (Classification c2) =
+    Classification
+      (Map.foldrWithKey (Map.insertWith (<>)) c1 c2)
+
+instance Monoid Classification where
+  mappend =
+    (<>)
+  mempty =
+    Classification mempty
+
+mkClassifier :: ClassifierName -> Bool -> Double -> Classification
+mkClassifier name matched percentage =
+  let
+    (Classification classifiers) = mempty
+  in
+    Classification $
+      Map.insertWith (<>) name (Classifier percentage matched) classifiers
+
 -- | A test monad allows the assertion of expectations.
 --
 type Test =
@@ -166,7 +224,7 @@ type Test =
 --
 newtype TestT m a =
   TestT {
-      unTest :: ExceptT Failure (Lazy.WriterT [Log] m) a
+      unTest :: ExceptT Failure (Lazy.WriterT (Classification, [Log]) m) a
     } deriving (
       Functor
     , Applicative
@@ -336,8 +394,8 @@ instance MFunctor TestT where
 
 instance Distributive TestT where
   type Transformer t TestT m = (
-      Transformer t (Lazy.WriterT [Log]) m
-    , Transformer t (ExceptT Failure) (Lazy.WriterT [Log] m)
+      Transformer t (Lazy.WriterT (Classification, [Log])) m
+    , Transformer t (ExceptT Failure) (Lazy.WriterT (Classification, [Log]) m)
     )
 
   distribute =
@@ -368,10 +426,10 @@ instance MonadResource m => MonadResource (TestT m) where
 
 instance MonadTransControl TestT where
   type StT TestT a =
-    (Either Failure a, [Log])
+    (Either Failure a, (Classification, [Log]))
 
   liftWith f =
-    mkTestT . fmap (, []) . fmap Right $ f $ runTestT
+    mkTestT . fmap (, (mempty, [])) . fmap Right $ f $ runTestT
 
   restoreT =
     mkTestT
@@ -441,34 +499,38 @@ instance MonadTest m => MonadTest (ResourceT m) where
   liftTest =
     lift . liftTest
 
-mkTestT :: m (Either Failure a, [Log]) -> TestT m a
+mkTestT :: m (Either Failure a, (Classification, [Log])) -> TestT m a
 mkTestT =
   TestT . ExceptT . Lazy.WriterT
 
-mkTest :: (Either Failure a, [Log]) -> Test a
+mkTest :: (Either Failure a, (Classification, [Log])) -> Test a
 mkTest =
   mkTestT . Identity
 
-runTestT :: TestT m a -> m (Either Failure a, [Log])
+runTestT :: TestT m a -> m (Either Failure a, (Classification, [Log]))
 runTestT =
   Lazy.runWriterT . runExceptT . unTest
 
-runTest :: Test a -> (Either Failure a, [Log])
+runTest :: Test a -> (Either Failure a, (Classification, [Log]))
 runTest =
   runIdentity . runTestT
+
+writeClassification :: MonadTest m => Classification -> m ()
+writeClassification c =
+  liftTest $ mkTest (pure (), (c, []))
 
 -- | Log some information which might be relevant to a potential test failure.
 --
 writeLog :: MonadTest m => Log -> m ()
 writeLog x =
-  liftTest $ mkTest (pure (), [x])
+  liftTest $ mkTest (pure (), (mempty, [x]))
 
 -- | Fail the test with an error message, useful for building other failure
 --   combinators.
 --
 failWith :: (MonadTest m, HasCallStack) => Maybe Diff -> String -> m a
-failWith mdiff msg =
-  liftTest $ mkTest (Left $ Failure (getCaller callStack) msg mdiff, [])
+failWith diff msg =
+  liftTest $ mkTest (Left $ Failure (getCaller callStack) msg diff, (mempty, []))
 
 -- | Annotates the source code with a message that might be useful for
 --   debugging a test failure.
@@ -719,6 +781,7 @@ forAllWith render gen =
 
 -- | Generates a random input for the test by running the provided generator.
 --
+--
 forAllT :: (Monad m, Show a, HasCallStack) => GenT m a -> PropertyT m a
 forAllT gen =
   withFrozenCallStack $ forAllWithT showPretty gen
@@ -734,6 +797,40 @@ forAll gen =
 discard :: Monad m => PropertyT m a
 discard =
   PropertyT $ lift Gen.discard
+
+-- | Classify a test with a given label if the predicate is true.
+--
+-- @
+--    prop_with_classifier :: Property
+--    prop_with_classifier = property $ do
+--      xs <- forAll $ Gen.list (Range.linear 0 100) Gen.alpha
+--      for_ xs $ \x -> do
+--        classify (x == 0) "newborns"
+--        classify (x > 0 && x < 13) "children"
+--        classify (x > 12 && x < 20) "teens"
+--        success
+-- @
+classify :: (MonadTest m, HasCallStack) => Bool -> String -> m ()
+classify = cover 0
+
+-- | Require a certain percentage of the tests to satisfy the classification.
+--
+-- @
+--    prop_with_coverage :: Property
+--    prop_with_coverage = property $ do
+--      withTests 100 . property $
+--        forAll Gen.bool >>= \match -> do
+--          cover 30 match "True"
+--          cover 30 (not match) "False"
+--          success
+-- @
+--
+--   The example above requires a minimum of 30% for both classifications. If
+--   these percentages are not met, it will log warnings.
+cover :: (MonadTest m, HasCallStack) => Double -> Bool -> String -> m ()
+cover minCoverage matched s =
+  writeClassification $
+    mkClassifier (ClassifierName s) matched minCoverage
 
 -- | Lift a test in to a property.
 --

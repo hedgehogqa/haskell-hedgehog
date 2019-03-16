@@ -54,6 +54,7 @@ import           Data.Semigroup (Semigroup(..))
 import           Hedgehog.Internal.Config
 import           Hedgehog.Internal.Discovery (Pos(..), Position(..))
 import qualified Hedgehog.Internal.Discovery as Discovery
+import           Hedgehog.Internal.Property (Classifier(..), ClassifierName(..))
 import           Hedgehog.Internal.Property (PropertyName(..), Log(..), Diff(..))
 import           Hedgehog.Internal.Seed (Seed)
 import           Hedgehog.Internal.Show
@@ -141,6 +142,7 @@ data Report a =
   Report {
       reportTests :: !TestCount
     , reportDiscards :: !DiscardCount
+    , reportClassification :: !(Map ClassifierName (Classifier, Int))
     , reportStatus :: !a
     } deriving (Show, Functor, Foldable, Traversable)
 
@@ -673,7 +675,7 @@ ppName = \case
     WL.text name
 
 ppProgress :: MonadIO m => Maybe PropertyName -> Report Progress -> m (Doc Markup)
-ppProgress name (Report tests discards status) =
+ppProgress name (Report tests discards _ status) =
   case status of
     Running ->
       pure . icon RunningIcon '●' . WL.annotate RunningHeader $
@@ -692,7 +694,7 @@ ppProgress name (Report tests discards status) =
         "(shrinking)"
 
 ppResult :: MonadIO m => Maybe PropertyName -> Report Result -> m (Doc Markup)
-ppResult name (Report tests discards result) =
+ppResult name (Report tests discards classes result) =
   case result of
     Failed failure -> do
       pfailure <- ppFailureReport name failure
@@ -715,14 +717,58 @@ ppResult name (Report tests discards result) =
         ppDiscardCount discards <>
         ", passed" <+>
         ppTestCount tests <>
-        "."
+        "." <+>
+        ppClassification classes tests <+>
+        ppCoverage classes tests
 
     OK ->
       pure . icon SuccessIcon '✓' . WL.annotate SuccessHeader $
         ppName name <+>
         "passed" <+>
         ppTestCount tests <>
-        "."
+        "." <+>
+        ppClassification classes tests <+>
+        ppCoverage classes tests
+
+ppClassification :: Map ClassifierName (Classifier, Int) -> TestCount -> Doc Markup
+ppClassification classifiers (TestCount tests) =
+  if Map.null classifiers then
+    mempty
+  else
+    (<>) WL.linebreak $ WL.indent 4 . WL.align . WL.vsep $
+      (\(ClassifierName k, (_, v)) -> WL.text $ show (occurrenceRate v tests) <> "% " <> k) <$> Map.toList classifiers
+
+occurrenceRate :: Int -> Int -> Double
+occurrenceRate occurrences tests =
+  let
+    percentage :: Double
+    percentage =
+      fromIntegral occurrences / fromIntegral tests * 100
+    thousandths :: Int
+    thousandths =
+      round $ percentage * 10
+  in
+    fromIntegral thousandths / 10
+
+ppCoverage :: Map ClassifierName (Classifier, Int) -> TestCount -> Doc Markup
+ppCoverage classifiers (TestCount tests) =
+  let
+    coverageLines = foldMap (uncurry renderCoverage) $ Map.toList classifiers
+    renderCoverage (ClassifierName name) (Classifier minRate _, total) =
+      if occurrenceRate total tests < minRate then
+        pure . WL.text $
+          "Only " <> show (occurrenceRate total tests) <> "% " <> name <>
+          ", but expected " <> show minRate <> "%"
+      else
+        []
+  in
+    if null coverageLines then
+      mempty
+    else
+      WL.linebreak <>
+      WL.linebreak <>
+      WL.text "⚠" <>
+      (WL.indent 3 . WL.align . WL.vsep) coverageLines
 
 ppWhenNonZero :: Doc a -> PropertyCount -> Maybe (Doc a)
 ppWhenNonZero suffix n =
