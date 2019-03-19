@@ -84,6 +84,8 @@ import           Control.Monad.Base (MonadBase(..))
 import           Control.Monad.Catch (MonadThrow(..), MonadCatch(..))
 import           Control.Monad.Catch (SomeException(..), displayException)
 import           Control.Monad.Error.Class (MonadError(..))
+import           Control.Monad.Fail (MonadFail (..))
+import qualified Control.Monad.Fail as Fail
 import           Control.Monad.IO.Class (MonadIO(..))
 import           Control.Monad.Morph (MFunctor(..))
 import           Control.Monad.Primitive (PrimMonad(..))
@@ -317,6 +319,10 @@ instance Monad m => Monad (TestT m) where
       unTest m >>=
       unTest . k
 
+  fail =
+    Fail.fail
+
+instance Monad m => MonadFail (TestT m) where
   fail err =
     TestT . ExceptT . pure . Left $ Failure Nothing err Nothing
 
