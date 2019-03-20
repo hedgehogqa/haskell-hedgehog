@@ -559,8 +559,8 @@ instance Monad m => Monad (GenT m) where
     Fail.fail
 
 instance Monad m => MonadFail (GenT m) where
-  fail =
-    error
+  fail _ =
+    mzero
 
 instance Monad m => Alternative (GenT m) where
   empty =
