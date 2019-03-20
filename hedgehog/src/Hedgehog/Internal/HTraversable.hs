@@ -4,6 +4,7 @@ module Hedgehog.Internal.HTraversable (
     HTraversable(..)
   ) where
 
+import Data.Proxy (Proxy(..))
 
 -- | Higher-order traversable functors.
 --
@@ -11,3 +12,6 @@ module Hedgehog.Internal.HTraversable (
 --
 class HTraversable t where
   htraverse :: Applicative f => (forall a. g a -> f (h a)) -> t g -> f (t h)
+
+instance HTraversable Proxy where
+  htraverse _ _ = pure Proxy
