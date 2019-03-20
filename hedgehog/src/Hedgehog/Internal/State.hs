@@ -428,7 +428,7 @@ data Command g m (state :: (* -> *) -> *) =
 
 -- | Checks that input for a command can be executed in the given state.
 --
-commandGenOK :: Command n m state -> state Symbolic -> Bool
+commandGenOK :: Command g m state -> state Symbolic -> Bool
 commandGenOK (Command inputGen _ _) state =
   Maybe.isJust (inputGen state)
 
@@ -562,9 +562,9 @@ dropInvalid =
 -- | Generates a single action from a set of possible commands.
 --
 action ::
-     (MonadGen n, MonadTest m)
-  => [Command n m state]
-  -> StateT (Context state) n (Action m state)
+     (MonadGen g, MonadTest m)
+  => [Command g m state]
+  -> StateT (Context state) g (Action m state)
 action commands =
   Gen.just $ do
     Context state0 _ <- get
@@ -595,11 +595,11 @@ action commands =
           (callbackEnsure callbacks)
 
 genActions ::
-     (MonadGen n, MonadTest m)
+     (MonadGen g, MonadTest m)
   => Range Int
-  -> [Command n m state]
+  -> [Command g m state]
   -> Context state
-  -> n ([Action m state], Context state)
+  -> g ([Action m state], Context state)
 genActions range commands ctx = do
   xs <- Gen.list range (action commands) `evalStateT` ctx
   pure $
@@ -664,11 +664,11 @@ instance Show (Sequential m state) where
 -- | Generates a sequence of actions from an initial model state and set of commands.
 --
 sequential ::
-     (MonadGen n, MonadTest m)
+     (MonadGen g, MonadTest m)
   => Range Int
   -> (forall v. state v)
-  -> [Command n m state]
-  -> n (Sequential m state)
+  -> [Command g m state]
+  -> g (Sequential m state)
 sequential range initial commands =
   fmap (Sequential . fst) $
     genActions range commands (mkContext initial)
@@ -709,12 +709,12 @@ renderParallel render (Parallel pre xs ys) =
 --   parallel.
 --
 parallel ::
-     (MonadGen n, MonadTest m)
+     (MonadGen g, MonadTest m)
   => Range Int
   -> Range Int
   -> (forall v. state v)
-  -> [Command n m state]
-  -> n (Parallel m state)
+  -> [Command g m state]
+  -> g (Parallel m state)
 parallel prefixN parallelN initial commands = do
   (prefix, ctx0) <- genActions prefixN commands (mkContext initial)
   (branch1, ctx1) <- genActions parallelN commands ctx0
