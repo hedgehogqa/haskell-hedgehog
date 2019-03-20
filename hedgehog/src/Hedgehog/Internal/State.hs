@@ -92,7 +92,17 @@ instance Show Name where
   showsPrec p (Name x) =
     showsPrec p x
 
--- | Symbolic values.
+-- | Symbolic values: Because hedgehog generates actions in a separate phase
+--   before execution, you will sometimes need to refer to the result of a
+--   previous action in a generator without knowing the value of the result
+--   (e.g., to get the ID of a previously-created user).
+--
+--   Symmbolic variables provide a token to stand in for the actual variables at
+--   generation time (and in 'Require'/'Update' callbacks). At execution time,
+--   real values are available, so your execute actions work on 'Concrete'
+--   variables.
+--
+--   See also: 'Command', 'Var'
 --
 data Symbolic a where
   Symbolic :: Typeable a => Name -> Symbolic a
@@ -130,7 +140,10 @@ instance Ord1 Symbolic where
     compare x y
 #endif
 
--- | Concrete values.
+-- | Concrete values: At test-execution time, 'Symbolic' values from generation
+--   are replaced with 'Concrete' values from performing actions. This type
+--   gives us something of the same kind as 'Symbolic' to pass as a type
+--   argument to 'Var'.
 --
 newtype Concrete a where
   Concrete :: a -> Concrete a
@@ -184,6 +197,9 @@ instance Ord1 Concrete where
 --   The state update `Callback` for a command needs to be polymorphic in the
 --   type of variable because it is used in both the generation and the
 --   execution phase.
+--
+--   The order of arguments makes 'Var' 'HTraverable', which is how 'Symbolic'
+--   values are turned into 'Concrete' ones.
 --
 newtype Var a v =
   Var (v a)
@@ -386,6 +402,7 @@ callbackEnsure callbacks s0 s i o =
 -- tests. @g@ is usually an instance of 'MonadGen', and @m@ is usually
 -- an instance of 'MonadTest'. These constraints appear when you pass
 -- your 'Command' list to 'sequential' or 'parallel'.
+--
 data Command g m (state :: (* -> *) -> *) =
   forall input output.
   (HTraversable input, Show (input Symbolic), Show output, Typeable output) =>
