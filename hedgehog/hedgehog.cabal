@@ -94,7 +94,6 @@ library
     Hedgehog.Internal.Distributive
     Hedgehog.Internal.Exception
     Hedgehog.Internal.Gen
-    Hedgehog.Internal.HTraversable
     Hedgehog.Internal.Opaque
     Hedgehog.Internal.Property
     Hedgehog.Internal.Queue

@@ -23,6 +23,7 @@ module Hedgehog.Internal.State (
   , Concrete(..)
   , Symbolic(..)
   , Name(..)
+  , HTraversable(..)
 
   -- * Environment
   , Environment(..)
@@ -74,7 +75,6 @@ import           Data.Typeable (Typeable, TypeRep, Proxy(..), typeRep)
 
 import           Hedgehog.Internal.Gen (MonadGen)
 import qualified Hedgehog.Internal.Gen as Gen
-import           Hedgehog.Internal.HTraversable (HTraversable(..))
 import           Hedgehog.Internal.Opaque (Opaque(..))
 import           Hedgehog.Internal.Property (MonadTest(..), Test, evalEither, evalM, success, runTest, failWith, annotate)
 import           Hedgehog.Internal.Range (Range)
@@ -166,6 +166,13 @@ instance Ord1 Concrete where
     compare x y
 #endif
 
+-- | Higher-order traversable functors.
+--
+-- This is used internally to make symbolic variables concrete given an 'Environment'.
+--
+class HTraversable t where
+  htraverse :: Applicative f => (forall a. Var a g -> f (Var a h)) -> t g -> f (t h)
+
 ------------------------------------------------------------------------
 
 -- | Variables are the potential or actual result of executing an action. They
@@ -183,40 +190,48 @@ instance Ord1 Concrete where
 --
 --   The state update `Callback` for a command needs to be polymorphic in the
 --   type of variable because it is used in both the generation and the
---   execution phase.
---
-newtype Var a v =
-  Var (v a)
+--   execution phase. The use of a GADT allows pattern matching in the update
+--   `Callback`, providing more flexibility when using the `Var output v`.
+data Var a v where
+  VarSymbolic :: Symbolic a -> Var a Symbolic
+  VarConcrete :: Concrete a -> Var a Concrete
 
 -- | Take the value from a concrete variable.
 --
 concrete :: Var a Concrete -> a
-concrete (Var (Concrete x)) =
+concrete (VarConcrete (Concrete x)) =
   x
 
 -- | Take the value from an opaque concrete variable.
 --
 opaque :: Var (Opaque a) Concrete -> a
-opaque (Var (Concrete (Opaque x))) =
+opaque (VarConcrete (Concrete (Opaque x))) =
   x
 
-instance (Eq a, Eq1 v) => Eq (Var a v) where
-  (==) (Var x) (Var y) =
+instance Eq a => Eq (Var a v) where
+  (==) (VarSymbolic x) (VarSymbolic y) =
+    eq1 x y
+  (==) (VarConcrete x) (VarConcrete y) =
     eq1 x y
 
-instance (Ord a, Ord1 v) => Ord (Var a v) where
-  compare (Var x) (Var y) =
+instance Ord a => Ord (Var a v) where
+  compare (VarSymbolic x) (VarSymbolic y) =
+    compare1 x y
+  compare (VarConcrete x) (VarConcrete y) =
     compare1 x y
 
-instance (Show a, Show1 v) => Show (Var a v) where
-  showsPrec p (Var x) =
+instance Show a => Show (Var a v) where
+  showsPrec p (VarSymbolic x) =
+    showParen (p >= 11) $
+      showString "Var " .
+      showsPrec1 11 x
+  showsPrec p (VarConcrete x) =
     showParen (p >= 11) $
       showString "Var " .
       showsPrec1 11 x
 
 instance HTraversable (Var a) where
-  htraverse f (Var v) =
-    fmap Var (f v)
+  htraverse f v = f v
 
 ------------------------------------------------------------------------
 -- Symbolic Environment
@@ -253,19 +268,19 @@ insertConcrete (Symbolic k) (Concrete v) =
 
 -- | Cast a 'Dynamic' in to a concrete value.
 --
-reifyDynamic :: forall a. Typeable a => Dynamic -> Either EnvironmentError (Concrete a)
+reifyDynamic :: forall a. Typeable a => Dynamic -> Either EnvironmentError (Var a Concrete)
 reifyDynamic dyn =
   case fromDynamic dyn of
     Nothing ->
       Left $ EnvironmentTypeError (typeRep (Proxy :: Proxy a)) (dynTypeRep dyn)
     Just x ->
-      Right $ Concrete x
+      Right $ VarConcrete (Concrete x)
 
 -- | Turns an environment in to a function for looking up a concrete value from
 --   a symbolic one.
 --
-reifyEnvironment :: Environment -> (forall a. Symbolic a -> Either EnvironmentError (Concrete a))
-reifyEnvironment (Environment vars) (Symbolic n) =
+reifyEnvironment :: Environment -> (forall a. Var a Symbolic -> Either EnvironmentError (Var a Concrete))
+reifyEnvironment (Environment vars) (VarSymbolic (Symbolic n)) =
   case Map.lookup n vars of
     Nothing ->
       Left $ EnvironmentValueNotFound n
@@ -452,8 +467,8 @@ takeSymbolic (Symbolic name) =
 
 -- | Insert a symbolic variable in to a map of variables to types.
 --
-insertSymbolic :: Symbolic a -> Map Name TypeRep -> Map Name TypeRep
-insertSymbolic s =
+insertSymbolic :: Var a Symbolic -> Map Name TypeRep -> Map Name TypeRep
+insertSymbolic (VarSymbolic s) =
   let
     (name, typ) =
       takeSymbolic s
@@ -511,7 +526,7 @@ contextNewVar = do
         Just ((name, _), _) ->
           Symbolic (name + 1)
 
-  put $ Context state (insertSymbolic var vars)
+  put $ Context state (insertSymbolic (VarSymbolic var) vars)
   pure var
 
 -- | Drops invalid actions from the sequence.
@@ -525,10 +540,10 @@ dropInvalid =
       if require state0 input && variablesOK input vars0 then do
         let
           state =
-            update state0 input (Var output)
+            update state0 input (VarSymbolic output)
 
           vars =
-            insertSymbolic output vars0
+            insertSymbolic (VarSymbolic output) vars0
 
         put $ Context state vars
         pure $ Just step
@@ -564,7 +579,7 @@ action commands =
       output <- contextNewVar
 
       contextUpdate $
-        callbackUpdate callbacks state0 input (Var output)
+        callbackUpdate callbacks state0 input (VarSymbolic output)
 
       pure . Just $
         Action input output exec
@@ -624,7 +639,7 @@ renderActionResult env (Action _ output@(Symbolic (Name name)) _ _ _ _) =
 
     actual =
       either unfound showPretty
-        $ reifyEnvironment env output
+        $ reifyEnvironment env (VarSymbolic output)
 
   in
     case lines actual of
@@ -724,7 +739,7 @@ execute (Action sinput soutput exec _require update ensure) =
 
     pure $
       ActionCheck
-        (\s0 -> update s0 input (Var coutput))
+        (\s0 -> update s0 input (VarConcrete coutput))
         (\s0 s -> ensure s0 s input output)
 
 -- | Executes a single action in the given evironment.
@@ -744,7 +759,7 @@ executeUpdateEnsure (state0, env0) (Action sinput soutput exec _require update e
         Concrete output
 
       state =
-        update state0 input (Var coutput)
+        update state0 input (VarConcrete coutput)
 
       env =
         insertConcrete soutput coutput env0
