@@ -4,7 +4,7 @@ To ensure consistency throughout the codebase and to aid any of you that are
 interested in contributing, please follow these instructions when structuring
 your code:
 
-# Indentation 
+# Indentation.
 
 The most general rule is to try and keep everything aligned to a multiple of two
 spaces, so we always wrap after `=` and `in`, like so:
@@ -42,7 +42,7 @@ data Bar =
   deriving Show
 ```
 
-# Long type signatures are displayed on newlines
+# Long type signatures are displayed on newlines.
 
 Avoid:
 
@@ -81,7 +81,13 @@ function :: forall m f t b. (
 function = ...
 ```
 
-# Avoid abbreviations / acronyms
+# Keep to single word names as much as possible.
+
+Try to avoid names like: `LogOfUpdates` and use single word names like `Journal`.
+
+This applies to functions, variables, data types, and everything else.
+
+# Avoid abbreviations / acronyms.
 
 Avoid acronyms and abbreviations. Names such as x, x0, x1, y, xs are fine for
 locals where types are obvious.
@@ -103,7 +109,7 @@ newtype Bar =
     } deriving Show
 ```
 
-# Maintain indentation for typeclass definitions
+# Maintain indentation for typeclass definitions.
 
 Avoid :
 
@@ -123,7 +129,7 @@ instance Monoid Foo where
     Foo mempty
 ```
 
-# Do not use `where`, only `let`
+# Do not use `where`, only `let`.
 
 Avoid:
 
@@ -147,7 +153,7 @@ function foo bar =
 ```
 Note that the two space indentation is maintained for the variables in the `let` binding.
 
-# Avoid pattern matching and guards in function defintions:
+# Avoid pattern matching and guards in function defintions.
 
 Avoid pattern matching out variables, and use `if` expressions over guards. The
 following function would be rejected and you will be asked to change it to the
@@ -172,7 +178,7 @@ function foo =
     nestedBar foo
 ```
 
-# Avoid using primes when naming things
+# Avoid using primes when naming things.
 
 Using decimal numbers instead is preferred as they are harder to miss when
 reading the code:
@@ -180,7 +186,7 @@ reading the code:
 Avoid: `x'`,`x''`.
 Use: `x0`, `x1`.
 
-# Use the `MonadTest` typeclass over concrete `PropertyT`:
+# Use the `MonadTest` typeclass over concrete `PropertyT`.
 
 This works better with how Hedgehog tests are normally written and allows for
 more general use.
