@@ -4,10 +4,10 @@ To ensure consistency throughout the codebase and to aid any of you that are
 interested in contributing, please follow these instructions when structuring
 your code:
 
-## Indentation.
+## Indent using multiples of two spaces.
 
-The most general rule is to try and keep everything aligned to a multiple of two
-spaces, so we always wrap after `=` and `in`, like so:
+The most general rule is to keep everything aligned to a multiple of two spaces,
+so we always wrap after `=` and `in`, like so:
 
 ```haskell
 let
@@ -83,9 +83,8 @@ function = ...
 
 ## Keep to single word names as much as possible.
 
-Try to avoid names like: `LogOfUpdates` and use single word names like `Journal`.
-
-This applies to functions, variables, data types, and everything else.
+Avoid names like `LogOfUpdates` and use single word names like `Journal`. This
+applies to functions, variables, data types, and everything else.
 
 ## Avoid abbreviations / acronyms.
 
@@ -155,7 +154,7 @@ Note that the two space indentation is maintained for the variables in the `let`
 
 ## Avoid pattern matching and guards in function defintions.
 
-Avoid pattern matching out variables, and use `if` expressions over guards. The
+Avoid pattern matching out variables and use `if` expressions over guards. The
 following function would be rejected and you will be asked to change it to the
 subsequent example.
 
@@ -184,7 +183,8 @@ Using decimal numbers instead is preferred as they are harder to miss when
 reading the code:
 
 Avoid: `x'`,`x''`.
-Use: `x0`, `x1`.
+
+Instead: `x0`, `x1`.
 
 ## Use the `MonadTest` typeclass over concrete `PropertyT`.
 
@@ -199,4 +199,11 @@ Avoid:
 Instead:
 ```haskell
 ... :: MonadTest m => ... -> m ()
+```
+
+If you require `IO` for the `m` then use the `MonadIO` constraint:
+
+Instead:
+```haskell
+... :: (MonadIO m, MonadTest m) => ... -> m ()
 ```
