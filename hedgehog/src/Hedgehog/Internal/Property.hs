@@ -150,6 +150,7 @@ newtype PropertyT m a =
     , MonadThrow
     , MonadCatch
     , MonadReader r
+    , MonadResource
     , MonadState s
     , MonadError e
     )
