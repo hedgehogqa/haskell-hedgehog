@@ -312,7 +312,7 @@ data Diff =
 
 instance Monad m => Monad (TestT m) where
   return =
-    TestT . return
+    pure
 
   (>>=) m k =
     TestT $

@@ -48,8 +48,6 @@ matrix:
       addons: {apt: {packages: [ghc-ppa-tools,cabal-install-2.4,ghc-8.4.1], sources: [hvr-ghc]}}
     - compiler: "ghc-8.2.2"
       addons: {apt: {packages: [ghc-ppa-tools,cabal-install-2.4,ghc-8.2.2], sources: [hvr-ghc]}}
-    - compiler: "ghc-8.2.1"
-      addons: {apt: {packages: [ghc-ppa-tools,cabal-install-2.4,ghc-8.2.1], sources: [hvr-ghc]}}
     - compiler: "ghc-8.0.2"
       addons: {apt: {packages: [ghc-ppa-tools,cabal-install-2.4,ghc-8.0.2], sources: [hvr-ghc]}}
     - compiler: "ghc-8.0.1"
@@ -86,22 +84,24 @@ install:
   - "printf 'packages: \"hedgehog-dieharder\"\\n' >> cabal.project"
   - "printf 'packages: \"hedgehog-example\"\\n' >> cabal.project"
   - "printf 'packages: \"hedgehog-quickcheck\"\\n' >> cabal.project"
+  - "printf 'packages: \"hedgehog-test-laws\"\\n' >> cabal.project"
   - "printf 'write-ghc-environment-files: always\\n' >> cabal.project"
   - touch cabal.project.local
-  - "for pkg in $($HCPKG list --simple-output); do echo $pkg | sed 's/-[^-]*$//' | grep -vE -- '^(hedgehog|hedgehog-dieharder|hedgehog-example|hedgehog-quickcheck)$' | sed 's/^/constraints: /' | sed 's/$/ installed/' >> cabal.project.local; done"
+  - "for pkg in $($HCPKG list --simple-output); do echo $pkg | sed 's/-[^-]*$//' | grep -vE -- '^(hedgehog|hedgehog-dieharder|hedgehog-example|hedgehog-quickcheck|hedgehog-test-laws)$' | sed 's/^/constraints: /' | sed 's/$/ installed/' >> cabal.project.local; done"
   - cat cabal.project || true
   - cat cabal.project.local || true
   - if [ -f "hedgehog/configure.ac" ]; then (cd "hedgehog" && autoreconf -i); fi
   - if [ -f "hedgehog-dieharder/configure.ac" ]; then (cd "hedgehog-dieharder" && autoreconf -i); fi
   - if [ -f "hedgehog-example/configure.ac" ]; then (cd "hedgehog-example" && autoreconf -i); fi
   - if [ -f "hedgehog-quickcheck/configure.ac" ]; then (cd "hedgehog-quickcheck" && autoreconf -i); fi
+  - if [ -f "hedgehog-test-laws/configure.ac" ]; then (cd "hedgehog-test-laws" && autoreconf -i); fi
   - rm -f cabal.project.freeze
   - ${CABAL} new-freeze -w ${HC} ${TEST} ${BENCH} --project-file="cabal.project" --dry
   - "cat \"cabal.project.freeze\" | sed -E 's/^(constraints: *| *)//' | sed 's/any.//'"
   - rm  "cabal.project.freeze"
   - ${CABAL} new-build -w ${HC} ${TEST} ${BENCH} --project-file="cabal.project" --dep -j2 all
   - ${CABAL} new-build -w ${HC} --disable-tests --disable-benchmarks --project-file="cabal.project" --dep -j2 all
-  - rm -rf .ghc.environment.* "hedgehog"/dist "hedgehog-dieharder"/dist "hedgehog-example"/dist "hedgehog-quickcheck"/dist
+  - rm -rf .ghc.environment.* "hedgehog"/dist "hedgehog-dieharder"/dist "hedgehog-example"/dist "hedgehog-quickcheck"/dist "hedgehog-test-laws"/dist
   - DISTDIR=$(mktemp -d /tmp/dist-test.XXXX)
 
 # Here starts the actual work to be performed for the package under test;
@@ -118,9 +118,10 @@ script:
   - "printf 'packages: \"hedgehog-dieharder-*/*.cabal\"\\n' >> cabal.project"
   - "printf 'packages: \"hedgehog-example-*/*.cabal\"\\n' >> cabal.project"
   - "printf 'packages: \"hedgehog-quickcheck-*/*.cabal\"\\n' >> cabal.project"
+  - "printf 'packages: \"hedgehog-test-laws-*/*.cabal\"\\n' >> cabal.project"
   - "printf 'write-ghc-environment-files: always\\n' >> cabal.project"
   - touch cabal.project.local
-  - "for pkg in $($HCPKG list --simple-output); do echo $pkg | sed 's/-[^-]*$//' | grep -vE -- '^(hedgehog|hedgehog-dieharder|hedgehog-example|hedgehog-quickcheck)$' | sed 's/^/constraints: /' | sed 's/$/ installed/' >> cabal.project.local; done"
+  - "for pkg in $($HCPKG list --simple-output); do echo $pkg | sed 's/-[^-]*$//' | grep -vE -- '^(hedgehog|hedgehog-dieharder|hedgehog-example|hedgehog-quickcheck|hedgehog-test-laws)$' | sed 's/^/constraints: /' | sed 's/$/ installed/' >> cabal.project.local; done"
   - cat cabal.project || true
   - cat cabal.project.local || true
   # this builds all libraries and executables (without tests/benchmarks)
@@ -135,6 +136,7 @@ script:
   - (cd hedgehog-dieharder-* && ${CABAL} check)
   - (cd hedgehog-example-* && ${CABAL} check)
   - (cd hedgehog-quickcheck-* && ${CABAL} check)
+  - (cd hedgehog-test-laws-* && ${CABAL} check)
 
   # haddock
   - ${CABAL} new-haddock -w ${HC} ${TEST} ${BENCH} all

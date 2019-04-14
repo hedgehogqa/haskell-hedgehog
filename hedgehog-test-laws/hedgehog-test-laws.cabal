@@ -1,0 +1,72 @@
+version: 0
+
+name:
+  hedgehog-test-laws
+author:
+  Jacob Stanley
+maintainer:
+  Jacob Stanley <jacob@stanley.io>
+homepage:
+  https://hedgehog.qa
+bug-reports:
+  https://github.com/hedgehogqa/haskell-hedgehog/issues
+synopsis:
+  Verify the monad / applicative instances for in Hedgehog are correct.
+description:
+  This is a separate package to avoid the QuickCheck dependency in the
+  main hedgehog package. Ideally we can remove this when we have a way
+  to test laws using Hedgehog itself.
+category:
+  Testing
+license:
+  BSD3
+license-file:
+  LICENSE
+cabal-version:
+  >= 1.8
+build-type:
+  Simple
+tested-with:
+    GHC == 7.10.2
+  , GHC == 7.10.3
+  , GHC == 8.0.1
+  , GHC == 8.0.2
+  , GHC == 8.2.2
+  , GHC == 8.4.1
+  , GHC == 8.4.2
+  , GHC == 8.4.3
+  , GHC == 8.4.4
+  , GHC == 8.6.1
+  , GHC == 8.6.2
+  , GHC == 8.6.3
+  , GHC == 8.6.4
+
+source-repository head
+  type: git
+  location: git://github.com/hedgehogqa/haskell-hedgehog.git
+
+test-suite test
+  type:
+    exitcode-stdio-1.0
+
+  main-is:
+    test.hs
+
+  ghc-options:
+    -Wall -threaded -O2
+
+  hs-source-dirs:
+    test
+
+  build-depends:
+      hedgehog
+    , base                            >= 3          && < 5
+    , checkers                        >= 0.5        && < 0.6
+    , QuickCheck                      >= 2.7        && < 2.14
+    , tasty                           >= 1.2        && < 1.3
+    , tasty-expected-failure          >= 0.11       && < 0.12
+    , tasty-quickcheck                >= 0.10       && < 0.11
+    , transformers                    >= 0.5        && < 0.6
+
+  if impl(ghc < 8.0)
+    buildable: False
