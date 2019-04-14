@@ -59,7 +59,7 @@ data Node m a =
   Node {
       nodeValue :: a
     , nodeChildren :: [Tree m a]
-    } deriving Eq
+    } deriving (Eq)
 
 -- | Create a 'Tree' from a 'Node'
 --
@@ -131,8 +131,8 @@ instance Applicative m => Applicative (Tree m) where
       liftA2 (<*>) mab ma
 
 instance Monad m => Monad (Node m) where
-  return =
-    pure
+  return x =
+    Node x []
 
   (>>=) (Node x xs) k =
     case k x of
