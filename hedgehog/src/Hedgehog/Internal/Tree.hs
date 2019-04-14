@@ -59,7 +59,7 @@ data Node m a =
   Node {
       nodeValue :: a
     , nodeChildren :: [Tree m a]
-    } deriving Eq
+    } deriving (Eq)
 
 -- | Create a 'Tree' from a 'Node'
 --
