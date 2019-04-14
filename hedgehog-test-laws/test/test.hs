@@ -1,43 +1,56 @@
+{-# OPTIONS_GHC -fno-warn-orphans #-}
 module Main where
 
-import Control.Applicative
-import Control.Monad.Trans.Maybe
-import Data.Functor.Classes
-import Hedgehog.Internal.Gen
-import Hedgehog.Internal.Range
-import Hedgehog.Internal.Seed
-import Hedgehog.Internal.Tree
-import Test.QuickCheck.Classes
-import Test.QuickCheck.Checkers
-import Test.QuickCheck
-import Test.Tasty
-import Test.Tasty.ExpectedFailure
-import Test.Tasty.QuickCheck
+import           Control.Applicative (liftA2)
+import           Control.Monad.Trans.Maybe (MaybeT(..))
+
+import           Data.Functor.Classes (Eq1(..))
+
+import           Hedgehog.Internal.Gen (GenT(..))
+import           Hedgehog.Internal.Range (Size(..))
+import           Hedgehog.Internal.Seed (Seed(..))
+import           Hedgehog.Internal.Tree (Tree(..), Node(..))
+
+import           Test.QuickCheck (Arbitrary(..), Arbitrary1(..), CoArbitrary(..))
+import           Test.QuickCheck (choose, vector, coarbitraryIntegral, property)
+
+import           Test.QuickCheck (arbitrary1)
+import           Test.QuickCheck.Checkers (EqProp(..), eq)
+import           Test.QuickCheck.Classes (applicative, monad, monadApplicative)
+import           Test.Tasty (TestTree, defaultMain, testGroup)
+import           Test.Tasty.ExpectedFailure (ignoreTest)
+import           Test.Tasty.QuickCheck (testProperties)
 
 main :: IO ()
 main =
   defaultMain instances
 
 instances ::  TestTree
-instances = testGroup "Instances"
-  [ testGroup "Tree" $ testBatch <$>
-      [ applicative      (undefined :: Tree Maybe (Bool, Char, Int))
-      , monad            (undefined :: Tree Maybe (Bool, Char, Int))
-      , monadApplicative (undefined :: Tree (Either Bool) (Char, Int))
-      ]
-  , testGroup "Node" $ testBatch <$>
-      [ applicative      (undefined :: Node Maybe (Bool, Char, Int))
-      , monad            (undefined :: Node Maybe (Bool, Char, Int))
-      , monadApplicative (undefined :: Node (Either Bool) (Char, Int))
-      ]
-  , ignoreTest $ testGroup "GenT" $ testBatch <$>
-      [ applicative      (undefined :: GenT Maybe (Bool, Char, Int))
-      , monad            (undefined :: GenT Maybe (Bool, Char, Int))
-      , monadApplicative (undefined :: GenT (Either Bool) (Char, Int))
-      ]
-  ]
-  where
-    testBatch = uncurry testProperties
+instances =
+  let
+    testBatch =
+      uncurry testProperties
+  in
+    testGroup "Instances" [
+      testGroup "Tree" $
+        testBatch <$> [
+            applicative (undefined :: Tree Maybe (Bool, Char, Int))
+          , monad (undefined :: Tree Maybe (Bool, Char, Int))
+          , monadApplicative (undefined :: Tree (Either Bool) (Char, Int))
+          ]
+    , testGroup "Node" $
+        testBatch <$> [
+            applicative (undefined :: Node Maybe (Bool, Char, Int))
+          , monad (undefined :: Node Maybe (Bool, Char, Int))
+          , monadApplicative (undefined :: Node (Either Bool) (Char, Int))
+          ]
+    , ignoreTest . testGroup "GenT" $
+        testBatch <$> [
+            applicative (undefined :: GenT Maybe (Bool, Char, Int))
+          , monad (undefined :: GenT Maybe (Bool, Char, Int))
+          , monadApplicative (undefined :: GenT (Either Bool) (Char, Int))
+          ]
+    ]
 
 ------------------------------------------------------------------------
 -- Orphan instances
@@ -45,10 +58,12 @@ instances = testGroup "Instances"
 -- Tree
 
 instance (Eq1 m, Eq a) => EqProp (Tree m a) where
-  (=-=) = eq
+  (=-=) =
+    eq
 
 instance (Arbitrary1 m, Arbitrary a) => Arbitrary (Tree m a) where
-  arbitrary = Tree <$> arbitrary1
+  arbitrary =
+    Tree <$> arbitrary1
 
 -- Node
 
