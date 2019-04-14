@@ -54,20 +54,20 @@ test-suite test
     test.hs
 
   ghc-options:
-    -Wall -threaded -O2 -fno-warn-orphans
+    -Wall -threaded -O2
 
   hs-source-dirs:
     test
 
   build-depends:
       hedgehog
-    , base
-    , checkers
-    , QuickCheck
-    , tasty
-    , tasty-expected-failure
-    , tasty-quickcheck
-    , transformers
+    , base                            >= 3          && < 5
+    , checkers                        >= 0.5        && < 0.6
+    , QuickCheck                      >= 2.7        && < 2.14
+    , tasty                           >= 1.2        && < 1.3
+    , tasty-expected-failure          >= 0.11       && < 0.12
+    , tasty-quickcheck                >= 0.10       && < 0.11
+    , transformers                    >= 0.5        && < 0.6
 
   if impl(ghc < 8.0)
     buildable: False

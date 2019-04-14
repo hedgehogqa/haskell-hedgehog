@@ -3,4 +3,4 @@ packages:
   hedgehog-dieharder
   hedgehog-example
   hedgehog-quickcheck
-
+  hedgehog-test-laws
