@@ -627,6 +627,10 @@ instance MonadTrans PropertyT where
   lift =
     PropertyT . lift . lift
 
+instance Monad m => MonadFail (PropertyT m) where
+  fail err =
+    PropertyT (Fail.fail err)
+
 instance MFunctor PropertyT where
   hoist f =
     PropertyT . hoist (hoist f) . unPropertyT
