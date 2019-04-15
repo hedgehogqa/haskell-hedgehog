@@ -39,22 +39,21 @@ unixSort input output = do
 
 prop_unix_sort :: Property
 prop_unix_sort =
-  property $ do
+  property . hoist runResourceT $ do
     values0 <- forAll $
       Gen.list (Range.linear 0 100) $
       Gen.string (Range.constant 1 5) Gen.alpha
 
-    test . hoist runResourceT $ do
-      (_, dir) <- Temp.createTempDirectory Nothing "prop_dir"
+    (_, dir) <- Temp.createTempDirectory Nothing "prop_dir"
 
-      let input = dir </> "input"
-          output = dir </> "output"
+    let input = dir </> "input"
+        output = dir </> "output"
 
-      liftIO $ writeFile input (unlines values0)
-      evalExceptT $ unixSort input output
-      values <- liftIO . fmap lines $ readFile output
+    liftIO $ writeFile input (unlines values0)
+    evalExceptT $ unixSort input output
+    values <- liftIO . fmap lines $ readFile output
 
-      values0 === values
+    values0 === values
 
 tests :: IO Bool
 tests =
