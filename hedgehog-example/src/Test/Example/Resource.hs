@@ -39,7 +39,7 @@ unixSort input output = do
 
 prop_unix_sort :: Property
 prop_unix_sort =
-  property $ hoist runResourceT $ do
+  property . hoist runResourceT $ do
     values0 <- forAll $
       Gen.list (Range.linear 0 100) $
       Gen.string (Range.constant 1 5) Gen.alpha
