@@ -150,10 +150,12 @@ newtype PropertyT m a =
     , MonadThrow
     , MonadCatch
     , MonadReader r
-    , MonadResource
     , MonadState s
     , MonadError e
     )
+
+-- NOTE: Move this to the deriving list above when we drop 7.10
+deriving instance MonadResource m => MonadResource (PropertyT m)
 
 -- | A test monad allows the assertion of expectations.
 --
