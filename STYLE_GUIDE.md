@@ -152,7 +152,7 @@ function foo bar =
 ```
 Note that the two space indentation is maintained for the variables in the `let` binding.
 
-## Avoid pattern matching and guards in function defintions.
+## Avoid pattern matching and guards in function definitions.
 
 Avoid pattern matching out variables and use `if` expressions over guards. The
 following function would be rejected and you will be asked to change it to the
