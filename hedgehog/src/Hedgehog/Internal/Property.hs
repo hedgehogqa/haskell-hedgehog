@@ -54,12 +54,9 @@ module Hedgehog.Internal.Property (
   , failure
   , success
   , assert
+  , diff
   , (===)
   , (/==)
-  , (<==)
-  , (>==)
-  , (<<<)
-  , (>>>)
 
   , eval
   , evalM
@@ -157,7 +154,6 @@ newtype PropertyT m a =
     , MonadState s
     , MonadError e
     )
-
 -- NOTE: Move this to the deriving list above when we drop 7.10
 deriving instance MonadResource m => MonadResource (PropertyT m)
 
@@ -326,9 +322,6 @@ instance Monad m => Monad (TestT m) where
       unTest m >>=
       unTest . k
 
-  fail =
-    Fail.fail
-
 instance Monad m => MonadFail (TestT m) where
   fail err =
     TestT . ExceptT . pure . Left $ Failure Nothing err Nothing
@@ -474,8 +467,8 @@ writeLog x =
 --   combinators.
 --
 failWith :: (MonadTest m, HasCallStack) => Maybe Diff -> String -> m a
-failWith diff msg =
-  liftTest $ mkTest (Left $ Failure (getCaller callStack) msg diff, [])
+failWith mdiff msg =
+  liftTest $ mkTest (Left $ Failure (getCaller callStack) msg mdiff, [])
 
 -- | Annotates the source code with a message that might be useful for
 --   debugging a test failure.
@@ -505,21 +498,31 @@ footnoteShow :: (MonadTest m, Show a) => a -> m ()
 footnoteShow =
   writeLog . Footnote . showPretty
 
--- | Fails with an error which shows the difference between two values.
+-- | Fails with an error that shows the difference between two values.
 --
 failDiff :: (MonadTest m, Show a, Show b, HasCallStack) => a -> b -> m ()
 failDiff x y =
   case valueDiff <$> mkValue x <*> mkValue y of
     Nothing ->
       withFrozenCallStack $
-        failWith Nothing $ unlines [
-            "━━━ Not Equal ━━━"
+        failWith Nothing $
+        unlines $ [
+            "Failed"
+          , "━━ lhs ━━"
           , showPretty x
+          , "━━ rhs ━━"
           , showPretty y
           ]
-    Just diff ->
+
+    Just vdiff@(ValueSame _) ->
       withFrozenCallStack $
-        failWith (Just $ Diff "Failed (" "- lhs" "=/=" "+ rhs" ")" diff) ""
+        failWith (Just $
+          Diff "━━━ Failed ("  "" "no differences" "" ") ━━━" vdiff) ""
+
+    Just vdiff ->
+      withFrozenCallStack $
+        failWith (Just $
+          Diff "━━━ Failed (" "- lhs" ") (" "+ rhs" ") ━━━" vdiff) ""
 
 -- | Fails with an error which renders the type of an exception and its error
 --   message.
@@ -528,7 +531,7 @@ failException :: (MonadTest m, HasCallStack) => SomeException -> m a
 failException (SomeException x) =
   withFrozenCallStack $
     failWith Nothing $ unlines [
-        "━━━ Exception: " ++ show (typeOf x) ++ " ━━━"
+        "━━━ Exception (" ++ show (typeOf x) ++ ") ━━━"
       , List.dropWhileEnd Char.isSpace (displayException x)
       ]
 
@@ -554,77 +557,48 @@ assert b = do
   else
     withFrozenCallStack failure
 
+-- | Fails the test and shows a git-like diff if the comparison operation
+--   evaluates to 'False' when applied to its arguments.
+--
+--   The comparison function is the second argument, which may be
+--   counter-intuitive to Haskell programmers. However, it allows operators to
+--   be written infix for easy reading:
+--
+-- @
+--   diff y (<) 87
+--   diff x (<=) 'r'
+-- @
+--
+--   /This function behaves like the unix `diff` tool, which gives a `0` exit
+--   code if the compared files are identical, or a `1` exit code code
+--   otherwise. Like unix `diff`, if the arguments fail the comparison, a diff
+--   is shown./
+--
+diff :: (MonadTest m, Show a, Show b, HasCallStack) => a -> (a -> b -> Bool) -> b -> m ()
+diff x op y = do
+  ok <- withFrozenCallStack $ eval (x `op` y)
+  if ok then
+    success
+  else
+    withFrozenCallStack $ failDiff x y
+
 infix 4 ===
 
 -- | Fails the test if the two arguments provided are not equal.
 --
 (===) :: (MonadTest m, Eq a, Show a, HasCallStack) => a -> a -> m ()
-(===) x y = do
-  ok <- withFrozenCallStack $ eval (x == y)
-  if ok then
-    success
-  else
-    withFrozenCallStack $ failDiff x y
+(===) x y =
+  withFrozenCallStack $
+    diff x (==) y
 
 infix 4 /==
 
 -- | Fails the test if the two arguments provided are equal.
 --
 (/==) :: (MonadTest m, Eq a, Show a, HasCallStack) => a -> a -> m ()
-(/==) x y = do
-  ok <- withFrozenCallStack $ eval (x /= y)
-  if ok then
-    success
-  else
-    withFrozenCallStack $
-      failWith Nothing $ unlines [
-          "━━━ Both equal to ━━━"
-        , showPretty x
-        ]
-
-infix 4 <==
-
--- | Fails the test if the right argument is less than the left.
---
-(<==) :: (MonadTest m, Ord a, Show a, HasCallStack) => a -> a -> m ()
-(<==) x y = do
-  ok <- withFrozenCallStack $ eval (x <= y)
-  if ok then
-    success
-  else
-    withFrozenCallStack $ failDiff x y
-
-infix 4 >==
-
--- | Fails the test if the right argument is greater than the left.
-(>==) :: (MonadTest m, Ord a, Show a, HasCallStack) => a -> a -> m ()
-(>==) x y = do
-  ok <- withFrozenCallStack $ eval (x >= y)
-  if ok then
-    success
-  else
-    withFrozenCallStack $ failDiff x y
-
-infix 4 <<<
-
--- | Fails the test if the right argument is less than or equal to the left.
-(<<<) :: (MonadTest m, Ord a, Show a, HasCallStack) => a -> a -> m ()
-(<<<) x y = do
-  ok <- withFrozenCallStack $ eval (x < y)
-  if ok then
-    success
-  else
-    withFrozenCallStack $ failDiff x y
-
-infix 4 >>>
-
-(>>>) :: (MonadTest m, Ord a, Show a, HasCallStack) => a -> a -> m ()
-(>>>) x y = do
-  ok <- withFrozenCallStack $ eval (x > y)
-  if ok then
-    success
-  else
-    withFrozenCallStack $ failDiff x y
+(/==) x y =
+  withFrozenCallStack $
+    diff x (/=) y
 
 -- | Fails the test if the value throws an exception when evaluated to weak
 --   head normal form (WHNF).

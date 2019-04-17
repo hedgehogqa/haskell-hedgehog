@@ -98,12 +98,9 @@ module Hedgehog (
   , success
   , failure
   , assert
+  , diff
   , (===)
   , (/==)
-  , (<==)
-  , (>==)
-  , (<<<)
-  , (>>>)
   , tripping
 
   , eval
@@ -154,8 +151,8 @@ import           Hedgehog.Internal.Distributive (Distributive(..))
 import           Hedgehog.Internal.Gen (Gen, GenT, MonadGen(..))
 import           Hedgehog.Internal.HTraversable (HTraversable(..))
 import           Hedgehog.Internal.Opaque (Opaque(..))
-import           Hedgehog.Internal.Property (annotate, annotateShow)
-import           Hedgehog.Internal.Property (assert, (===), (/==), (<==), (>==), (<<<), (>>>))
+import           Hedgehog.Internal.Property (assert, diff, annotate, annotateShow)
+import           Hedgehog.Internal.Property ((===), (/==))
 import           Hedgehog.Internal.Property (discard, failure, success)
 import           Hedgehog.Internal.Property (DiscardLimit, withDiscards)
 import           Hedgehog.Internal.Property (eval, evalM, evalIO)
