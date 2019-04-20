@@ -1,6 +1,8 @@
 {-# OPTIONS_HADDOCK not-home #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE DoAndIfThenElse #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -21,11 +23,11 @@ module Hedgehog.Internal.Property (
   , PropertyName(..)
   , PropertyConfig(..)
   , TestLimit(..)
-  , Classifier(..)
-  , ClassifierName(..)
-  , Classification(..)
+  , TestCount(..)
   , DiscardLimit(..)
+  , DiscardCount(..)
   , ShrinkLimit(..)
+  , ShrinkCount(..)
   , ShrinkRetries(..)
   , withTests
   , withDiscards
@@ -37,19 +39,19 @@ module Hedgehog.Internal.Property (
   , forAllT
   , forAllWith
   , forAllWithT
-  , classify
-  , cover
   , discard
 
   -- * Group
   , Group(..)
   , GroupName(..)
+  , PropertyCount(..)
 
   -- * TestT
   , MonadTest(..)
   , Test
   , TestT(..)
   , Log(..)
+  , Journal(..)
   , Failure(..)
   , Diff(..)
   , annotate
@@ -68,6 +70,22 @@ module Hedgehog.Internal.Property (
   , evalIO
   , evalEither
   , evalExceptT
+
+  -- * Coverage
+  , Coverage(..)
+  , Classifier(..)
+  , ClassifierName(..)
+  , classify
+  , cover
+  , coverPercentage
+  , classifierCovered
+  , coverageSuccess
+  , coverageFailures
+
+  , Cover(..)
+  , CoverCount(..)
+  , CoverPercentage(..)
+  , toCoverCount
 
   -- * Internal
   -- $internal
@@ -164,57 +182,6 @@ newtype PropertyT m a =
 -- NOTE: Move this to the deriving list above when we drop 7.10
 deriving instance MonadResource m => MonadResource (PropertyT m)
 
--- | Classifiers use strings as labels
---
-newtype ClassifierName =
-  ClassifierName {
-      unClassifierName :: String
-    } deriving (Show, Eq, Ord)
-
--- | A classifier can be attached to a property conditionally
---
---   When the amount of occurrences don't exceed the minimum percentage, a
---   warning will be issued.
-data Classifier =
-  Classifier {
-      classifierPercentage :: !Double
-    , classifierMatched :: !Bool
-    } deriving (Show)
-
--- | This semigroup is right biased, the percentage from the rightmost
---   `Classifier` will be kept. This shouldn't be a problem since the library
---   doesn't allow setting multiple classifiers with the same label.
-instance Semigroup Classifier where
-  (Classifier _ m1) <> (Classifier percentage m2) =
-    Classifier percentage (m1 || m2)
-
--- | Classification are a count of how many times a property has ocurred
---   during a test run
---
-newtype Classification =
-  Classification {
-      classificationClassifiers :: Map ClassifierName Classifier
-    } deriving (Show)
-
-instance Semigroup Classification where
-  (Classification c1) <> (Classification c2) =
-    Classification
-      (Map.foldrWithKey (Map.insertWith (<>)) c1 c2)
-
-instance Monoid Classification where
-  mappend =
-    (<>)
-  mempty =
-    Classification mempty
-
-mkClassifier :: ClassifierName -> Bool -> Double -> Classification
-mkClassifier name matched percentage =
-  let
-    (Classification classifiers) = mempty
-  in
-    Classification $
-      Map.insertWith (<>) name (Classifier percentage matched) classifiers
-
 -- | A test monad allows the assertion of expectations.
 --
 type Test =
@@ -224,7 +191,7 @@ type Test =
 --
 newtype TestT m a =
   TestT {
-      unTest :: ExceptT Failure (Lazy.WriterT (Classification, [Log]) m) a
+      unTest :: ExceptT Failure (Lazy.WriterT Journal m) a
     } deriving (
       Functor
     , Applicative
@@ -272,6 +239,18 @@ newtype TestLimit =
   TestLimit Int
   deriving (Eq, Ord, Show, Num, Enum, Real, Integral)
 
+-- | The number of tests a property ran successfully.
+--
+newtype TestCount =
+  TestCount Int
+  deriving (Eq, Ord, Show, Num, Enum, Real, Integral)
+
+-- | The number of tests a property had to discard.
+--
+newtype DiscardCount =
+  DiscardCount Int
+  deriving (Eq, Ord, Show, Num, Enum, Real, Integral)
+
 -- | The number of discards to allow before giving up.
 --
 --   Can be constructed using numeric literals:
@@ -295,6 +274,12 @@ newtype DiscardLimit =
 --
 newtype ShrinkLimit =
   ShrinkLimit Int
+  deriving (Eq, Ord, Show, Num, Enum, Real, Integral)
+
+-- | The numbers of times a property was able to shrink after a failing test.
+--
+newtype ShrinkCount =
+  ShrinkCount Int
   deriving (Eq, Ord, Show, Num, Enum, Real, Integral)
 
 -- | The number of times to re-run a test during shrinking. This is useful if
@@ -337,10 +322,16 @@ newtype GroupName =
       unGroupName :: String
     } deriving (Eq, Ord, Show, IsString, Semigroup)
 
+-- | The number of properties in a group.
+--
+newtype PropertyCount =
+  PropertyCount Int
+  deriving (Eq, Ord, Show, Num, Enum, Real, Integral)
+
 --
 -- FIXME This whole Log/Failure thing could be a lot more structured to allow
 -- FIXME for richer user controlled error messages, think Doc. Ideally we'd
--- FIXME allow user's to create their own diffs anywhere.
+-- FIXME allow user's to crete their own diffs anywhere.
 --
 
 -- | Log messages which are recorded during a test run.
@@ -349,6 +340,13 @@ data Log =
     Annotation (Maybe Span) String
   | Footnote String
     deriving (Eq, Show)
+
+-- | A record containing the details of a test run.
+data Journal =
+  Journal {
+      journalCoverage :: !(Coverage Cover)
+    , journalLogs :: ![Log]
+    } deriving (Eq, Show)
 
 -- | Details on where and why a test failed.
 --
@@ -367,6 +365,76 @@ data Diff =
     , diffSuffix :: String
     , diffValue :: ValueDiff
     } deriving (Eq, Show)
+
+-- | Whether a test is covered by a classifier, and therefore belongs to a
+--   'Class'.
+--
+data Cover =
+    NoCover
+  | Cover
+    deriving (Eq, Ord, Show)
+
+-- | The total number of tests which are covered by a classifier.
+--
+--   Can be constructed using numeric literals:
+--
+-- @
+--   30 :: CoverCount
+-- @
+--
+newtype CoverCount =
+  CoverCount {
+      unCoverCount :: Int
+    } deriving (Eq, Ord, Show, Num)
+
+-- | The relative number of tests which are covered by a classifier.
+--
+--   Can be constructed using numeric literals:
+--
+-- @
+--   30 :: CoverPercentage
+-- @
+--
+newtype CoverPercentage =
+  CoverPercentage {
+      unCoverPercentage :: Double
+    } deriving (Eq, Ord, Show, Num)
+
+-- | The name of a classifier.
+--
+--   Can be constructed using `OverloadedStrings`:
+--
+-- @
+--   "apples" :: ClassifierName
+-- @
+--
+newtype ClassifierName =
+  ClassifierName {
+      unClassifierName :: String
+    } deriving (Eq, Ord, Show, IsString)
+
+-- | The extent to which a test is covered by a classifier.
+--
+--   /When a classifier's coverage does not exceed the required minimum, the
+--   test will be failed./
+--
+data Classifier a =
+  Classifier {
+      classifierName :: !ClassifierName
+    , classifierLocation :: !(Maybe Span)
+    , classifierMinimum :: !CoverPercentage
+    , classifierExtent :: !a
+    } deriving (Eq, Show, Functor, Foldable, Traversable)
+
+-- | The extent to which all classifiers cover a test.
+--
+--   /When a given classification's coverage does not exceed the required
+--   minimum, the test will be failed./
+--
+newtype Coverage a =
+  Coverage {
+      unCoverage :: Map ClassifierName (Classifier a)
+    } deriving (Eq, Show, Functor, Foldable, Traversable)
 
 ------------------------------------------------------------------------
 -- TestT
@@ -394,8 +462,8 @@ instance MFunctor TestT where
 
 instance Distributive TestT where
   type Transformer t TestT m = (
-      Transformer t (Lazy.WriterT (Classification, [Log])) m
-    , Transformer t (ExceptT Failure) (Lazy.WriterT (Classification, [Log]) m)
+      Transformer t (Lazy.WriterT Journal) m
+    , Transformer t (ExceptT Failure) (Lazy.WriterT Journal m)
     )
 
   distribute =
@@ -426,10 +494,10 @@ instance MonadResource m => MonadResource (TestT m) where
 
 instance MonadTransControl TestT where
   type StT TestT a =
-    (Either Failure a, (Classification, [Log]))
+    (Either Failure a, Journal)
 
   liftWith f =
-    mkTestT . fmap (, (mempty, [])) . fmap Right $ f $ runTestT
+    mkTestT . fmap (, mempty) . fmap Right $ f $ runTestT
 
   restoreT =
     mkTestT
@@ -499,38 +567,50 @@ instance MonadTest m => MonadTest (ResourceT m) where
   liftTest =
     lift . liftTest
 
-mkTestT :: m (Either Failure a, (Classification, [Log])) -> TestT m a
+instance Semigroup Journal where
+  (<>) (Journal c0 logs0) (Journal c1 logs1) =
+    Journal (c0 <> c1) (logs0 <> logs1)
+
+instance Monoid Journal where
+  mempty =
+    Journal mempty mempty
+  mappend =
+    (<>)
+
+mkTestT :: m (Either Failure a, Journal) -> TestT m a
 mkTestT =
   TestT . ExceptT . Lazy.WriterT
 
-mkTest :: (Either Failure a, (Classification, [Log])) -> Test a
+mkTest :: (Either Failure a, Journal) -> Test a
 mkTest =
   mkTestT . Identity
 
-runTestT :: TestT m a -> m (Either Failure a, (Classification, [Log]))
+runTestT :: TestT m a -> m (Either Failure a, Journal)
 runTestT =
   Lazy.runWriterT . runExceptT . unTest
 
-runTest :: Test a -> (Either Failure a, (Classification, [Log]))
+runTest :: Test a -> (Either Failure a, Journal)
 runTest =
   runIdentity . runTestT
 
-writeClassification :: MonadTest m => Classification -> m ()
-writeClassification c =
-  liftTest $ mkTest (pure (), (c, []))
+-- | Write the current coverage information.
+--
+writeCoverage :: MonadTest m => Coverage Cover -> m ()
+writeCoverage c =
+  liftTest $ mkTest (pure (), Journal c [])
 
 -- | Log some information which might be relevant to a potential test failure.
 --
 writeLog :: MonadTest m => Log -> m ()
 writeLog x =
-  liftTest $ mkTest (pure (), (mempty, [x]))
+  liftTest $ mkTest (pure (), (Journal mempty [x]))
 
 -- | Fail the test with an error message, useful for building other failure
 --   combinators.
 --
 failWith :: (MonadTest m, HasCallStack) => Maybe Diff -> String -> m a
-failWith diff msg =
-  liftTest $ mkTest (Left $ Failure (getCaller callStack) msg diff, (mempty, []))
+failWith mdiff msg =
+  liftTest $ mkTest (Left $ Failure (getCaller callStack) msg mdiff, (Journal mempty []))
 
 -- | Annotates the source code with a message that might be useful for
 --   debugging a test failure.
@@ -798,40 +878,6 @@ discard :: Monad m => PropertyT m a
 discard =
   PropertyT $ lift Gen.discard
 
--- | Classify a test with a given label if the predicate is true.
---
--- @
---    prop_with_classifier :: Property
---    prop_with_classifier = property $ do
---      xs <- forAll $ Gen.list (Range.linear 0 100) Gen.alpha
---      for_ xs $ \x -> do
---        classify (x == 0) "newborns"
---        classify (x > 0 && x < 13) "children"
---        classify (x > 12 && x < 20) "teens"
---        success
--- @
-classify :: (MonadTest m, HasCallStack) => Bool -> String -> m ()
-classify = cover 0
-
--- | Require a certain percentage of the tests to satisfy the classification.
---
--- @
---    prop_with_coverage :: Property
---    prop_with_coverage = property $ do
---      withTests 100 . property $
---        forAll Gen.bool >>= \match -> do
---          cover 30 match "True"
---          cover 30 (not match) "False"
---          success
--- @
---
---   The example above requires a minimum of 30% for both classifications. If
---   these percentages are not met, it will log warnings.
-cover :: (MonadTest m, HasCallStack) => Double -> Bool -> String -> m ()
-cover minCoverage matched s =
-  writeClassification $
-    mkClassifier (ClassifierName s) matched minCoverage
-
 -- | Lift a test in to a property.
 --
 --   Because both 'TestT' and 'PropertyT' have 'MonadTest' instances, this
@@ -916,6 +962,129 @@ property :: HasCallStack => PropertyT IO () -> Property
 property m =
   Property defaultConfig $
     withFrozenCallStack (evalM m)
+
+------------------------------------------------------------------------
+-- Classification
+
+instance Semigroup Cover where
+  (<>) NoCover NoCover =
+    NoCover
+  (<>) _ _ =
+    Cover
+
+instance Monoid Cover where
+  mempty =
+    NoCover
+  mappend =
+    (<>)
+
+instance Semigroup CoverCount where
+  (<>) (CoverCount n0) (CoverCount n1) =
+    CoverCount (n0 + n1)
+
+instance Monoid CoverCount where
+  mempty =
+    CoverCount 0
+  mappend =
+    (<>)
+
+toCoverCount :: Cover -> CoverCount
+toCoverCount = \case
+  NoCover ->
+    CoverCount 0
+  Cover ->
+    CoverCount 1
+
+-- | This semigroup is right biased. The name, location and percentage from the
+--   rightmost `Classifier` will be kept. This shouldn't be a problem since the
+--   library doesn't allow setting multiple classes with the same 'ClassifierName'.
+instance Semigroup a => Semigroup (Classifier a) where
+  (<>) (Classifier _ _ _ m0) (Classifier name location percentage m1) =
+    Classifier name location percentage (m0 <> m1)
+
+instance Semigroup a => Semigroup (Coverage a) where
+  (<>) (Coverage c0) (Coverage c1) =
+    Coverage $
+      Map.foldrWithKey (Map.insertWith (<>)) c0 c1
+
+instance (Semigroup a, Monoid a) => Monoid (Coverage a) where
+  mempty =
+    Coverage mempty
+  mappend =
+    (<>)
+
+mkCoverage :: Maybe Span -> ClassifierName -> CoverPercentage -> Cover -> Coverage Cover
+mkCoverage mlocation name minimum_ cover_ =
+  Coverage $
+    Map.singleton name (Classifier name mlocation minimum_ cover_)
+
+coverPercentage :: TestCount -> CoverCount -> CoverPercentage
+coverPercentage (TestCount tests) (CoverCount count) =
+  let
+    percentage :: Double
+    percentage =
+      fromIntegral count / fromIntegral tests * 100
+
+    thousandths :: Int
+    thousandths =
+      round $ percentage * 10
+  in
+    CoverPercentage (fromIntegral thousandths / 10)
+
+classifierCovered :: TestCount -> Classifier CoverCount -> Bool
+classifierCovered tests (Classifier _ _ minimum_ population) =
+  coverPercentage tests population >= minimum_
+
+coverageSuccess :: TestCount -> Coverage CoverCount -> Bool
+coverageSuccess tests =
+  null . coverageFailures tests
+
+coverageFailures :: TestCount -> Coverage CoverCount -> [Classifier CoverCount]
+coverageFailures tests (Coverage kvs) =
+  filter (not . classifierCovered tests) (Map.elems kvs)
+
+-- | Records the proportion of tests which satisfy a given condition.
+--
+-- @
+--    prop_with_classifier :: Property
+--    prop_with_classifier =
+--      property $ do
+--        xs <- forAll $ Gen.list (Range.linear 0 100) Gen.alpha
+--        for_ xs $ \x -> do
+--          classify "newborns" $ x == 0
+--          classify "children" $ x > 0 && x < 13
+--          classify "teens" $ x > 12 && x < 20
+-- @
+classify :: MonadTest m => ClassifierName -> Bool -> m ()
+classify =
+  cover 0
+
+-- | Require a certain percentage of the tests to be covered by the
+--   classifier.
+--
+-- @
+--    prop_with_coverage :: Property
+--    prop_with_coverage =
+--      property $ do
+--        match <- forAll Gen.bool
+--        cover 30 "True" $ match
+--        cover 30 "False" $ not match
+-- @
+--
+--   The example above requires a minimum of 30% coverage for both
+--   classifiers. If these requirements are not met, it will fail the test.
+--
+cover :: (MonadTest m, HasCallStack) => CoverPercentage -> ClassifierName -> Bool -> m ()
+cover minimum_ name covered =
+  let
+    cover_ =
+      if covered then
+        Cover
+      else
+        NoCover
+  in
+    writeCoverage $
+      mkCoverage (getCaller callStack) name minimum_ cover_
 
 ------------------------------------------------------------------------
 -- FIXME Replace with DeriveLift when we drop 7.10 support.

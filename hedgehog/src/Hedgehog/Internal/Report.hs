@@ -17,11 +17,6 @@ module Hedgehog.Internal.Report (
   , FailureReport(..)
   , FailedAnnotation(..)
 
-  , ShrinkCount(..)
-  , TestCount(..)
-  , DiscardCount(..)
-  , PropertyCount(..)
-
   , Style(..)
   , Markup(..)
 
@@ -50,12 +45,19 @@ import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Maybe (mapMaybe, catMaybes)
 import           Data.Semigroup (Semigroup(..))
+import           Data.Traversable (for)
 
 import           Hedgehog.Internal.Config
 import           Hedgehog.Internal.Discovery (Pos(..), Position(..))
 import qualified Hedgehog.Internal.Discovery as Discovery
-import           Hedgehog.Internal.Property (Classifier(..), ClassifierName(..))
+import           Hedgehog.Internal.Property (Coverage(..), Classifier(..), ClassifierName(..))
+import           Hedgehog.Internal.Property (CoverCount(..), CoverPercentage(..))
 import           Hedgehog.Internal.Property (PropertyName(..), Log(..), Diff(..))
+import           Hedgehog.Internal.Property (ShrinkCount(..), PropertyCount(..))
+import           Hedgehog.Internal.Property (TestCount(..), DiscardCount(..))
+import           Hedgehog.Internal.Property (coverPercentage, coverageFailures)
+import           Hedgehog.Internal.Property (classifierCovered)
+
 import           Hedgehog.Internal.Seed (Seed)
 import           Hedgehog.Internal.Show
 import           Hedgehog.Internal.Source
@@ -76,30 +78,6 @@ import           Text.Printf (printf)
 ------------------------------------------------------------------------
 -- Data
 
--- | The numbers of times a property was able to shrink after a failing test.
---
-newtype ShrinkCount =
-  ShrinkCount Int
-  deriving (Eq, Ord, Show, Num, Enum, Real, Integral)
-
--- | The number of tests a property ran successfully.
---
-newtype TestCount =
-  TestCount Int
-  deriving (Eq, Ord, Show, Num, Enum, Real, Integral)
-
--- | The number of tests a property had to discard.
---
-newtype DiscardCount =
-  DiscardCount Int
-  deriving (Eq, Ord, Show, Num, Enum, Real, Integral)
-
--- | The number of properties in a group.
---
-newtype PropertyCount =
-  PropertyCount Int
-  deriving (Eq, Ord, Show, Num, Enum, Real, Integral)
-
 data FailedAnnotation =
   FailedAnnotation {
       failedSpan :: !(Maybe Span)
@@ -111,6 +89,7 @@ data FailureReport =
       failureSize :: !Size
     , failureSeed :: !Seed
     , failureShrinks :: !ShrinkCount
+    , failureCoverage :: !(Maybe (Coverage CoverCount))
     , failureAnnotations :: ![FailedAnnotation]
     , failureLocation :: !(Maybe Span)
     , failureMessage :: !String
@@ -142,7 +121,7 @@ data Report a =
   Report {
       reportTests :: !TestCount
     , reportDiscards :: !DiscardCount
-    , reportClassification :: !(Map ClassifierName (Classifier, Int))
+    , reportCoverage :: !(Coverage CoverCount)
     , reportStatus :: !a
     } deriving (Show, Functor, Foldable, Traversable)
 
@@ -222,11 +201,13 @@ data Markup =
   | ShrinkingIcon
   | ShrinkingHeader
   | FailedIcon
-  | FailedHeader
+  | FailedText
   | GaveUpIcon
-  | GaveUpHeader
+  | GaveUpText
   | SuccessIcon
-  | SuccessHeader
+  | SuccessText
+  | CoverageIcon
+  | CoverageText
   | DeclarationLocation
   | StyledLineNo !Style
   | StyledBorder !Style
@@ -281,12 +262,13 @@ mkFailure ::
      Size
   -> Seed
   -> ShrinkCount
+  -> Maybe (Coverage CoverCount)
   -> Maybe Span
   -> String
   -> Maybe Diff
   -> [Log]
   -> FailureReport
-mkFailure size seed shrinks location message diff logs =
+mkFailure size seed shrinks mcoverage location message diff logs =
   let
     inputs =
       mapMaybe takeAnnotation logs
@@ -294,7 +276,7 @@ mkFailure size seed shrinks location message diff logs =
     footnotes =
       mapMaybe takeFootnote logs
   in
-    FailureReport size seed shrinks inputs location message diff footnotes
+    FailureReport size seed shrinks mcoverage inputs location message diff footnotes
 
 ------------------------------------------------------------------------
 -- Pretty Printing
@@ -506,11 +488,11 @@ ppDiff (Diff prefix removed infix_ added suffix diff) = [
 
 ppFailureLocation ::
      MonadIO m
-  => String
+  => [Doc Markup]
   -> Maybe Diff
   -> Span
   -> m (Maybe (Declaration (Style, [(Style, Doc Markup)])))
-ppFailureLocation msg mdiff sloc =
+ppFailureLocation msgs mdiff sloc =
   runMaybeT $ do
     decl <- fmap defaultStyle . MaybeT $ readDeclaration sloc
     (startCol, endCol) <- bimap fromIntegral fromIntegral <$> lastLineSpan sloc decl
@@ -525,7 +507,7 @@ ppFailureLocation msg mdiff sloc =
           markup FailureGutter (WL.text "│ ") <> x
 
       msgDocs =
-        fmap ((StyleFailure, ) . ppFailure . markup FailureMessage . WL.text) (List.lines msg)
+        fmap ((StyleFailure, ) . ppFailure . markup FailureMessage) msgs
 
       diffDocs =
         case mdiff of
@@ -621,9 +603,9 @@ ppTextLines :: String -> [Doc Markup]
 ppTextLines =
   fmap WL.text . List.lines
 
-ppFailureReport :: MonadIO m => Maybe PropertyName -> FailureReport -> m (Doc Markup)
-ppFailureReport name (FailureReport size seed _ inputs0 mlocation0 msg mdiff msgs0) = do
-  (msgs, mlocation) <-
+ppFailureReport :: MonadIO m => Maybe PropertyName -> TestCount -> FailureReport -> m (Doc Markup)
+ppFailureReport name tests (FailureReport size seed _ mcoverage inputs0 mlocation0 msg mdiff msgs0) = do
+  (msgs1, mlocation) <-
     case mlocation0 of
       Nothing ->
         -- Move the failure message to the end section if we have
@@ -640,16 +622,37 @@ ppFailureReport name (FailureReport size seed _ inputs0 mlocation0 msg mdiff msg
           pure (docs, Nothing)
 
       Just location0 ->
-        (concatMap ppTextLines msgs0,)
-          <$> ppFailureLocation msg mdiff location0
+        fmap (concatMap ppTextLines msgs0,) $
+          ppFailureLocation (fmap WL.text $ List.lines msg) mdiff location0
 
-  (args, idecls) <- partitionEithers <$> zipWithM ppFailedInput [0..] inputs0
+  coverageLocations <-
+    case mcoverage of
+      Nothing ->
+        pure []
+      Just coverage ->
+        for (coverageFailures tests coverage) $ \(Classifier _ mclocation _ count) ->
+          case mclocation of
+            Nothing ->
+              pure Nothing
+            Just clocation ->
+              let
+                coverageMsg =
+                  WL.cat [
+                      "Failed ("
+                    , WL.annotate CoverageText $
+                        ppCoverPercentage (coverPercentage tests count) <> " coverage"
+                    , ")"
+                    ]
+              in
+                ppFailureLocation [coverageMsg] Nothing clocation
+
+  (args, idecls) <- fmap partitionEithers $ zipWithM ppFailedInput [0..] inputs0
 
   let
     decls =
       mergeDeclarations .
       catMaybes $
-        mlocation : fmap pure idecls
+        mlocation : coverageLocations <> fmap pure idecls
 
     with xs f =
       if null xs then
@@ -657,14 +660,19 @@ ppFailureReport name (FailureReport size seed _ inputs0 mlocation0 msg mdiff msg
       else
         [f xs]
 
-  pure . WL.indent 2 . WL.vsep . WL.punctuate WL.line $ concat [
+    msgs =
+      fmap (WL.indent 2) msgs1 <>
+      maybe [] (ppCoverage tests) mcoverage
+
+  pure . WL.vsep . WL.punctuate WL.line $ concat [
       with args $
-        WL.vsep . WL.punctuate WL.line
+        WL.indent 2 . WL.vsep . WL.punctuate WL.line
     , with decls $
-        WL.vsep . WL.punctuate WL.line . fmap ppDeclaration
+        WL.indent 2 . WL.vsep . WL.punctuate WL.line . fmap ppDeclaration
     , with msgs $
         WL.vsep
-    , [ppReproduce name size seed]
+    , with [ppReproduce name size seed] $
+        WL.indent 2 . WL.vsep
     ]
 
 ppName :: Maybe PropertyName -> Doc a
@@ -675,15 +683,18 @@ ppName = \case
     WL.text name
 
 ppProgress :: MonadIO m => Maybe PropertyName -> Report Progress -> m (Doc Markup)
-ppProgress name (Report tests discards _ status) =
+ppProgress name (Report tests discards coverage status) =
   case status of
     Running ->
-      pure . icon RunningIcon '●' . WL.annotate RunningHeader $
-        ppName name <+>
-        "passed" <+>
-        ppTestCount tests <>
-        ppWithDiscardCount discards <+>
-        "(running)"
+      pure . WL.vsep $ [
+          icon RunningIcon '●' . WL.annotate RunningHeader $
+            ppName name <+>
+            "passed" <+>
+            ppTestCount tests <>
+            ppWithDiscardCount discards <+>
+            "(running)"
+        ] ++
+        ppCoverage tests coverage
 
     Shrinking failure ->
       pure . icon ShrinkingIcon '↯' . WL.annotate ShrinkingHeader $
@@ -694,12 +705,12 @@ ppProgress name (Report tests discards _ status) =
         "(shrinking)"
 
 ppResult :: MonadIO m => Maybe PropertyName -> Report Result -> m (Doc Markup)
-ppResult name (Report tests discards classes result) =
+ppResult name (Report tests discards coverage result) = do
   case result of
     Failed failure -> do
-      pfailure <- ppFailureReport name failure
+      pfailure <- ppFailureReport name tests failure
       pure . WL.vsep $ [
-          icon FailedIcon '✗' . WL.annotate FailedHeader $
+          icon FailedIcon '✗' . WL.annotate FailedText $
             ppName name <+>
             "failed after" <+>
             ppTestCount tests <>
@@ -711,64 +722,57 @@ ppResult name (Report tests discards classes result) =
         ]
 
     GaveUp ->
-      pure . icon GaveUpIcon '⚐' . WL.annotate GaveUpHeader $
-        ppName name <+>
-        "gave up after" <+>
-        ppDiscardCount discards <>
-        ", passed" <+>
-        ppTestCount tests <>
-        "." <+>
-        ppClassification classes tests <+>
-        ppCoverage classes tests
+      pure . WL.vsep $ [
+          icon GaveUpIcon '⚐' . WL.annotate GaveUpText $
+            ppName name <+>
+            "gave up after" <+>
+            ppDiscardCount discards <>
+            ", passed" <+>
+            ppTestCount tests <>
+            "."
+        ] ++
+        ppCoverage tests coverage
 
     OK ->
-      pure . icon SuccessIcon '✓' . WL.annotate SuccessHeader $
-        ppName name <+>
-        "passed" <+>
-        ppTestCount tests <>
-        "." <+>
-        ppClassification classes tests <+>
-        ppCoverage classes tests
+      pure . WL.vsep $ [
+          icon SuccessIcon '✓' . WL.annotate SuccessText $
+            ppName name <+>
+            "passed" <+>
+            ppTestCount tests <>
+            "."
+        ] ++
+        ppCoverage tests coverage
 
-ppClassification :: Map ClassifierName (Classifier, Int) -> TestCount -> Doc Markup
-ppClassification classifiers (TestCount tests) =
-  if Map.null classifiers then
+ppCoverage :: TestCount -> Coverage CoverCount -> [Doc Markup]
+ppCoverage tests (Coverage classes) =
+  if Map.null classes then
     mempty
   else
-    (<>) WL.linebreak $ WL.indent 4 . WL.align . WL.vsep $
-      (\(ClassifierName k, (_, v)) -> WL.text $ show (occurrenceRate v tests) <> "% " <> k) <$> Map.toList classifiers
+    let
+      ppClass classifier@(Classifier name _ minimum_ count) =
+        if classifierCovered tests classifier then
+          "  " <>
+          ppCoverPercentage (coverPercentage tests count) <>
+          " " <>
+          ppClassifierName name
+        else
+          icon CoverageIcon '⚠' . WL.annotate CoverageText $
+            ppCoverPercentage (coverPercentage tests count) <>
+            " " <>
+            ppClassifierName name <>
+            " < " <>
+            ppCoverPercentage minimum_
+    in
+      fmap ppClass $
+        Map.elems classes
 
-occurrenceRate :: Int -> Int -> Double
-occurrenceRate occurrences tests =
-  let
-    percentage :: Double
-    percentage =
-      fromIntegral occurrences / fromIntegral tests * 100
-    thousandths :: Int
-    thousandths =
-      round $ percentage * 10
-  in
-    fromIntegral thousandths / 10
+ppClassifierName :: ClassifierName -> Doc a
+ppClassifierName (ClassifierName name) =
+  WL.text name
 
-ppCoverage :: Map ClassifierName (Classifier, Int) -> TestCount -> Doc Markup
-ppCoverage classifiers (TestCount tests) =
-  let
-    coverageLines = foldMap (uncurry renderCoverage) $ Map.toList classifiers
-    renderCoverage (ClassifierName name) (Classifier minRate _, total) =
-      if occurrenceRate total tests < minRate then
-        pure . WL.text $
-          "Only " <> show (occurrenceRate total tests) <> "% " <> name <>
-          ", but expected " <> show minRate <> "%"
-      else
-        []
-  in
-    if null coverageLines then
-      mempty
-    else
-      WL.linebreak <>
-      WL.linebreak <>
-      WL.text "⚠" <>
-      (WL.indent 3 . WL.align . WL.vsep) coverageLines
+ppCoverPercentage :: CoverPercentage -> Doc Markup
+ppCoverPercentage (CoverPercentage percentage) =
+  WL.text (show percentage) <> "%"
 
 ppWhenNonZero :: Doc a -> PropertyCount -> Maybe (Doc a)
 ppWhenNonZero suffix n =
@@ -780,13 +784,13 @@ ppWhenNonZero suffix n =
 annotateSummary :: Summary -> Doc Markup -> Doc Markup
 annotateSummary summary =
   if summaryFailed summary > 0 then
-    icon FailedIcon '✗' . WL.annotate FailedHeader
+    icon FailedIcon '✗' . WL.annotate FailedText
   else if summaryGaveUp summary > 0 then
-    icon GaveUpIcon '⚐' . WL.annotate GaveUpHeader
+    icon GaveUpIcon '⚐' . WL.annotate GaveUpText
   else if summaryWaiting summary > 0 || summaryRunning summary > 0 then
     icon WaitingIcon '○' . WL.annotate WaitingHeader
   else
-    icon SuccessIcon '✓' . WL.annotate SuccessHeader
+    icon SuccessIcon '✓' . WL.annotate SuccessText
 
 ppSummary :: MonadIO m => Summary -> m (Doc Markup)
 ppSummary summary =
@@ -857,16 +861,20 @@ renderDoc mcolor doc = do
         setSGRCode [vivid Red]
       FailedIcon ->
         setSGRCode [vivid Red]
-      FailedHeader ->
+      FailedText ->
         setSGRCode [vivid Red]
       GaveUpIcon ->
         setSGRCode [dull Yellow]
-      GaveUpHeader ->
+      GaveUpText ->
         setSGRCode [dull Yellow]
       SuccessIcon ->
         setSGRCode [dull Green]
-      SuccessHeader ->
+      SuccessText ->
         setSGRCode [dull Green]
+      CoverageIcon ->
+        setSGRCode [dull Yellow]
+      CoverageText ->
+        setSGRCode [dull Yellow]
 
       DeclarationLocation ->
         setSGRCode []
@@ -940,6 +948,7 @@ renderDoc mcolor doc = do
     hSetEncoding stdout utf8
     hSetEncoding stderr utf8
 #endif
+
   pure .
     display .
     WL.renderSmart 100 $

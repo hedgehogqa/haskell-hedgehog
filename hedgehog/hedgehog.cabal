@@ -132,7 +132,6 @@ test-suite test
   other-modules:
     Test.Hedgehog.Seed
     Test.Hedgehog.Text
-    Test.Hedgehog.Classified
 
   build-depends:
       hedgehog

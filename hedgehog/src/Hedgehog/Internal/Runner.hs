@@ -33,17 +33,18 @@ import           Control.Monad.Catch (MonadCatch(..), catchAll)
 import           Control.Monad.IO.Class (MonadIO(..))
 
 import           Data.Semigroup ((<>))
-import           Data.Map (Map)
-import qualified Data.Map.Strict as Map
 
 import           Hedgehog.Internal.Config
 import           Hedgehog.Internal.Gen (runGenT, runDiscardEffect)
-import           Hedgehog.Internal.Property (Classifier(..), Classification(..))
-import           Hedgehog.Internal.Property (ClassifierName)
+import           Hedgehog.Internal.Property (Journal(..), Coverage(..))
+import           Hedgehog.Internal.Property (DiscardCount(..), ShrinkCount(..))
 import           Hedgehog.Internal.Property (Group(..), GroupName(..))
+import           Hedgehog.Internal.Property (CoverCount(..), toCoverCount)
 import           Hedgehog.Internal.Property (Property(..), PropertyConfig(..), PropertyName(..))
+import           Hedgehog.Internal.Property (PropertyT(..), Failure(..), runTestT)
 import           Hedgehog.Internal.Property (ShrinkLimit, ShrinkRetries, withTests)
-import           Hedgehog.Internal.Property (PropertyT(..), Log(..), Failure(..), runTestT)
+import           Hedgehog.Internal.Property (TestCount(..), PropertyCount(..))
+import           Hedgehog.Internal.Property (coverageSuccess)
 import           Hedgehog.Internal.Queue
 import           Hedgehog.Internal.Region
 import           Hedgehog.Internal.Report
@@ -122,19 +123,18 @@ takeSmallest ::
   -> ShrinkLimit
   -> ShrinkRetries
   -> (Progress -> m ())
-  -> Node m (Maybe (Either Failure (), (Classification, [Log])))
+  -> Node m (Maybe (Either Failure (), Journal))
   -> m Result
 takeSmallest size seed shrinks slimit retries updateUI = \case
   Node Nothing _ ->
     pure GaveUp
 
-  Node (Just (x, (_, w))) xs ->
+  Node (Just (x, (Journal _ logs))) xs ->
     case x of
       Left (Failure loc err mdiff) -> do
         let
           failure =
-            -- FIXME: maybe add classifier to failure?
-            mkFailure size seed shrinks loc err mdiff (reverse w)
+            mkFailure size seed shrinks Nothing loc err mdiff (reverse logs)
 
         updateUI $ Shrinking failure
 
@@ -167,30 +167,38 @@ checkReport cfg size0 seed0 test0 updateUI =
     test =
       catchAll test0 (fail . show)
 
-    consolidate (Classification c) classifiers =
-      Map.foldrWithKey combine classifiers c
-    combine k v@(Classifier _ True) =
-      Map.insertWith insertion k (v, 1)
-    combine k v@(Classifier _ False) =
-      Map.insertWith insertion k (v, 0)
-    insertion (_, tot) (c, count) =
-      (c, tot + count)
-
-    loop :: TestCount -> DiscardCount -> Size -> Seed -> Map ClassifierName (Classifier, Int) -> m (Report Result)
-    loop !tests !discards !size !seed !classifiers0 = do
-      updateUI $ Report tests discards classifiers0 Running
+    loop ::
+         TestCount
+      -> DiscardCount
+      -> Size
+      -> Seed
+      -> Coverage CoverCount
+      -> m (Report Result)
+    loop !tests !discards !size !seed !coverage0 = do
+      updateUI $ Report tests discards coverage0 Running
 
       if size > 99 then
         -- size has reached limit, reset to 0
-        loop tests discards 0 seed classifiers0
+        loop tests discards 0 seed coverage0
 
       else if tests >= fromIntegral (propertyTestLimit cfg) then
-        -- we've hit the test limit, test was successful
-        pure $ Report tests discards classifiers0 OK
+        -- we've hit the test limit
+        if coverageSuccess tests coverage0 then
+          -- all classifiers satisfied, test was successful
+          pure $ Report tests discards coverage0 OK
+        else
+          -- some classifiers unsatisfied, test was successful
+          let
+            message =
+              "Insufficient coverage\n" <>
+              "━━━━━━━━━━━━━━━━━━━━━"
+          in
+            pure . Report tests discards coverage0 . Failed $
+              mkFailure size seed 0 (Just coverage0) Nothing message Nothing []
 
       else if discards >= fromIntegral (propertyDiscardLimit cfg) then
         -- we've hit the discard limit, give up
-        pure $ Report tests discards classifiers0 GaveUp
+        pure $ Report tests discards coverage0 GaveUp
 
       else
         case Seed.split seed of
@@ -199,13 +207,12 @@ checkReport cfg size0 seed0 test0 updateUI =
               runTree . runDiscardEffect $ runGenT size s0 . runTestT $ unPropertyT test
             case x of
               Nothing ->
-                loop tests (discards + 1) (size + 1) s1 classifiers0
+                loop tests (discards + 1) (size + 1) s1 coverage0
 
-              Just (Left _, (classification, _)) ->
+              Just (Left _, _) ->
                 let
-                  classifiers = consolidate classification classifiers0
                   mkReport =
-                    Report (tests + 1) discards classifiers
+                    Report (tests + 1) discards coverage0
                 in
                   fmap mkReport $
                     takeSmallest
@@ -217,11 +224,12 @@ checkReport cfg size0 seed0 test0 updateUI =
                       (updateUI . mkReport)
                       node
 
-              Just (Right (), (classification, _)) ->
+              Just (Right (), (Journal coverage1 _)) ->
                 let
-                  classifiers = consolidate classification classifiers0
+                  coverage =
+                    fmap toCoverCount coverage1 <> coverage0
                 in
-                  loop (tests + 1) discards (size + 1) s1 classifiers
+                  loop (tests + 1) discards (size + 1) s1 coverage
   in
     loop 0 0 size0 seed0 mempty
 
@@ -298,6 +306,7 @@ checkGroup config (Group group props) =
     hSetEncoding stdout utf8
     hSetEncoding stderr utf8
 #endif
+
     putStrLn $ "━━━ " ++ unGroupName group ++ " ━━━"
 
     verbosity <- resolveVerbosity (runnerVerbosity config)
