@@ -36,10 +36,15 @@ import           Data.Semigroup ((<>))
 
 import           Hedgehog.Internal.Config
 import           Hedgehog.Internal.Gen (runGenT, runDiscardEffect)
+import           Hedgehog.Internal.Property (Journal(..), Coverage(..))
+import           Hedgehog.Internal.Property (DiscardCount(..), ShrinkCount(..))
 import           Hedgehog.Internal.Property (Group(..), GroupName(..))
+import           Hedgehog.Internal.Property (CoverCount(..), toCoverCount)
 import           Hedgehog.Internal.Property (Property(..), PropertyConfig(..), PropertyName(..))
+import           Hedgehog.Internal.Property (PropertyT(..), Failure(..), runTestT)
 import           Hedgehog.Internal.Property (ShrinkLimit, ShrinkRetries, withTests)
-import           Hedgehog.Internal.Property (PropertyT(..), Log(..), Failure(..), runTestT)
+import           Hedgehog.Internal.Property (TestCount(..), PropertyCount(..))
+import           Hedgehog.Internal.Property (coverageSuccess)
 import           Hedgehog.Internal.Queue
 import           Hedgehog.Internal.Region
 import           Hedgehog.Internal.Report
@@ -118,18 +123,18 @@ takeSmallest ::
   -> ShrinkLimit
   -> ShrinkRetries
   -> (Progress -> m ())
-  -> Node m (Maybe (Either Failure (), [Log]))
+  -> Node m (Maybe (Either Failure (), Journal))
   -> m Result
 takeSmallest size seed shrinks slimit retries updateUI = \case
   Node Nothing _ ->
     pure GaveUp
 
-  Node (Just (x, w)) xs ->
+  Node (Just (x, (Journal _ logs))) xs ->
     case x of
       Left (Failure loc err mdiff) -> do
         let
           failure =
-            mkFailure size seed shrinks loc err mdiff (reverse w)
+            mkFailure size seed shrinks Nothing loc err mdiff (reverse logs)
 
         updateUI $ Shrinking failure
 
@@ -162,21 +167,38 @@ checkReport cfg size0 seed0 test0 updateUI =
     test =
       catchAll test0 (fail . show)
 
-    loop :: TestCount -> DiscardCount -> Size -> Seed -> m (Report Result)
-    loop !tests !discards !size !seed = do
-      updateUI $ Report tests discards Running
+    loop ::
+         TestCount
+      -> DiscardCount
+      -> Size
+      -> Seed
+      -> Coverage CoverCount
+      -> m (Report Result)
+    loop !tests !discards !size !seed !coverage0 = do
+      updateUI $ Report tests discards coverage0 Running
 
       if size > 99 then
         -- size has reached limit, reset to 0
-        loop tests discards 0 seed
+        loop tests discards 0 seed coverage0
 
       else if tests >= fromIntegral (propertyTestLimit cfg) then
-        -- we've hit the test limit, test was successful
-        pure $ Report tests discards OK
+        -- we've hit the test limit
+        if coverageSuccess tests coverage0 then
+          -- all classifiers satisfied, test was successful
+          pure $ Report tests discards coverage0 OK
+        else
+          -- some classifiers unsatisfied, test was successful
+          let
+            message =
+              "Insufficient coverage\n" <>
+              "━━━━━━━━━━━━━━━━━━━━━"
+          in
+            pure . Report tests discards coverage0 . Failed $
+              mkFailure size seed 0 (Just coverage0) Nothing message Nothing []
 
       else if discards >= fromIntegral (propertyDiscardLimit cfg) then
         -- we've hit the discard limit, give up
-        pure $ Report tests discards GaveUp
+        pure $ Report tests discards coverage0 GaveUp
 
       else
         case Seed.split seed of
@@ -185,12 +207,12 @@ checkReport cfg size0 seed0 test0 updateUI =
               runTree . runDiscardEffect $ runGenT size s0 . runTestT $ unPropertyT test
             case x of
               Nothing ->
-                loop tests (discards + 1) (size + 1) s1
+                loop tests (discards + 1) (size + 1) s1 coverage0
 
               Just (Left _, _) ->
                 let
                   mkReport =
-                    Report (tests + 1) discards
+                    Report (tests + 1) discards coverage0
                 in
                   fmap mkReport $
                     takeSmallest
@@ -202,10 +224,14 @@ checkReport cfg size0 seed0 test0 updateUI =
                       (updateUI . mkReport)
                       node
 
-              Just (Right (), _) ->
-                loop (tests + 1) discards (size + 1) s1
+              Just (Right (), (Journal coverage1 _)) ->
+                let
+                  coverage =
+                    fmap toCoverCount coverage1 <> coverage0
+                in
+                  loop (tests + 1) discards (size + 1) s1 coverage
   in
-    loop 0 0 size0 seed0
+    loop 0 0 size0 seed0 mempty
 
 checkRegion ::
      MonadIO m
@@ -280,6 +306,7 @@ checkGroup config (Group group props) =
     hSetEncoding stdout utf8
     hSetEncoding stderr utf8
 #endif
+
     putStrLn $ "━━━ " ++ unGroupName group ++ " ━━━"
 
     verbosity <- resolveVerbosity (runnerVerbosity config)
