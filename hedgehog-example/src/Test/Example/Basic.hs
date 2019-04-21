@@ -70,8 +70,8 @@ prop_foo =
 
     guard (y `mod` 2 == (1 :: Int))
 
-    assert $
-      y < 87 && x <= 'r'
+    diff y (<) 87
+    diff x (<=) 'r'
 
 ------------------------------------------------------------------------
 -- Example 3
@@ -251,7 +251,7 @@ prop_record =
   property $ do
     x <- forAll genRecord
     y <- forAll genRecord
-    x === y
+    diff x (==) y
 
 prop_different_record :: Property
 prop_different_record =

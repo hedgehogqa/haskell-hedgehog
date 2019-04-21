@@ -3,9 +3,9 @@ module Hedgehog.Internal.Tripping (
     tripping
   ) where
 
-import           Hedgehog.Internal.Property
-import           Hedgehog.Internal.Show
-import           Hedgehog.Internal.Source
+import           Hedgehog.Internal.Property (MonadTest, Diff(..), success, failWith)
+import           Hedgehog.Internal.Show (valueDiff, mkValue, showPretty)
+import           Hedgehog.Internal.Source (HasCallStack, withFrozenCallStack)
 
 
 -- | Test that a pair of encode / decode functions are compatible.
@@ -56,7 +56,8 @@ tripping x encode decode =
         Just diff ->
           withFrozenCallStack $
             failWith
-              (Just $ Diff "━━━ " "- Original" "/" "+ Roundtrip" " ━━━" diff) $
+              (Just $
+                Diff "━━━ " "- Original" ") (" "+ Roundtrip" " ━━━" diff) $
               unlines [
                   "━━━ Intermediate ━━━"
                 , showPretty i

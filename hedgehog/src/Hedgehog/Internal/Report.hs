@@ -496,8 +496,8 @@ ppLineDiff = \case
 ppDiff :: Diff -> [Doc Markup]
 ppDiff (Diff prefix removed infix_ added suffix diff) = [
     markup DiffPrefix (WL.text prefix) <>
-    markup DiffRemoved (WL.text removed) <+>
-    markup DiffInfix (WL.text infix_) <+>
+    markup DiffRemoved (WL.text removed) <>
+    markup DiffInfix (WL.text infix_) <>
     markup DiffAdded (WL.text added) <>
     markup DiffSuffix (WL.text suffix)
   ] ++ fmap ppLineDiff (toLineDiff diff)
