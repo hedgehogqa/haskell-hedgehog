@@ -142,9 +142,6 @@ module Hedgehog (
 
   , Show1
   , showsPrec1
-
-  -- * Test runner
-  , runTests
   ) where
 
 import           Data.Functor.Classes (Eq1, eq1, Ord1, compare1, Show1, showsPrec1)
@@ -171,7 +168,6 @@ import           Hedgehog.Internal.Property (Test, TestT, property, test)
 import           Hedgehog.Internal.Property (TestLimit, withTests)
 import           Hedgehog.Internal.Range (Range, Size(..))
 import           Hedgehog.Internal.Runner (check, recheck, checkSequential, checkParallel)
-import           Hedgehog.Internal.Runner (runTests)
 
 import           Hedgehog.Internal.Seed (Seed(..))
 import           Hedgehog.Internal.State (Command(..), Callback(..))

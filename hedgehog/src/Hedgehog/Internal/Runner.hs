@@ -17,9 +17,6 @@ module Hedgehog.Internal.Runner (
   , checkSequential
   , checkGroup
 
-  -- * Top level testsuite runner
-  , runTests
-
   -- * Internal
   , checkReport
   , checkRegion
@@ -435,16 +432,6 @@ checkParallel =
       , runnerVerbosity =
           Nothing
       }
-
--- | Like `runTests` but exit with `exitFailure` if one or more of the tests
--- fail.
-runTests :: [IO Bool] -> IO ()
-runTests tests = do
-  hSetBuffering stdout LineBuffering
-  hSetBuffering stderr LineBuffering
-  result <- and <$> sequence tests
-  unless result
-    exitFailure
 
 ------------------------------------------------------------------------
 -- FIXME Replace with DeriveLift when we drop 7.10 support.
