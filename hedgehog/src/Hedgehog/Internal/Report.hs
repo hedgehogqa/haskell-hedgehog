@@ -50,13 +50,13 @@ import           Data.Traversable (for)
 import           Hedgehog.Internal.Config
 import           Hedgehog.Internal.Discovery (Pos(..), Position(..))
 import qualified Hedgehog.Internal.Discovery as Discovery
-import           Hedgehog.Internal.Property (Coverage(..), Classifier(..), ClassifierName(..))
+import           Hedgehog.Internal.Property (Coverage(..), Label(..), LabelName(..))
 import           Hedgehog.Internal.Property (CoverCount(..), CoverPercentage(..))
 import           Hedgehog.Internal.Property (PropertyName(..), Log(..), Diff(..))
 import           Hedgehog.Internal.Property (ShrinkCount(..), PropertyCount(..))
 import           Hedgehog.Internal.Property (TestCount(..), DiscardCount(..))
 import           Hedgehog.Internal.Property (coverPercentage, coverageFailures)
-import           Hedgehog.Internal.Property (classifierCovered)
+import           Hedgehog.Internal.Property (labelCovered)
 
 import           Hedgehog.Internal.Seed (Seed)
 import           Hedgehog.Internal.Show
@@ -122,7 +122,6 @@ data Report a =
       reportTests :: !TestCount
     , reportDiscards :: !DiscardCount
     , reportCoverage :: !(Coverage CoverCount)
-    , reportLabels :: ![[String]]
     , reportStatus :: !a
     } deriving (Show, Functor, Foldable, Traversable)
 
@@ -604,7 +603,7 @@ ppTextLines :: String -> [Doc Markup]
 ppTextLines =
   fmap WL.text . List.lines
 
-ppFailureReport :: MonadIO m => Maybe PropertyName -> TestCount -> FailureReport -> m (Doc Markup)
+ppFailureReport :: MonadIO m => Maybe PropertyName -> TestCount -> FailureReport -> m [Doc Markup]
 ppFailureReport name tests (FailureReport size seed _ mcoverage inputs0 mlocation0 msg mdiff msgs0) = do
   (msgs1, mlocation) <-
     case mlocation0 of
@@ -631,7 +630,7 @@ ppFailureReport name tests (FailureReport size seed _ mcoverage inputs0 mlocatio
       Nothing ->
         pure []
       Just coverage ->
-        for (coverageFailures tests coverage) $ \(Classifier _ mclocation _ count) ->
+        for (coverageFailures tests coverage) $ \(MkLabel _ mclocation _ count) ->
           case mclocation of
             Nothing ->
               pure Nothing
@@ -661,19 +660,31 @@ ppFailureReport name tests (FailureReport size seed _ mcoverage inputs0 mlocatio
       else
         [f xs]
 
-    msgs =
-      fmap (WL.indent 2) msgs1 <>
-      maybe [] (ppCoverage tests) mcoverage
+    whenSome f xs =
+      if null xs then
+        xs
+      else
+        f xs
 
-  pure . WL.vsep . WL.punctuate WL.line $ concat [
+    bottom =
+      maybe [ppReproduce name size seed] (const []) mcoverage
+
+  pure .
+    whenSome (mempty :) .
+    whenSome (++ [mempty]) .
+    WL.punctuate WL.line .
+    fmap (WL.vsep . fmap (WL.indent 2)) .
+    fmap (id :: [Doc Markup] -> [Doc Markup]) .
+    filter (not . null) $
+    concat [
       with args $
-        WL.indent 2 . WL.vsep . WL.punctuate WL.line
+        WL.punctuate WL.line
     , with decls $
-        WL.indent 2 . WL.vsep . WL.punctuate WL.line . fmap ppDeclaration
-    , with msgs $
-        WL.vsep
-    , with [ppReproduce name size seed] $
-        WL.indent 2 . WL.vsep
+        WL.punctuate WL.line . fmap ppDeclaration
+    , with msgs1 $
+        id
+    , with bottom $
+        id
     ]
 
 ppName :: Maybe PropertyName -> Doc a
@@ -684,7 +695,7 @@ ppName = \case
     WL.text name
 
 ppProgress :: MonadIO m => Maybe PropertyName -> Report Progress -> m (Doc Markup)
-ppProgress name (Report tests discards coverage _ status) =
+ppProgress name (Report tests discards coverage status) =
   case status of
     Running ->
       pure . WL.vsep $ [
@@ -705,28 +716,8 @@ ppProgress name (Report tests discards coverage _ status) =
         ppShrinkDiscard (failureShrinks failure) discards <+>
         "(shrinking)"
 
-ppLabelMap :: Map String Double -> Doc Markup
-ppLabelMap m =
-  WL.vsep $ WL.text "Labels:" : (ppLabel <$> Map.toList m) ++ [mempty]
- where
-  ppLabel (label, percentage) =
-    WL.fill 12 (WL.text (showsPrec 6 percentage "") <+> WL.char '%')
-      <> WL.text label
-
-ppLabels :: TestCount -> [[String]] -> Doc Markup
-ppLabels (TestCount tests) labels = WL.vsep
-  (ppLabelMap <$> (buildLabelMap <$> labels'))
- where
-  labels' = List.transpose labels
-  buildLabelMap =
-    fmap (mkPercentage tests) . foldr (\k -> Map.insertWith (+) k 1) mempty
-
-  mkPercentage :: Int -> Int -> Double
-  mkPercentage denominator numerator =
-    100 * fromIntegral numerator / fromIntegral denominator
-
 ppResult :: MonadIO m => Maybe PropertyName -> Report Result -> m (Doc Markup)
-ppResult name (Report tests discards coverage labels result) = do
+ppResult name (Report tests discards coverage result) = do
   case result of
     Failed failure -> do
       pfailure <- ppFailureReport name tests failure
@@ -737,10 +728,9 @@ ppResult name (Report tests discards coverage labels result) = do
             ppTestCount tests <>
             ppShrinkDiscard (failureShrinks failure) discards <>
             "."
-        , mempty
-        , pfailure
-        , mempty
-        ]
+        ] ++
+        ppCoverage tests coverage ++
+        pfailure
 
     GaveUp ->
       pure . WL.vsep $ [
@@ -762,39 +752,125 @@ ppResult name (Report tests discards coverage labels result) = do
             ppTestCount tests <>
             "."
         ] ++
-        ppLabels tests labels ++
         ppCoverage tests coverage
 
 ppCoverage :: TestCount -> Coverage CoverCount -> [Doc Markup]
-ppCoverage tests (Coverage classes) =
-  if Map.null classes then
+ppCoverage tests x =
+  if Map.null (coverageLabels x) then
     mempty
   else
-    let
-      ppClass classifier@(Classifier name _ minimum_ count) =
-        if classifierCovered tests classifier then
-          "  " <>
-          ppCoverPercentage (coverPercentage tests count) <>
-          " " <>
-          ppClassifierName name
-        else
-          icon CoverageIcon '⚠' . WL.annotate CoverageText $
-            ppCoverPercentage (coverPercentage tests count) <>
-            " " <>
-            ppClassifierName name <>
-            " < " <>
-            ppCoverPercentage minimum_
-    in
-      fmap ppClass $
-        Map.elems classes
+    fmap (ppLabel tests (coverageWidth tests x)) .
+    List.sortOn labelLocation $
+    Map.elems (coverageLabels x)
 
-ppClassifierName :: ClassifierName -> Doc a
-ppClassifierName (ClassifierName name) =
+data ColumnWidth =
+  ColumnWidth {
+      widthPercentage :: !Int
+    , _widthMinimum :: !Int
+    , widthName :: !Int
+    , _widthNameFail :: !Int
+    }
+
+instance Semigroup ColumnWidth where
+  (<>) (ColumnWidth p0 m0 n0 f0) (ColumnWidth p1 m1 n1 f1) =
+    ColumnWidth
+      (max p0 p1)
+      (max m0 m1)
+      (max n0 n1)
+      (max f0 f1)
+
+instance Monoid ColumnWidth where
+  mempty =
+    ColumnWidth 0 0 0 0
+  mappend =
+    (<>)
+
+coverageWidth :: TestCount -> Coverage CoverCount -> ColumnWidth
+coverageWidth tests (Coverage labels) =
+  foldMap (labelWidth tests) labels
+
+labelWidth :: TestCount -> Label CoverCount -> ColumnWidth
+labelWidth tests x =
+  let
+    percentage =
+      length .
+      renderCoverPercentage .
+      coverPercentage tests $
+      labelAnnotation x
+
+    minimum_ =
+      length .
+      renderCoverPercentage $
+      labelMinimum x
+
+    name =
+      length .
+      unLabelName $
+      labelName x
+
+    nameFail =
+      if labelCovered tests x then
+        0
+      else
+        name
+  in
+    ColumnWidth percentage minimum_ name nameFail
+
+ppLeftPad :: Int -> Doc a -> Doc a
+ppLeftPad n doc =
+  let
+    ndoc =
+      length (show doc)
+
+    pad =
+      WL.text $
+        List.replicate (n - ndoc) ' '
+  in
+    pad <> doc
+
+ppLabel :: TestCount -> ColumnWidth -> Label CoverCount -> Doc Markup
+ppLabel tests w x@(MkLabel name _ minimum_ count) =
+  let
+    wcover =
+      ppLeftPad (widthPercentage w) $
+        ppCoverPercentage (coverPercentage tests count)
+
+    wname =
+      WL.fill (widthName w) (ppLabelName name)
+  in
+    if labelCovered tests x then
+      WL.hcat [
+          "  "
+        , wcover
+        , " "
+        , wname
+        , if minimum_ == 0 then
+            mempty
+          else
+            " ✓ " <> ppCoverPercentage minimum_
+        ]
+    else
+      WL.annotate CoverageText $
+      WL.hcat [
+          "⚠ "
+        , wcover
+        , " "
+        , wname
+        , " ✗ "
+        , ppCoverPercentage minimum_
+        ]
+
+ppLabelName :: LabelName -> Doc a
+ppLabelName (LabelName name) =
   WL.text name
 
 ppCoverPercentage :: CoverPercentage -> Doc Markup
-ppCoverPercentage (CoverPercentage percentage) =
-  WL.text (show percentage) <> "%"
+ppCoverPercentage =
+  WL.text . renderCoverPercentage
+
+renderCoverPercentage :: CoverPercentage -> String
+renderCoverPercentage (CoverPercentage percentage) =
+  printf "%.0f" percentage <> "%"
 
 ppWhenNonZero :: Doc a -> PropertyCount -> Maybe (Doc a)
 ppWhenNonZero suffix n =
