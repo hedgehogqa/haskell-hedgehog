@@ -25,7 +25,6 @@ module Hedgehog.Internal.Runner (
 
 import           Control.Concurrent.STM (TVar, atomically)
 import qualified Control.Concurrent.STM.TVar as TVar
-import           Control.Monad (unless)
 import           Control.Monad.Catch (MonadCatch(..), catchAll)
 import           Control.Monad.IO.Class (MonadIO(..))
 
@@ -52,12 +51,6 @@ import           Hedgehog.Range (Size)
 
 import           Language.Haskell.TH.Lift (deriveLift)
 
-import           System.Exit (exitFailure)
-#if mingw32_HOST_OS
-import           System.IO (BufferMode (LineBuffering), hSetBuffering, hSetEncoding, stdout, stderr, utf8)
-#else
-import           System.IO (BufferMode (LineBuffering), hSetBuffering, stderr, stdout)
-#endif
 
 -- | Configuration for a property test run.
 --
