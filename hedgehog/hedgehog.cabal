@@ -133,6 +133,7 @@ test-suite test
   other-modules:
     Test.Hedgehog.Seed
     Test.Hedgehog.Text
+    Test.Hedgehog.Zip
 
   build-depends:
       hedgehog

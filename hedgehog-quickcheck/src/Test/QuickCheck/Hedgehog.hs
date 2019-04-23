@@ -4,9 +4,6 @@ module Test.QuickCheck.Hedgehog (
     hedgehog
   ) where
 
-import           Control.Monad.Trans.Maybe (runMaybeT)
-import           Data.Functor.Identity (runIdentity)
-
 import           Hedgehog
 import           Hedgehog.Internal.Gen (runGen)
 import qualified Hedgehog.Internal.Seed as Seed

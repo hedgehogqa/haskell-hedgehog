@@ -1,5 +1,4 @@
 {-# OPTIONS_HADDOCK not-home #-}
-{-# LANGUAGE ApplicativeDo #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveFunctor #-}
@@ -180,6 +179,7 @@ import qualified Control.Monad.Trans.State.Strict as Strict
 import qualified Control.Monad.Trans.Writer.Lazy as Lazy
 import qualified Control.Monad.Trans.Writer.Strict as Strict
 import           Control.Monad.Writer.Class (MonadWriter(..))
+import           Control.Monad.Zip (MonadZip(..))
 
 import           Data.Bifunctor (first, second)
 import           Data.ByteString (ByteString)
@@ -207,7 +207,7 @@ import           Hedgehog.Internal.Distributive (Distributive(..))
 import           Hedgehog.Internal.Seed (Seed)
 import qualified Hedgehog.Internal.Seed as Seed
 import qualified Hedgehog.Internal.Shrink as Shrink
-import           Hedgehog.Internal.Tree (TreeT(..), NodeT(..))
+import           Hedgehog.Internal.Tree (Tree, TreeT(..), NodeT(..))
 import qualified Hedgehog.Internal.Tree as Tree
 import           Hedgehog.Range (Size, Range)
 import qualified Hedgehog.Range as Range
@@ -269,7 +269,7 @@ runDiscardEffect =
 --
 --   'Nothing' means discarded, 'Just' means we have a value.
 --
-runGen :: Size -> Seed -> Gen a -> Maybe (TreeT Identity a)
+runGen :: Size -> Seed -> Gen a -> Maybe (Tree a)
 runGen size seed gen =
   fmap (fmap Maybe.fromJust) .
   Tree.filter Maybe.isJust .
@@ -331,7 +331,7 @@ instance Monad m => MonadGen (GenT m) where
       mx <- Trans.lift . Trans.lift . runMaybeT . runTreeT $ runGenT size seed gen
       case mx of
         Nothing ->
-          mzero
+          empty
         Just (NodeT x xs) ->
           pure (x, liftTreeMaybeT . Tree.fromNodeT $ NodeT x xs)
 
@@ -559,7 +559,7 @@ instance Functor m => Functor (GenT m) where
       fmap f (runGenT seed size gen)
 
 --
--- implementation: satisfies law (ap = <*>)
+-- implementation: parallel shrinking
 --
 instance Monad m => Applicative (GenT m) where
   pure =
@@ -568,8 +568,22 @@ instance Monad m => Applicative (GenT m) where
     GenT $ \ size seed ->
       case Seed.split seed of
         (sf, sm) ->
-          runGenT size sf f <*>
-          runGenT size sm m
+          uncurry ($) <$>
+            runGenT size sf f `mzip`
+            runGenT size sm m
+
+--
+-- implementation: satisfies law (ap = <*>)
+--
+--instance Monad m => Applicative (GenT m) where
+--  pure =
+--    liftTreeMaybeT . pure
+--  (<*>) f m =
+--    GenT $ \ size seed ->
+--      case Seed.split seed of
+--        (sf, sm) ->
+--          runGenT size sf f <*>
+--          runGenT size sm m
 
 instance Monad m => Monad (GenT m) where
   return =
@@ -1267,7 +1281,7 @@ recursive f nonrec rec =
 --
 discard :: MonadGen m => m a
 discard =
-  liftGen mzero
+  liftGen empty
 
 -- | Discards the generator if the generated value does not satisfy the
 --   predicate.

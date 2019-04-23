@@ -9,7 +9,7 @@ import           Data.Functor.Classes (Eq1(..))
 import           Hedgehog.Internal.Gen (GenT(..))
 import           Hedgehog.Internal.Range (Size(..))
 import           Hedgehog.Internal.Seed (Seed(..))
-import           Hedgehog.Internal.Tree (Tree(..), Node(..))
+import           Hedgehog.Internal.Tree (TreeT(..), NodeT(..))
 
 import           Test.QuickCheck (Arbitrary(..), Arbitrary1(..), CoArbitrary(..))
 import           Test.QuickCheck (choose, vector, coarbitraryIntegral, property)
@@ -32,20 +32,20 @@ instances =
       uncurry testProperties
   in
     testGroup "Instances" [
-      testGroup "Tree" $
+      testGroup "TreeT" $
         testBatch <$> [
-            applicative (undefined :: Tree Maybe (Bool, Char, Int))
-          , monad (undefined :: Tree Maybe (Bool, Char, Int))
-          , monadApplicative (undefined :: Tree (Either Bool) (Char, Int))
+            applicative (undefined :: TreeT Maybe (Bool, Char, Int))
+          , monad (undefined :: TreeT Maybe (Bool, Char, Int))
+          , monadApplicative (undefined :: TreeT (Either Bool) (Char, Int))
           ]
-    , testGroup "Node" $
+    , testGroup "NodeT" $
         testBatch <$> [
-            applicative (undefined :: Node Maybe (Bool, Char, Int))
-          , monad (undefined :: Node Maybe (Bool, Char, Int))
-          , monadApplicative (undefined :: Node (Either Bool) (Char, Int))
+            applicative (undefined :: NodeT Maybe (Bool, Char, Int))
+          , monad (undefined :: NodeT Maybe (Bool, Char, Int))
+          , monadApplicative (undefined :: NodeT (Either Bool) (Char, Int))
           ]
-    , ignoreTest . testGroup "GenT" $
-        testBatch <$> [
+    , testGroup "GenT" $
+        ignoreTest . testBatch <$> [
             applicative (undefined :: GenT Maybe (Bool, Char, Int))
           , monad (undefined :: GenT Maybe (Bool, Char, Int))
           , monadApplicative (undefined :: GenT (Either Bool) (Char, Int))
@@ -57,23 +57,23 @@ instances =
 
 -- Tree
 
-instance (Eq1 m, Eq a) => EqProp (Tree m a) where
+instance (Eq1 m, Eq a) => EqProp (TreeT m a) where
   (=-=) =
     eq
 
-instance (Arbitrary1 m, Arbitrary a) => Arbitrary (Tree m a) where
+instance (Arbitrary1 m, Arbitrary a) => Arbitrary (TreeT m a) where
   arbitrary =
-    Tree <$> arbitrary1
+    TreeT <$> arbitrary1
 
 -- Node
 
-instance (Eq1 m, Eq a) => EqProp (Node m a) where
+instance (Eq1 m, Eq a) => EqProp (NodeT m a) where
   (=-=) = eq
 
-instance (Arbitrary1 m, Arbitrary a) => Arbitrary (Node m a) where
+instance (Arbitrary1 m, Arbitrary a) => Arbitrary (NodeT m a) where
   arbitrary = do
     n <- choose (0, 2)
-    liftA2 Node arbitrary (vector n)
+    liftA2 NodeT arbitrary (vector n)
 
 -- GenT
 
@@ -93,7 +93,7 @@ instance (Arbitrary1 m) => Arbitrary1 (MaybeT m) where
   liftArbitrary = fmap MaybeT . liftArbitrary . liftArbitrary
 
 instance Show (GenT m a) where
-  show _ = "GenT { unGen = <function> }"
+  show _ = "GenT { unGenT = <function> }"
 
 instance (Eq1 m, Eq a) => EqProp (GenT m a) where
   GenT f0 =-= GenT f1 = property $ liftA2 (=-=) f0 f1

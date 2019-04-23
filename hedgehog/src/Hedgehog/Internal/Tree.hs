@@ -1,5 +1,4 @@
 {-# OPTIONS_HADDOCK not-home #-}
-{-# LANGUAGE ApplicativeDo #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -42,6 +41,7 @@ import           Control.Monad.State.Class (MonadState(..))
 import           Control.Monad.Trans.Class (MonadTrans(..))
 import           Control.Monad.Trans.Resource (MonadResource(..))
 import           Control.Monad.Writer.Class (MonadWriter(..))
+import           Control.Monad.Zip (MonadZip(..))
 
 import           Data.Functor.Identity (Identity(..))
 import           Data.Functor.Classes (Eq1(..))
@@ -51,6 +51,7 @@ import           Data.Functor.Classes (showsUnaryWith, showsBinaryWith)
 #endif
 import           Data.Foldable (Foldable(..))
 import           Data.Maybe (mapMaybe)
+import           Data.Monoid (mappend)
 
 import           Hedgehog.Internal.Distributive
 
@@ -148,7 +149,7 @@ instance Foldable Tree where
 
 instance Foldable Node where
   foldMap f (NodeT x xs) =
-    f x <> mconcat (fmap (foldMap f) xs)
+    f x `mappend` mconcat (fmap (foldMap f) xs)
 
 ------------------------------------------------------------------------
 -- NodeT/TreeT instances
@@ -215,6 +216,24 @@ instance MonadPlus m => MonadPlus (TreeT m) where
     TreeT mzero
   mplus x y =
     TreeT (runTreeT x `mplus` runTreeT y)
+
+zipTreeT :: forall f a b. Applicative f => TreeT f a -> TreeT f b -> TreeT f (a, b)
+zipTreeT l0@(TreeT left) r0@(TreeT right) =
+  TreeT $
+    let
+      zipNodeT :: NodeT f a -> NodeT f b -> NodeT f (a, b)
+      zipNodeT (NodeT a ls) (NodeT b rs) =
+          NodeT (a, b) $
+            concat [
+                [zipTreeT l1 r0 | l1 <- ls]
+              , [zipTreeT l0 r1 | r1 <- rs]
+              ]
+    in
+      zipNodeT <$> left <*> right
+
+instance Monad m => MonadZip (TreeT m) where
+  mzip =
+    zipTreeT
 
 instance MonadTrans TreeT where
   lift f =
