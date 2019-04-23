@@ -50,6 +50,9 @@ import           Hedgehog.Range (Size)
 
 import           Language.Haskell.TH.Lift (deriveLift)
 
+#if mingw32_HOST_OS
+import           System.IO (hSetEncoding, stdout, stderr, utf8)
+#endif
 
 -- | Configuration for a property test run.
 --
