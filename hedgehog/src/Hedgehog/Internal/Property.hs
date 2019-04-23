@@ -73,14 +73,17 @@ module Hedgehog.Internal.Property (
 
   -- * Coverage
   , Coverage(..)
-  , Classifier(..)
-  , ClassifierName(..)
-  , classify
+  , Label(..)
+  , LabelName(..)
   , cover
+  , classify
+  , label
+  , collect
   , coverPercentage
-  , classifierCovered
+  , labelCovered
   , coverageSuccess
   , coverageFailures
+  , journalCoverage
 
   , Cover(..)
   , CoverCount(..)
@@ -339,14 +342,14 @@ newtype PropertyCount =
 data Log =
     Annotation (Maybe Span) String
   | Footnote String
+  | Label (Label Cover)
     deriving (Eq, Show)
 
 -- | A record containing the details of a test run.
-data Journal =
+newtype Journal =
   Journal {
-      journalCoverage :: !(Coverage Cover)
-    , journalLogs :: ![Log]
-    } deriving (Eq, Show)
+      journalLogs :: [Log]
+    } deriving (Eq, Show, Semigroup, Monoid)
 
 -- | Details on where and why a test failed.
 --
@@ -405,12 +408,12 @@ newtype CoverPercentage =
 --   Can be constructed using `OverloadedStrings`:
 --
 -- @
---   "apples" :: ClassifierName
+--   "apples" :: LabelName
 -- @
 --
-newtype ClassifierName =
-  ClassifierName {
-      unClassifierName :: String
+newtype LabelName =
+  LabelName {
+      unLabelName :: String
     } deriving (Eq, Ord, Show, IsString)
 
 -- | The extent to which a test is covered by a classifier.
@@ -418,12 +421,12 @@ newtype ClassifierName =
 --   /When a classifier's coverage does not exceed the required minimum, the
 --   test will be failed./
 --
-data Classifier a =
-  Classifier {
-      classifierName :: !ClassifierName
-    , classifierLocation :: !(Maybe Span)
-    , classifierMinimum :: !CoverPercentage
-    , classifierExtent :: !a
+data Label a =
+  MkLabel {
+      labelName :: !LabelName
+    , labelLocation :: !(Maybe Span)
+    , labelMinimum :: !CoverPercentage
+    , labelAnnotation :: !a
     } deriving (Eq, Show, Functor, Foldable, Traversable)
 
 -- | The extent to which all classifiers cover a test.
@@ -433,7 +436,7 @@ data Classifier a =
 --
 newtype Coverage a =
   Coverage {
-      unCoverage :: Map ClassifierName (Classifier a)
+      coverageLabels :: Map LabelName (Label a)
     } deriving (Eq, Show, Functor, Foldable, Traversable)
 
 ------------------------------------------------------------------------
@@ -567,16 +570,6 @@ instance MonadTest m => MonadTest (ResourceT m) where
   liftTest =
     lift . liftTest
 
-instance Semigroup Journal where
-  (<>) (Journal c0 logs0) (Journal c1 logs1) =
-    Journal (c0 <> c1) (logs0 <> logs1)
-
-instance Monoid Journal where
-  mempty =
-    Journal mempty mempty
-  mappend =
-    (<>)
-
 mkTestT :: m (Either Failure a, Journal) -> TestT m a
 mkTestT =
   TestT . ExceptT . Lazy.WriterT
@@ -593,24 +586,18 @@ runTest :: Test a -> (Either Failure a, Journal)
 runTest =
   runIdentity . runTestT
 
--- | Write the current coverage information.
---
-writeCoverage :: MonadTest m => Coverage Cover -> m ()
-writeCoverage c =
-  liftTest $ mkTest (pure (), Journal c [])
-
 -- | Log some information which might be relevant to a potential test failure.
 --
 writeLog :: MonadTest m => Log -> m ()
 writeLog x =
-  liftTest $ mkTest (pure (), (Journal mempty [x]))
+  liftTest $ mkTest (pure (), (Journal [x]))
 
 -- | Fail the test with an error message, useful for building other failure
 --   combinators.
 --
 failWith :: (MonadTest m, HasCallStack) => Maybe Diff -> String -> m a
 failWith mdiff msg =
-  liftTest $ mkTest (Left $ Failure (getCaller callStack) msg mdiff, (Journal mempty []))
+  liftTest $ mkTest (Left $ Failure (getCaller callStack) msg mdiff, mempty)
 
 -- | Annotates the source code with a message that might be useful for
 --   debugging a test failure.
@@ -641,7 +628,6 @@ footnoteShow =
   writeLog . Footnote . showPretty
 
 -- | Fails with an error that shows the difference between two values.
---
 failDiff :: (MonadTest m, Show a, Show b, HasCallStack) => a -> b -> m ()
 failDiff x y =
   case valueDiff <$> mkValue x <*> mkValue y of
@@ -964,7 +950,7 @@ property m =
     withFrozenCallStack (evalM m)
 
 ------------------------------------------------------------------------
--- Classification
+-- Coverage
 
 instance Semigroup Cover where
   (<>) NoCover NoCover =
@@ -996,11 +982,11 @@ toCoverCount = \case
     CoverCount 1
 
 -- | This semigroup is right biased. The name, location and percentage from the
---   rightmost `Classifier` will be kept. This shouldn't be a problem since the
+--   rightmost `Label` will be kept. This shouldn't be a problem since the
 --   library doesn't allow setting multiple classes with the same 'ClassifierName'.
-instance Semigroup a => Semigroup (Classifier a) where
-  (<>) (Classifier _ _ _ m0) (Classifier name location percentage m1) =
-    Classifier name location percentage (m0 <> m1)
+instance Semigroup a => Semigroup (Label a) where
+  (<>) (MkLabel _ _ _ m0) (MkLabel name location percentage m1) =
+    MkLabel name location percentage (m0 <> m1)
 
 instance Semigroup a => Semigroup (Coverage a) where
   (<>) (Coverage c0) (Coverage c1) =
@@ -1012,11 +998,6 @@ instance (Semigroup a, Monoid a) => Monoid (Coverage a) where
     Coverage mempty
   mappend =
     (<>)
-
-mkCoverage :: Maybe Span -> ClassifierName -> CoverPercentage -> Cover -> Coverage Cover
-mkCoverage mlocation name minimum_ cover_ =
-  Coverage $
-    Map.singleton name (Classifier name mlocation minimum_ cover_)
 
 coverPercentage :: TestCount -> CoverCount -> CoverPercentage
 coverPercentage (TestCount tests) (CoverCount count) =
@@ -1031,33 +1012,35 @@ coverPercentage (TestCount tests) (CoverCount count) =
   in
     CoverPercentage (fromIntegral thousandths / 10)
 
-classifierCovered :: TestCount -> Classifier CoverCount -> Bool
-classifierCovered tests (Classifier _ _ minimum_ population) =
+labelCovered :: TestCount -> Label CoverCount -> Bool
+labelCovered tests (MkLabel _ _ minimum_ population) =
   coverPercentage tests population >= minimum_
 
 coverageSuccess :: TestCount -> Coverage CoverCount -> Bool
 coverageSuccess tests =
   null . coverageFailures tests
 
-coverageFailures :: TestCount -> Coverage CoverCount -> [Classifier CoverCount]
+coverageFailures :: TestCount -> Coverage CoverCount -> [Label CoverCount]
 coverageFailures tests (Coverage kvs) =
-  filter (not . classifierCovered tests) (Map.elems kvs)
+  filter (not . labelCovered tests) (Map.elems kvs)
 
--- | Records the proportion of tests which satisfy a given condition.
---
--- @
---    prop_with_classifier :: Property
---    prop_with_classifier =
---      property $ do
---        xs <- forAll $ Gen.list (Range.linear 0 100) Gen.alpha
---        for_ xs $ \x -> do
---          classify "newborns" $ x == 0
---          classify "children" $ x > 0 && x < 13
---          classify "teens" $ x > 12 && x < 20
--- @
-classify :: MonadTest m => ClassifierName -> Bool -> m ()
-classify =
-  cover 0
+fromLabel :: Label a -> Coverage a
+fromLabel x =
+  Coverage $
+    Map.singleton (labelName x) x
+
+unionsCoverage :: Semigroup a => [Coverage a] -> Coverage a
+unionsCoverage =
+  Coverage .
+  Map.unionsWith (<>) .
+  fmap coverageLabels
+
+journalCoverage :: Journal -> Coverage CoverCount
+journalCoverage (Journal logs) =
+  fmap toCoverCount .
+  unionsCoverage $ do
+    Label x <- logs
+    pure (fromLabel x)
 
 -- | Require a certain percentage of the tests to be covered by the
 --   classifier.
@@ -1074,7 +1057,7 @@ classify =
 --   The example above requires a minimum of 30% coverage for both
 --   classifiers. If these requirements are not met, it will fail the test.
 --
-cover :: (MonadTest m, HasCallStack) => CoverPercentage -> ClassifierName -> Bool -> m ()
+cover :: (MonadTest m, HasCallStack) => CoverPercentage -> LabelName -> Bool -> m ()
 cover minimum_ name covered =
   let
     cover_ =
@@ -1083,8 +1066,40 @@ cover minimum_ name covered =
       else
         NoCover
   in
-    writeCoverage $
-      mkCoverage (getCaller callStack) name minimum_ cover_
+    writeLog . Label $
+      MkLabel name (getCaller callStack) minimum_ cover_
+
+-- | Records the proportion of tests which satisfy a given condition.
+--
+-- @
+--    prop_with_classifier :: Property
+--    prop_with_classifier =
+--      property $ do
+--        xs <- forAll $ Gen.list (Range.linear 0 100) Gen.alpha
+--        for_ xs $ \x -> do
+--          classify "newborns" $ x == 0
+--          classify "children" $ x > 0 && x < 13
+--          classify "teens" $ x > 12 && x < 20
+-- @
+classify :: (MonadTest m, HasCallStack) => LabelName -> Bool -> m ()
+classify name covered =
+  withFrozenCallStack $
+    cover 0 name covered
+
+-- | Add a label for each test run. It produces a table showing the percentage
+--   of test runs that produced each label.
+--
+label :: (MonadTest m, HasCallStack) => LabelName -> m ()
+label name =
+  withFrozenCallStack $
+    cover 0 name True
+
+-- | Like 'label', but uses the 'Show'n value as the label.
+--
+collect :: (MonadTest m, Show a, HasCallStack) => a -> m ()
+collect x =
+  withFrozenCallStack $
+    cover 0 (LabelName (show x)) True
 
 ------------------------------------------------------------------------
 -- FIXME Replace with DeriveLift when we drop 7.10 support.

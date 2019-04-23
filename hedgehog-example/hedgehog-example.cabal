@@ -43,6 +43,7 @@ library
 
   exposed-modules:
       Test.Example.Basic
+    , Test.Example.Coverage
     , Test.Example.Exception
     , Test.Example.QuickCheck
     , Test.Example.References

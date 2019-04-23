@@ -32,15 +32,14 @@ import           Data.Semigroup ((<>))
 
 import           Hedgehog.Internal.Config
 import           Hedgehog.Internal.Gen (runGenT, runDiscardEffect)
-import           Hedgehog.Internal.Property (Journal(..), Coverage(..))
 import           Hedgehog.Internal.Property (DiscardCount(..), ShrinkCount(..))
 import           Hedgehog.Internal.Property (Group(..), GroupName(..))
-import           Hedgehog.Internal.Property (CoverCount(..), toCoverCount)
+import           Hedgehog.Internal.Property (Journal(..), Coverage(..), CoverCount(..))
 import           Hedgehog.Internal.Property (Property(..), PropertyConfig(..), PropertyName(..))
 import           Hedgehog.Internal.Property (PropertyT(..), Failure(..), runTestT)
 import           Hedgehog.Internal.Property (ShrinkLimit, ShrinkRetries, withTests)
 import           Hedgehog.Internal.Property (TestCount(..), PropertyCount(..))
-import           Hedgehog.Internal.Property (coverageSuccess)
+import           Hedgehog.Internal.Property (coverageSuccess, journalCoverage)
 import           Hedgehog.Internal.Queue
 import           Hedgehog.Internal.Region
 import           Hedgehog.Internal.Report
@@ -119,7 +118,7 @@ takeSmallest size seed shrinks slimit retries updateUI = \case
   Node Nothing _ ->
     pure GaveUp
 
-  Node (Just (x, (Journal _ logs))) xs ->
+  Node (Just (x, (Journal logs))) xs ->
     case x of
       Left (Failure loc err mdiff) -> do
         let
@@ -176,15 +175,19 @@ checkReport cfg size0 seed0 test0 updateUI =
         if coverageSuccess tests coverage0 then
           -- all classifiers satisfied, test was successful
           pure $ Report tests discards coverage0 OK
+
         else
           -- some classifiers unsatisfied, test was successful
-          let
-            message =
-              "Insufficient coverage\n" <>
-              "━━━━━━━━━━━━━━━━━━━━━"
-          in
-            pure . Report tests discards coverage0 . Failed $
-              mkFailure size seed 0 (Just coverage0) Nothing message Nothing []
+          pure . Report tests discards coverage0 . Failed $
+            mkFailure
+              size
+              seed
+              0
+              (Just coverage0)
+              Nothing
+              "Insufficient coverage."
+              Nothing
+              []
 
       else if discards >= fromIntegral (propertyDiscardLimit cfg) then
         -- we've hit the discard limit, give up
@@ -214,10 +217,10 @@ checkReport cfg size0 seed0 test0 updateUI =
                       (updateUI . mkReport)
                       node
 
-              Just (Right (), (Journal coverage1 _)) ->
+              Just (Right (), journal) ->
                 let
                   coverage =
-                    fmap toCoverCount coverage1 <> coverage0
+                    journalCoverage journal <> coverage0
                 in
                   loop (tests + 1) discards (size + 1) s1 coverage
   in
