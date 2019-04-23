@@ -1,16 +1,21 @@
 {-# OPTIONS_HADDOCK not-home #-}
+{-# LANGUAGE ApplicativeDo #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-} -- MonadBase
 module Hedgehog.Internal.Tree (
-    Tree(..)
-  , Node(..)
+    Tree
+  , TreeT(..)
+  , runTree
 
-  , fromNode
+  , Node
+  , NodeT(..)
+  , fromNodeT
 
   , unfold
   , unfoldForest
@@ -18,7 +23,10 @@ module Hedgehog.Internal.Tree (
   , expand
   , prune
 
+  , filter
+
   , render
+  , renderT
   ) where
 
 import           Control.Applicative (Alternative(..), liftA2)
@@ -34,223 +42,267 @@ import           Control.Monad.State.Class (MonadState(..))
 import           Control.Monad.Trans.Class (MonadTrans(..))
 import           Control.Monad.Trans.Resource (MonadResource(..))
 import           Control.Monad.Writer.Class (MonadWriter(..))
-import           Data.Functor.Classes (Eq1(..))
 
+import           Data.Functor.Identity (Identity(..))
+import           Data.Functor.Classes (Eq1(..))
 #if MIN_VERSION_base(4,9,0)
 import           Data.Functor.Classes (Show1(..), showsPrec1)
 import           Data.Functor.Classes (showsUnaryWith, showsBinaryWith)
 #endif
+import           Data.Foldable (Foldable(..))
+import           Data.Maybe (mapMaybe)
 
 import           Hedgehog.Internal.Distributive
 
+import           Prelude hiding (filter)
+
 ------------------------------------------------------------------------
+
+-- | A rose tree.
+--
+type Tree =
+  TreeT Identity
 
 -- | An effectful tree, each node in the tree can have an effect before it is
 --   produced.
 --
-newtype Tree m a =
-  Tree {
-      runTree :: m (Node m a)
+newtype TreeT m a =
+  TreeT {
+      runTreeT :: m (NodeT m a)
     }
+
+-- | A node in a rose tree.
+--
+type Node =
+  NodeT Identity
 
 -- | A node in an effectful tree, as well as its unevaluated children.
 --
-data Node m a =
-  Node {
+data NodeT m a =
+  NodeT {
       nodeValue :: a
-    , nodeChildren :: [Tree m a]
+    , nodeChildren :: [TreeT m a]
     } deriving (Eq)
 
--- | Create a 'Tree' from a 'Node'
+-- | Extracts the 'Node' from a 'Tree'.
 --
-fromNode :: Applicative m => Node m a -> Tree m a
-fromNode =
-  Tree . pure
+runTree :: Tree a -> Node a
+runTree =
+  runIdentity . runTreeT
+
+-- | Create a 'TreeT' from a 'NodeT'
+--
+fromNodeT :: Applicative m => NodeT m a -> TreeT m a
+fromNodeT =
+  TreeT . pure
 
 -- | Create a tree from a value and an unfolding function.
 --
-unfold :: Monad m => (a -> [a]) -> a -> Tree m a
+unfold :: Monad m => (a -> [a]) -> a -> TreeT m a
 unfold f x =
-  Tree . pure $
-    Node x (unfoldForest f x)
+  TreeT . pure $
+    NodeT x (unfoldForest f x)
 
 -- | Create a forest from a value and an unfolding function.
 --
-unfoldForest :: Monad m => (a -> [a]) -> a -> [Tree m a]
+unfoldForest :: Monad m => (a -> [a]) -> a -> [TreeT m a]
 unfoldForest f =
   fmap (unfold f) . f
 
 -- | Expand a tree using an unfolding function.
 --
-expand :: Monad m => (a -> [a]) -> Tree m a -> Tree m a
+expand :: Monad m => (a -> [a]) -> TreeT m a -> TreeT m a
 expand f m =
-  Tree $ do
-    Node x xs <- runTree m
-    pure . Node x $
+  TreeT $ do
+    NodeT x xs <- runTreeT m
+    pure . NodeT x $
       fmap (expand f) xs ++ unfoldForest f x
 
 -- | Throw away a tree's children.
 --
-prune :: Monad m => Tree m a -> Tree m a
+prune :: Monad m => TreeT m a -> TreeT m a
 prune m =
-  Tree $ do
-    Node x _ <- runTree m
-    pure $ Node x []
+  TreeT $ do
+    NodeT x _ <- runTreeT m
+    pure $ NodeT x []
+
+-- | Returns a tree containing only elements that match the predicate.
+--
+filter :: (a -> Bool) -> Tree a -> Maybe (Tree a)
+filter p m =
+  let
+    NodeT x xs =
+      runTree m
+  in
+    if p x then
+      Just . TreeT . pure . NodeT x $
+        mapMaybe (filter p) xs
+    else
+      Nothing
 
 ------------------------------------------------------------------------
--- Node/Tree instances
 
-instance (Eq1 m, Eq a) => Eq (Tree m a) where
-  Tree m0 == Tree m1 =
+instance Foldable Tree where
+  foldMap f (TreeT mx) =
+    foldMap f (runIdentity mx)
+
+instance Foldable Node where
+  foldMap f (NodeT x xs) =
+    f x <> mconcat (fmap (foldMap f) xs)
+
+------------------------------------------------------------------------
+-- NodeT/TreeT instances
+
+instance (Eq1 m, Eq a) => Eq (TreeT m a) where
+  TreeT m0 == TreeT m1 =
 #if MIN_VERSION_base(4,9,0) || MIN_VERSION_transformers(0,5,0)
     liftEq (==) m0 m1
 #else
     eq1 m0 m1
 #endif
 
-instance Functor m => Functor (Node m) where
-  fmap f (Node x xs) =
-    Node (f x) (fmap (fmap f) xs)
+instance Functor m => Functor (NodeT m) where
+  fmap f (NodeT x xs) =
+    NodeT (f x) (fmap (fmap f) xs)
 
-instance Functor m => Functor (Tree m) where
+instance Functor m => Functor (TreeT m) where
   fmap f =
-    Tree . fmap (fmap f) . runTree
+    TreeT . fmap (fmap f) . runTreeT
 
-instance Applicative m => Applicative (Node m) where
+instance Applicative m => Applicative (NodeT m) where
   pure x =
-    Node x []
-  (<*>) (Node ab tabs) na@(Node a tas) =
-    Node (ab a) $
-      map (<*> (fromNode na)) tabs ++ map (fmap ab) tas
+    NodeT x []
+  (<*>) (NodeT ab tabs) na@(NodeT a tas) =
+    NodeT (ab a) $
+      map (<*> (fromNodeT na)) tabs ++ map (fmap ab) tas
 
-instance Applicative m => Applicative (Tree m) where
+instance Applicative m => Applicative (TreeT m) where
   pure =
-    Tree . pure . pure
-  (<*>) (Tree mab) (Tree ma) =
-    Tree $
+    TreeT . pure . pure
+  (<*>) (TreeT mab) (TreeT ma) =
+    TreeT $
       liftA2 (<*>) mab ma
 
-instance Monad m => Monad (Node m) where
+instance Monad m => Monad (NodeT m) where
   return =
     pure
 
-  (>>=) (Node x xs) k =
+  (>>=) (NodeT x xs) k =
     case k x of
-      Node y ys ->
-        Node y $
-          fmap (Tree . fmap (>>= k) . runTree) xs ++ ys
+      NodeT y ys ->
+        NodeT y $
+          fmap (TreeT . fmap (>>= k) . runTreeT) xs ++ ys
 
-instance Monad m => Monad (Tree m) where
+instance Monad m => Monad (TreeT m) where
   return =
     pure
 
   (>>=) m k =
-    Tree $ do
-      Node x xs <- runTree m
-      Node y ys <- runTree (k x)
-      pure . Node y $
+    TreeT $ do
+      NodeT x xs <- runTreeT m
+      NodeT y ys <- runTreeT (k x)
+      pure . NodeT y $
         fmap (>>= k) xs ++ ys
 
-instance MonadPlus m => Alternative (Tree m) where
+instance Alternative m => Alternative (TreeT m) where
   empty =
-    mzero
-  (<|>) =
-    mplus
+    TreeT empty
+  (<|>) x y =
+    TreeT (runTreeT x <|> runTreeT y)
 
-instance MonadPlus m => MonadPlus (Tree m) where
+instance MonadPlus m => MonadPlus (TreeT m) where
   mzero =
-    Tree mzero
+    TreeT mzero
   mplus x y =
-    Tree (runTree x `mplus` runTree y)
+    TreeT (runTreeT x `mplus` runTreeT y)
 
-instance MonadTrans Tree where
-  lift m =
-    Tree $ do
-      x <- m
-      pure (Node x [])
+instance MonadTrans TreeT where
+  lift f =
+    TreeT $
+      fmap (\x -> NodeT x []) f
 
-instance MFunctor Node where
-  hoist f (Node x xs) =
-    Node x (fmap (hoist f) xs)
+instance MFunctor NodeT where
+  hoist f (NodeT x xs) =
+    NodeT x (fmap (hoist f) xs)
 
-instance MFunctor Tree where
-  hoist f (Tree m) =
-    Tree . f $ fmap (hoist f) m
+instance MFunctor TreeT where
+  hoist f (TreeT m) =
+    TreeT . f $ fmap (hoist f) m
 
-embedNode :: Monad m => (t (Node t b) -> Tree m (Node t b)) -> Node t b -> Node m b
-embedNode f (Node x xs) =
-  Node x (fmap (embedTree f) xs)
+embedNodeT :: Monad m => (t (NodeT t b) -> TreeT m (NodeT t b)) -> NodeT t b -> NodeT m b
+embedNodeT f (NodeT x xs) =
+  NodeT x (fmap (embedTreeT f) xs)
 
-embedTree :: Monad m => (t (Node t b) -> Tree m (Node t b)) -> Tree t b -> Tree m b
-embedTree f (Tree m) =
-  Tree . pure . embedNode f =<< f m
+embedTreeT :: Monad m => (t (NodeT t b) -> TreeT m (NodeT t b)) -> TreeT t b -> TreeT m b
+embedTreeT f (TreeT m) =
+  TreeT . pure . embedNodeT f =<< f m
 
-instance MMonad Tree where
+instance MMonad TreeT where
   embed f m =
-    embedTree f m
+    embedTreeT f m
 
-distributeNode :: Transformer t Tree m => Node (t m) a -> t (Tree m) a
-distributeNode (Node x xs) =
-  join . lift . fromNode . Node (pure x) $
-    fmap (pure . distributeTree) xs
+distributeNodeT :: Transformer t TreeT m => NodeT (t m) a -> t (TreeT m) a
+distributeNodeT (NodeT x xs) =
+  join . lift . fromNodeT . NodeT (pure x) $
+    fmap (pure . distributeTreeT) xs
 
-distributeTree :: Transformer t Tree m => Tree (t m) a -> t (Tree m) a
-distributeTree x =
-  distributeNode =<< hoist lift (runTree x)
+distributeTreeT :: Transformer t TreeT m => TreeT (t m) a -> t (TreeT m) a
+distributeTreeT x =
+  distributeNodeT =<< hoist lift (runTreeT x)
 
-instance Distributive Tree where
+instance Distributive TreeT where
   distribute =
-    distributeTree
+    distributeTreeT
 
-instance PrimMonad m => PrimMonad (Tree m) where
-  type PrimState (Tree m) =
+instance PrimMonad m => PrimMonad (TreeT m) where
+  type PrimState (TreeT m) =
     PrimState m
   primitive =
     lift . primitive
 
-instance MonadIO m => MonadIO (Tree m) where
+instance MonadIO m => MonadIO (TreeT m) where
   liftIO =
     lift . liftIO
 
-instance MonadBase b m => MonadBase b (Tree m) where
+instance MonadBase b m => MonadBase b (TreeT m) where
   liftBase =
     lift . liftBase
 
-instance MonadThrow m => MonadThrow (Tree m) where
+instance MonadThrow m => MonadThrow (TreeT m) where
   throwM =
     lift . throwM
 
-handleNode :: (Exception e, MonadCatch m) => (e -> Tree m a) -> Node m a -> Node m a
-handleNode onErr (Node x xs) =
-  Node x $
-    fmap (handleTree onErr) xs
+handleNodeT :: (Exception e, MonadCatch m) => (e -> TreeT m a) -> NodeT m a -> NodeT m a
+handleNodeT onErr (NodeT x xs) =
+  NodeT x $
+    fmap (handleTreeT onErr) xs
 
-handleTree :: (Exception e, MonadCatch m) => (e -> Tree m a) -> Tree m a -> Tree m a
-handleTree onErr m =
-  Tree . fmap (handleNode onErr) $
-    catch (runTree m) (runTree . onErr)
+handleTreeT :: (Exception e, MonadCatch m) => (e -> TreeT m a) -> TreeT m a -> TreeT m a
+handleTreeT onErr m =
+  TreeT . fmap (handleNodeT onErr) $
+    catch (runTreeT m) (runTreeT . onErr)
 
-instance MonadCatch m => MonadCatch (Tree m) where
+instance MonadCatch m => MonadCatch (TreeT m) where
   catch =
-    flip handleTree
+    flip handleTreeT
 
-localNode :: MonadReader r m => (r -> r) -> Node m a -> Node m a
-localNode f (Node x xs) =
-  Node x $
-    fmap (localTree f) xs
+localNodeT :: MonadReader r m => (r -> r) -> NodeT m a -> NodeT m a
+localNodeT f (NodeT x xs) =
+  NodeT x $
+    fmap (localTreeT f) xs
 
-localTree :: MonadReader r m => (r -> r) -> Tree m a -> Tree m a
-localTree f (Tree m) =
-  Tree $
-    pure . localNode f =<< local f m
+localTreeT :: MonadReader r m => (r -> r) -> TreeT m a -> TreeT m a
+localTreeT f (TreeT m) =
+  TreeT $
+    pure . localNodeT f =<< local f m
 
-instance MonadReader r m => MonadReader r (Tree m) where
+instance MonadReader r m => MonadReader r (TreeT m) where
   ask =
     lift ask
   local =
-    localTree
+    localTreeT
 
-instance MonadState s m => MonadState s (Tree m) where
+instance MonadState s m => MonadState s (TreeT m) where
   get =
     lift get
   put =
@@ -258,55 +310,55 @@ instance MonadState s m => MonadState s (Tree m) where
   state =
     lift . state
 
-listenNode :: MonadWriter w m => w -> Node m a -> Node m (a, w)
-listenNode w (Node x xs) =
-  Node (x, w) $
-    fmap (listenTree w) xs
+listenNodeT :: MonadWriter w m => w -> NodeT m a -> NodeT m (a, w)
+listenNodeT w (NodeT x xs) =
+  NodeT (x, w) $
+    fmap (listenTreeT w) xs
 
-listenTree :: MonadWriter w m => w -> Tree m a -> Tree m (a, w)
-listenTree w0 (Tree m) =
-  Tree $ do
+listenTreeT :: MonadWriter w m => w -> TreeT m a -> TreeT m (a, w)
+listenTreeT w0 (TreeT m) =
+  TreeT $ do
     (x, w) <- listen m
-    pure $ listenNode (mappend w0 w) x
+    pure $ listenNodeT (mappend w0 w) x
 
 -- FIXME This just throws away the writer modification function.
-passNode :: MonadWriter w m => Node m (a, w -> w) -> Node m a
-passNode (Node (x, _) xs) =
-  Node x $
-    fmap passTree xs
+passNodeT :: MonadWriter w m => NodeT m (a, w -> w) -> NodeT m a
+passNodeT (NodeT (x, _) xs) =
+  NodeT x $
+    fmap passTreeT xs
 
-passTree :: MonadWriter w m => Tree m (a, w -> w) -> Tree m a
-passTree (Tree m) =
-  Tree $
-    pure . passNode =<< m
+passTreeT :: MonadWriter w m => TreeT m (a, w -> w) -> TreeT m a
+passTreeT (TreeT m) =
+  TreeT $
+    pure . passNodeT =<< m
 
-instance MonadWriter w m => MonadWriter w (Tree m) where
+instance MonadWriter w m => MonadWriter w (TreeT m) where
   writer =
     lift . writer
   tell =
     lift . tell
   listen =
-    listenTree mempty
+    listenTreeT mempty
   pass =
-    passTree
+    passTreeT
 
-handleErrorNode :: MonadError e m => (e -> Tree m a) -> Node m a -> Node m a
-handleErrorNode onErr (Node x xs) =
-  Node x $
-    fmap (handleErrorTree onErr) xs
+handleErrorNodeT :: MonadError e m => (e -> TreeT m a) -> NodeT m a -> NodeT m a
+handleErrorNodeT onErr (NodeT x xs) =
+  NodeT x $
+    fmap (handleErrorTreeT onErr) xs
 
-handleErrorTree :: MonadError e m => (e -> Tree m a) -> Tree m a -> Tree m a
-handleErrorTree onErr m =
-  Tree . fmap (handleErrorNode onErr) $
-    catchError (runTree m) (runTree . onErr)
+handleErrorTreeT :: MonadError e m => (e -> TreeT m a) -> TreeT m a -> TreeT m a
+handleErrorTreeT onErr m =
+  TreeT . fmap (handleErrorNodeT onErr) $
+    catchError (runTreeT m) (runTreeT . onErr)
 
-instance MonadError e m => MonadError e (Tree m) where
+instance MonadError e m => MonadError e (TreeT m) where
   throwError =
     lift . throwError
   catchError =
-    flip handleErrorTree
+    flip handleErrorTreeT
 
-instance MonadResource m => MonadResource (Tree m) where
+instance MonadResource m => MonadResource (TreeT m) where
   liftResourceT =
     lift . liftResourceT
 
@@ -314,16 +366,16 @@ instance MonadResource m => MonadResource (Tree m) where
 -- Show/Show1 instances
 
 #if MIN_VERSION_base(4,9,0)
-instance (Show1 m, Show a) => Show (Node m a) where
+instance (Show1 m, Show a) => Show (NodeT m a) where
   showsPrec =
     showsPrec1
 
-instance (Show1 m, Show a) => Show (Tree m a) where
+instance (Show1 m, Show a) => Show (TreeT m a) where
   showsPrec =
     showsPrec1
 
-instance Show1 m => Show1 (Node m) where
-  liftShowsPrec sp sl d (Node x xs) =
+instance Show1 m => Show1 (NodeT m) where
+  liftShowsPrec sp sl d (NodeT x xs) =
     let
       sp1 =
         liftShowsPrec sp sl
@@ -334,10 +386,10 @@ instance Show1 m => Show1 (Node m) where
       sp2 =
         liftShowsPrec sp1 sl1
     in
-      showsBinaryWith sp sp2 "Node" d x xs
+      showsBinaryWith sp sp2 "NodeT" d x xs
 
-instance Show1 m => Show1 (Tree m) where
-  liftShowsPrec sp sl d (Tree m) =
+instance Show1 m => Show1 (TreeT m) where
+  liftShowsPrec sp sl d (TreeT m) =
     let
       sp1 =
         liftShowsPrec sp sl
@@ -348,7 +400,7 @@ instance Show1 m => Show1 (Tree m) where
       sp2 =
         liftShowsPrec sp1 sl1
     in
-      showsUnaryWith sp2 "Tree" d m
+      showsUnaryWith sp2 "TreeT" d m
 #endif
 
 ------------------------------------------------------------------------
@@ -358,22 +410,22 @@ instance Show1 m => Show1 (Tree m) where
 -- Rendering implementation based on the one from containers/Data.Tree
 --
 
-renderTreeLines :: Monad m => Tree m String -> m [String]
-renderTreeLines (Tree m) = do
-  Node x xs0 <- m
+renderTreeTLines :: Monad m => TreeT m String -> m [String]
+renderTreeTLines (TreeT m) = do
+  NodeT x xs0 <- m
   xs <- renderForestLines xs0
   pure $
-    lines (renderNode x) ++ xs
+    lines (renderNodeT x) ++ xs
 
-renderNode :: String -> String
-renderNode xs =
+renderNodeT :: String -> String
+renderNodeT xs =
   case xs of
     [_] ->
       ' ' : xs
     _ ->
       xs
 
-renderForestLines :: Monad m => [Tree m String] -> m [String]
+renderForestLines :: Monad m => [TreeT m String] -> m [String]
 renderForestLines xs0 =
   let
     shift hd other =
@@ -384,18 +436,25 @@ renderForestLines xs0 =
         pure []
 
       [x] -> do
-        s <- renderTreeLines x
+        s <- renderTreeTLines x
         pure $
           shift " └╼" "   " s
 
       x : xs -> do
-        s <- renderTreeLines x
+        s <- renderTreeTLines x
         ss <- renderForestLines xs
         pure $
           shift " ├╼" " │ " s ++ ss
 
+-- | Render a tree of strings.
+--
+render :: Tree String -> String
+render =
+  runIdentity . renderT
+
 -- | Render a tree of strings, note that this forces all the delayed effects in
 --   the tree.
-render :: Monad m => Tree m String -> m String
-render =
-  fmap unlines . renderTreeLines
+--
+renderT :: Monad m => TreeT m String -> m String
+renderT =
+  fmap unlines . renderTreeTLines
