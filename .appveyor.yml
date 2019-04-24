@@ -32,9 +32,9 @@ install:
  - "refreshenv"
  - "%CABAL% --version"
  - "%HC% --version"
- - "%CABAL% new-update"
- - "%CABAL% new-build -w %HC% %TEST% %BENCH% --dep -j2 all"
- - "%CABAL% new-build -w %HC% %NOTEST% %NOBENCH% --dep -j2 all"
+ - "%CABAL% v2-update"
+ - "%CABAL% v2-build -w %HC% %TEST% %BENCH% --dep -j2 all"
+ - "%CABAL% v2-build -w %HC% %NOTEST% %NOBENCH% --dep -j2 all"
 
 build: off
 
@@ -44,11 +44,11 @@ test_script:
  - "cat cabal.project || true"
 
  # this builds all libraries and executables (without tests/benchmarks)
- - "%CABAL% new-build --disable-tests --disable-benchmarks all"
+ - "%CABAL% v2-build --disable-tests --disable-benchmarks all"
 
  # build & run tests, build benchmarks
- - "%CABAL% new-build -w %HC% %TEST% %BENCH% all"
- - "%CABAL% new-test -w %HC% %TEST% %BENCH% all"
+ - "%CABAL% v2-build -w %HC% %TEST% %BENCH% all"
+ - "%CABAL% v2-test -w %HC% %TEST% %BENCH% all"
 
  # haddock
- - "%CABAL% new-haddock -w %HC% %TEST% %BENCH% all"
+ - "%CABAL% v2-haddock -w %HC% %TEST% %BENCH% all"
