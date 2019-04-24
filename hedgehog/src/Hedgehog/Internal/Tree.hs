@@ -45,13 +45,9 @@ import           Control.Monad.Zip (MonadZip(..))
 
 import           Data.Functor.Identity (Identity(..))
 import           Data.Functor.Classes (Eq1(..))
-#if MIN_VERSION_base(4,9,0)
 import           Data.Functor.Classes (Show1(..), showsPrec1)
 import           Data.Functor.Classes (showsUnaryWith, showsBinaryWith)
-#endif
-import           Data.Foldable (Foldable(..))
 import           Data.Maybe (mapMaybe)
-import           Data.Monoid (mappend)
 
 import           Hedgehog.Internal.Distributive
 
@@ -156,11 +152,7 @@ instance Foldable Node where
 
 instance (Eq1 m, Eq a) => Eq (TreeT m a) where
   TreeT m0 == TreeT m1 =
-#if MIN_VERSION_base(4,9,0) || MIN_VERSION_transformers(0,5,0)
     liftEq (==) m0 m1
-#else
-    eq1 m0 m1
-#endif
 
 instance Functor m => Functor (NodeT m) where
   fmap f (NodeT x xs) =
@@ -384,7 +376,6 @@ instance MonadResource m => MonadResource (TreeT m) where
 ------------------------------------------------------------------------
 -- Show/Show1 instances
 
-#if MIN_VERSION_base(4,9,0)
 instance (Show1 m, Show a) => Show (NodeT m a) where
   showsPrec =
     showsPrec1
@@ -420,7 +411,6 @@ instance Show1 m => Show1 (TreeT m) where
         liftShowsPrec sp1 sl1
     in
       showsUnaryWith sp2 "TreeT" d m
-#endif
 
 ------------------------------------------------------------------------
 -- Pretty Printing
