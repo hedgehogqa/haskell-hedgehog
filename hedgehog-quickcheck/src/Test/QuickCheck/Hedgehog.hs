@@ -4,13 +4,10 @@ module Test.QuickCheck.Hedgehog (
     hedgehog
   ) where
 
-import           Control.Monad.Trans.Maybe (runMaybeT)
-import           Data.Functor.Identity (runIdentity)
-
 import           Hedgehog
-import           Hedgehog.Internal.Gen (runGenT)
+import           Hedgehog.Internal.Gen (runGen)
 import qualified Hedgehog.Internal.Seed as Seed
-import           Hedgehog.Internal.Tree (Tree(..), Node(..))
+import           Hedgehog.Internal.Tree (NodeT(..), runTree)
 
 import qualified Test.QuickCheck as QuickCheck
 
@@ -33,10 +30,10 @@ hedgehog gen =
       else do
         seed <- genSeed
         size <- QuickCheck.sized (pure . fromIntegral)
-        case runIdentity . runMaybeT . runTree $ runGenT size seed gen of
+        case runGen size seed gen of
           Nothing ->
             loop (n - 1)
           Just x ->
-            pure $ nodeValue x
+            pure . nodeValue $ runTree x
   in
     loop (100 :: Int)

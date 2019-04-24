@@ -45,7 +45,7 @@ import           Hedgehog.Internal.Region
 import           Hedgehog.Internal.Report
 import           Hedgehog.Internal.Seed (Seed)
 import qualified Hedgehog.Internal.Seed as Seed
-import           Hedgehog.Internal.Tree (Tree(..), Node(..))
+import           Hedgehog.Internal.Tree (TreeT(..), NodeT(..))
 import           Hedgehog.Range (Size)
 
 import           Language.Haskell.TH.Lift (deriveLift)
@@ -84,24 +84,24 @@ findM xs0 def p =
           Just x ->
             return x
 
-isFailure :: Node m (Maybe (Either x a, b)) -> Bool
+isFailure :: NodeT m (Maybe (Either x a, b)) -> Bool
 isFailure = \case
-  Node (Just (Left _, _)) _ ->
+  NodeT (Just (Left _, _)) _ ->
     True
   _ ->
     False
 
-isSuccess :: Node m (Maybe (Either x a, b)) -> Bool
+isSuccess :: NodeT m (Maybe (Either x a, b)) -> Bool
 isSuccess =
   not . isFailure
 
 runTreeN ::
      Monad m
   => ShrinkRetries
-  -> Tree m (Maybe (Either x a, b))
-  -> m (Node m (Maybe (Either x a, b)))
+  -> TreeT m (Maybe (Either x a, b))
+  -> m (NodeT m (Maybe (Either x a, b)))
 runTreeN n m = do
-  o <- runTree m
+  o <- runTreeT m
   if n > 0 && isSuccess o then
     runTreeN (n - 1) m
   else
@@ -115,13 +115,13 @@ takeSmallest ::
   -> ShrinkLimit
   -> ShrinkRetries
   -> (Progress -> m ())
-  -> Node m (Maybe (Either Failure (), Journal))
+  -> NodeT m (Maybe (Either Failure (), Journal))
   -> m Result
 takeSmallest size seed shrinks slimit retries updateUI = \case
-  Node Nothing _ ->
+  NodeT Nothing _ ->
     pure GaveUp
 
-  Node (Just (x, (Journal logs))) xs ->
+  NodeT (Just (x, (Journal logs))) xs ->
     case x of
       Left (Failure loc err mdiff) -> do
         let
@@ -199,8 +199,8 @@ checkReport cfg size0 seed0 test0 updateUI =
       else
         case Seed.split seed of
           (s0, s1) -> do
-            node@(Node x _) <-
-              runTree . runDiscardEffect $ runGenT size s0 . runTestT $ unPropertyT test
+            node@(NodeT x _) <-
+              runTreeT . runDiscardEffect $ runGenT size s0 . runTestT $ unPropertyT test
             case x of
               Nothing ->
                 loop tests (discards + 1) (size + 1) s1 coverage0

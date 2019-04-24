@@ -123,15 +123,18 @@ module Hedgehog.Internal.Gen (
   , printTree
   , printWith
   , printTreeWith
+  , renderTree
 
   -- * Internal
   -- $internal
 
   -- ** Transfomer
+  , runGen
   , runGenT
   , mapGenT
   , generate
-  , liftTree
+  , liftTreeT
+  , liftTreeMaybeT
   , runDiscardEffect
 
   -- ** Size
@@ -148,9 +151,6 @@ module Hedgehog.Internal.Gen (
   , Vec(..)
   , Nat(..)
   , subtermMVec
-
-  -- ** Sampling
-  , renderNodes
   ) where
 
 import           Control.Applicative (Alternative(..),liftA2)
@@ -179,6 +179,7 @@ import qualified Control.Monad.Trans.State.Strict as Strict
 import qualified Control.Monad.Trans.Writer.Lazy as Lazy
 import qualified Control.Monad.Trans.Writer.Strict as Strict
 import           Control.Monad.Writer.Class (MonadWriter(..))
+import           Control.Monad.Zip (MonadZip(..))
 
 import           Data.Bifunctor (first, second)
 import           Data.ByteString (ByteString)
@@ -206,7 +207,7 @@ import           Hedgehog.Internal.Distributive (Distributive(..))
 import           Hedgehog.Internal.Seed (Seed)
 import qualified Hedgehog.Internal.Seed as Seed
 import qualified Hedgehog.Internal.Shrink as Shrink
-import           Hedgehog.Internal.Tree (Tree(..), Node(..))
+import           Hedgehog.Internal.Tree (Tree, TreeT(..), NodeT(..))
 import qualified Hedgehog.Internal.Tree as Tree
 import           Hedgehog.Range (Size, Range)
 import qualified Hedgehog.Range as Range
@@ -226,18 +227,18 @@ type Gen =
 --
 newtype GenT m a =
   GenT {
-      unGen :: Size -> Seed -> Tree (MaybeT m) a
+      unGenT :: Size -> Seed -> TreeT (MaybeT m) a
     }
 
 -- | Runs a generator, producing its shrink tree.
 --
-runGenT :: Size -> Seed -> GenT m a -> Tree (MaybeT m) a
+runGenT :: Size -> Seed -> GenT m a -> TreeT (MaybeT m) a
 runGenT size seed (GenT m) =
   m size seed
 
 -- | Map over a generator's shrink tree.
 --
-mapGenT :: (Tree (MaybeT m) a -> Tree (MaybeT n) b) -> GenT m a -> GenT n b
+mapGenT :: (TreeT (MaybeT m) a -> TreeT (MaybeT n) b) -> GenT m a -> GenT n b
 mapGenT f gen =
   GenT $ \size seed ->
     f (runGenT size seed gen)
@@ -245,16 +246,35 @@ mapGenT f gen =
 -- | Lift a predefined shrink tree in to a generator, ignoring the seed and the
 --   size.
 --
-liftTree :: Tree (MaybeT m) a -> GenT m a
-liftTree x =
+liftTreeT :: Monad m => TreeT m a -> GenT m a
+liftTreeT x =
+  GenT $ \_ _ ->
+    hoist (MaybeT . fmap Just) x
+
+-- | Lift a predefined shrink tree in to a generator, ignoring the seed and the
+--   size.
+--
+liftTreeMaybeT :: TreeT (MaybeT m) a -> GenT m a
+liftTreeMaybeT x =
   GenT (\_ _ -> x)
 
 -- | Run the discard effects through the tree and reify them as 'Maybe' values
 --   at the nodes. 'Nothing' means discarded, 'Just' means we have a value.
 --
-runDiscardEffect :: Monad m => Tree (MaybeT m) a -> Tree m (Maybe a)
+runDiscardEffect :: Monad m => TreeT (MaybeT m) a -> TreeT m (Maybe a)
 runDiscardEffect =
   runMaybeT . distribute
+
+-- | Run a generator, yielding its shrink tree.
+--
+--   'Nothing' means discarded, 'Just' means we have a value.
+--
+runGen :: Size -> Seed -> Gen a -> Maybe (Tree a)
+runGen size seed gen =
+  fmap (fmap Maybe.fromJust) .
+  Tree.filter Maybe.isJust .
+  runDiscardEffect $
+  runGenT size seed gen
 
 ------------------------------------------------------------------------
 -- MonadGen
@@ -308,12 +328,12 @@ instance Monad m => MonadGen (GenT m) where
 
   freezeGen gen =
     GenT $ \size seed -> do
-      mx <- Trans.lift . Trans.lift . runMaybeT . runTree $ runGenT size seed gen
+      mx <- Trans.lift . Trans.lift . runMaybeT . runTreeT $ runGenT size seed gen
       case mx of
         Nothing ->
-          mzero
-        Just (Node x xs) ->
-          pure (x, liftTree . Tree.fromNode $ Node x xs)
+          empty
+        Just (NodeT x xs) ->
+          pure (x, liftTreeMaybeT . Tree.fromNodeT $ NodeT x xs)
 
 instance MonadGen m => MonadGen (IdentityT m) where
   liftGen =
@@ -538,14 +558,32 @@ instance Functor m => Functor (GenT m) where
     GenT $ \seed size ->
       fmap f (runGenT seed size gen)
 
+--
+-- implementation: parallel shrinking
+--
 instance Monad m => Applicative (GenT m) where
   pure =
-    liftTree . pure
+    liftTreeMaybeT . pure
   (<*>) f m =
     GenT $ \ size seed ->
       case Seed.split seed of
         (sf, sm) ->
-          runGenT size sf f <*> runGenT size sm m
+          uncurry ($) <$>
+            runGenT size sf f `mzip`
+            runGenT size sm m
+
+--
+-- implementation: satisfies law (ap = <*>)
+--
+--instance Monad m => Applicative (GenT m) where
+--  pure =
+--    liftTreeMaybeT . pure
+--  (<*>) f m =
+--    GenT $ \ size seed ->
+--      case Seed.split seed of
+--        (sf, sm) ->
+--          runGenT size sf f <*>
+--          runGenT size sm m
 
 instance Monad m => Monad (GenT m) where
   return =
@@ -573,7 +611,7 @@ instance Monad m => Alternative (GenT m) where
 
 instance Monad m => MonadPlus (GenT m) where
   mzero =
-    liftTree mzero
+    liftTreeMaybeT mzero
 
   mplus x y =
     GenT $ \size seed ->
@@ -584,7 +622,7 @@ instance Monad m => MonadPlus (GenT m) where
 
 instance MonadTrans GenT where
   lift =
-    liftTree . Trans.lift . Trans.lift
+    liftTreeMaybeT . Trans.lift . Trans.lift
 
 instance MFunctor GenT where
   hoist f =
@@ -600,7 +638,7 @@ embedMaybe ::
 embedMaybe f m =
   Trans.lift . MaybeT . pure =<< f (runMaybeT m)
 
-embedTree :: Monad n => (forall a. m a -> Tree (MaybeT n) a) -> Tree (MaybeT m) b -> Tree (MaybeT n) b
+embedTree :: Monad n => (forall a. m a -> TreeT (MaybeT n) a) -> TreeT (MaybeT m) b -> TreeT (MaybeT n) b
 embedTree f tree =
   embed (embedMaybe f) tree
 
@@ -619,13 +657,13 @@ instance MMonad GenT where
 distributeGen :: Transformer t GenT m => GenT (t m) a -> t (GenT m) a
 distributeGen x =
   join . Trans.lift . GenT $ \size seed ->
-    pure . hoist liftTree . distribute . hoist distribute $ runGenT size seed x
+    pure . hoist liftTreeMaybeT . distribute . hoist distribute $ runGenT size seed x
 
 instance Distributive GenT where
   type Transformer t GenT m = (
       Monad (t (GenT m))
     , Transformer t MaybeT m
-    , Transformer t Tree (MaybeT m)
+    , Transformer t TreeT (MaybeT m)
     )
 
   distribute =
@@ -1243,7 +1281,7 @@ recursive f nonrec rec =
 --
 discard :: MonadGen m => m a
 discard =
-  liftGen mzero
+  liftGen empty
 
 -- | Discards the generator if the generated value does not satisfy the
 --   predicate.
@@ -1555,45 +1593,13 @@ sample gen =
           error "Hedgehog.Gen.sample: too many discards, could not generate a sample"
         else do
           seed <- Seed.random
-          case runIdentity . runMaybeT . runTree $ runGenT 30 seed gen of
+          case runIdentity . runMaybeT . runTreeT $ runGenT 30 seed gen of
             Nothing ->
               loop (n - 1)
             Just x ->
               pure $ nodeValue x
     in
       loop (100 :: Int)
-
--- | Print the value produced by a generator, and the first level of shrinks,
---   for the given size and seed.
---
---   Use 'print' to generate a value from a random seed.
---
-printWith :: (MonadIO m, Show a) => Size -> Seed -> Gen a -> m ()
-printWith size seed gen =
-  liftIO $ do
-    let
-      Node x ss =
-        runIdentity . runTree $ renderNodes size seed gen
-
-    putStrLn "=== Outcome ==="
-    putStrLn x
-    putStrLn "=== Shrinks ==="
-
-    for_ ss $ \s ->
-      let
-        Node y _ =
-          runIdentity $ runTree s
-      in
-        putStrLn y
-
--- | Print the shrink tree produced by a generator, for the given size and
---   seed.
---
---   Use 'printTree' to generate a value from a random seed.
---
-printTreeWith :: (MonadIO m, Show a) => Size -> Seed -> Gen a -> m ()
-printTreeWith size seed gen = do
-  liftIO . putStr . runIdentity . Tree.render $ renderNodes size seed gen
 
 -- | Run a generator with a random seed and print the outcome, and the first
 --   level of shrinks.
@@ -1613,6 +1619,35 @@ print :: (MonadIO m, Show a) => Gen a -> m ()
 print gen = do
   seed <- liftIO Seed.random
   printWith 30 seed gen
+
+-- | Print the value produced by a generator, and the first level of shrinks,
+--   for the given size and seed.
+--
+--   Use 'print' to generate a value from a random seed.
+--
+printWith :: (MonadIO m, Show a) => Size -> Seed -> Gen a -> m ()
+printWith size seed gen =
+  liftIO $ do
+    case runGen size seed gen of
+      Nothing -> do
+        putStrLn "=== Outcome ==="
+        putStrLn "<discard>"
+
+      Just tree -> do
+        let
+          NodeT x ss =
+            runIdentity (runTreeT tree)
+
+        putStrLn "=== Outcome ==="
+        putStrLn (show x)
+        putStrLn "=== Shrinks ==="
+
+        for_ ss $ \s ->
+          let
+            NodeT y _ =
+              runIdentity $ runTreeT s
+          in
+            putStrLn (show y)
 
 -- | Run a generator with a random seed and print the resulting shrink tree.
 --
@@ -1636,11 +1671,26 @@ printTree gen = do
   seed <- liftIO Seed.random
   printTreeWith 30 seed gen
 
--- | Render a generator as a tree of strings.
+-- | Print the shrink tree produced by a generator, for the given size and
+--   seed.
 --
-renderNodes :: (Monad m, Show a) => Size -> Seed -> Gen a -> Tree m String
-renderNodes size seed =
-  fmap (Maybe.maybe "<discard>" show) . runDiscardEffect . runGenT size seed . lift
+--   Use 'printTree' to generate a value from a random seed.
+--
+printTreeWith :: (MonadIO m, Show a) => Size -> Seed -> Gen a -> m ()
+printTreeWith size seed gen = do
+  liftIO . putStr $
+    renderTree size seed gen
+
+-- | Render the shrink tree produced by a generator, for the given size and
+--   seed.
+--
+renderTree :: Show a => Size -> Seed -> Gen a -> String
+renderTree size seed gen =
+  case runGen size seed gen of
+    Nothing ->
+      "<discard>"
+    Just x ->
+      Tree.render (fmap show x)
 
 ------------------------------------------------------------------------
 -- Internal
