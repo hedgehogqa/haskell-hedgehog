@@ -465,16 +465,16 @@ instance MFunctor TestT where
   hoist f =
     TestT . hoist (hoist f) . unTest
 
-instance Distributive TestT where
+instance MonadTransDistributive TestT where
   type Transformer t TestT m = (
       Transformer t (Lazy.WriterT Journal) m
     , Transformer t (ExceptT Failure) (Lazy.WriterT Journal m)
     )
 
-  distribute =
+  distributeT =
     hoist TestT .
-    distribute .
-    hoist distribute .
+    distributeT .
+    hoist distributeT .
     unTest
 
 instance PrimMonad m => PrimMonad (TestT m) where
@@ -787,16 +787,16 @@ instance MFunctor PropertyT where
   hoist f =
     PropertyT . hoist (hoist f) . unPropertyT
 
-instance Distributive PropertyT where
+instance MonadTransDistributive PropertyT where
   type Transformer t PropertyT m = (
       Transformer t GenT m
     , Transformer t TestT (GenT m)
     )
 
-  distribute =
+  distributeT =
     hoist PropertyT .
-    distribute .
-    hoist distribute .
+    distributeT .
+    hoist distributeT .
     unPropertyT
 
 instance PrimMonad m => PrimMonad (PropertyT m) where
@@ -845,7 +845,7 @@ forAllWithT render gen = do
 --
 forAllWith :: (Monad m, HasCallStack) => (a -> String) -> Gen a -> PropertyT m a
 forAllWith render gen =
-  withFrozenCallStack $ forAllWithT render $ Gen.lift gen
+  withFrozenCallStack $ forAllWithT render $ Gen.generalize gen
 
 -- | Generates a random input for the test by running the provided generator.
 --
@@ -864,7 +864,7 @@ forAll gen =
 --
 discard :: Monad m => PropertyT m a
 discard =
-  PropertyT $ lift Gen.discard
+  PropertyT $ lift (Gen.generalize Gen.discard)
 
 -- | Lift a test in to a property.
 --

@@ -130,6 +130,7 @@ test-suite test
       hedgehog
     , base                            >= 3          && < 5
     , containers                      >= 0.4        && < 0.7
+    , mtl                             >= 2.1        && < 2.3
     , pretty-show                     >= 1.6        && < 1.10
     , semigroups                      >= 0.16       && < 0.19
     , text                            >= 1.1        && < 1.3

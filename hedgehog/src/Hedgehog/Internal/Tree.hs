@@ -2,6 +2,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -11,6 +12,8 @@ module Hedgehog.Internal.Tree (
     Tree
   , TreeT(..)
   , runTree
+  , treeValue
+  , treeChildren
 
   , Node
   , NodeT(..)
@@ -23,6 +26,7 @@ module Hedgehog.Internal.Tree (
   , prune
 
   , filter
+  , interleave
 
   , render
   , renderT
@@ -77,7 +81,10 @@ type Node =
 --
 data NodeT m a =
   NodeT {
+      -- | The value at this 'NodeT' in the 'TreeT'.
       nodeValue :: a
+
+      -- | The children of this 'NodeT'.
     , nodeChildren :: [TreeT m a]
     } deriving (Eq)
 
@@ -92,6 +99,18 @@ runTree =
 fromNodeT :: Applicative m => NodeT m a -> TreeT m a
 fromNodeT =
   TreeT . pure
+
+-- | The value at the root of the 'Tree'.
+--
+treeValue :: Tree a -> a
+treeValue =
+  nodeValue . runTree
+
+-- | The children of the 'Tree'.
+--
+treeChildren :: Tree a -> [Tree a]
+treeChildren =
+  nodeChildren . runTree
 
 -- | Create a tree from a value and an unfolding function.
 --
@@ -136,6 +155,68 @@ filter p m =
         mapMaybe (filter p) xs
     else
       Nothing
+
+------------------------------------------------------------------------
+
+-- | All ways a list can be split
+--
+-- > splits [1,2,3]
+-- > ==
+-- > [ ([], 1, [2, 3])
+--   , ([1], 2, [3])
+--   , ([1, 2], 3, [])
+--   ]
+--
+splits :: [a] -> [([a], a, [a])]
+splits = \case
+  [] ->
+    []
+  x : xs ->
+    ([], x, xs) :
+    fmap (\(as, b, cs) -> (x : as, b, cs)) (splits xs)
+
+
+--dropOne :: [Tree a] -> [Tree [a]]
+--dropOne ts = do
+--  (xs, _, zs) <- splits ts
+--  pure $ interleave (xs ++ zs)
+--
+--shrinkOne :: [Tree a] -> [Tree [a]]
+--shrinkOne ts = do
+--  (xs, y0, zs) <- splits ts
+--  y <- treeChildren y0
+--  pure $ interleave (xs ++ [y] ++ zs)
+--
+--interleave :: [Tree a] -> Tree [a]
+--interleave ts0 =
+--  mkTree (fmap treeValue ts0) $
+--    concat [
+--        dropOne ts0
+--      , shrinkOne ts0
+--      ]
+
+dropOne :: Monad m => [NodeT m a] -> [TreeT m [a]]
+dropOne ts = do
+  (xs, _y, zs) <- splits ts
+  pure . TreeT . pure $
+    interleave (xs ++ zs)
+
+shrinkOne :: Monad m => [NodeT m a] -> [TreeT m [a]]
+shrinkOne ts = do
+  (xs, y0, zs) <- splits ts
+  y1 <- nodeChildren y0
+  pure . TreeT $ do
+    y2 <- runTreeT y1
+    pure $
+      interleave (xs ++ [y2] ++ zs)
+
+interleave :: forall m a. Monad m => [NodeT m a] -> NodeT m [a]
+interleave ts =
+  NodeT (fmap nodeValue ts) $
+    concat [
+        dropOne ts
+      , shrinkOne ts
+      ]
 
 ------------------------------------------------------------------------
 
@@ -261,8 +342,8 @@ distributeTreeT :: Transformer t TreeT m => TreeT (t m) a -> t (TreeT m) a
 distributeTreeT x =
   distributeNodeT =<< hoist lift (runTreeT x)
 
-instance Distributive TreeT where
-  distribute =
+instance MonadTransDistributive TreeT where
+  distributeT =
     distributeTreeT
 
 instance PrimMonad m => PrimMonad (TreeT m) where

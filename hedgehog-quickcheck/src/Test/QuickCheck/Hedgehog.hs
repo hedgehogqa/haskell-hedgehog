@@ -5,9 +5,9 @@ module Test.QuickCheck.Hedgehog (
   ) where
 
 import           Hedgehog
-import           Hedgehog.Internal.Gen (runGen)
+import           Hedgehog.Internal.Gen (evalGen)
 import qualified Hedgehog.Internal.Seed as Seed
-import           Hedgehog.Internal.Tree (NodeT(..), runTree)
+import           Hedgehog.Internal.Tree (treeValue)
 
 import qualified Test.QuickCheck as QuickCheck
 
@@ -30,10 +30,10 @@ hedgehog gen =
       else do
         seed <- genSeed
         size <- QuickCheck.sized (pure . fromIntegral)
-        case runGen size seed gen of
+        case evalGen size seed gen of
           Nothing ->
             loop (n - 1)
           Just x ->
-            pure . nodeValue $ runTree x
+            pure $ treeValue x
   in
     loop (100 :: Int)
