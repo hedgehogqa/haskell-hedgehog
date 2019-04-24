@@ -4,12 +4,11 @@ clone_folder: "C:\\WORK"
 environment:
   global:
     CABAL: "cabal --store-dir=C:\\SR --http-transport=plain-http"
-    CABAL_VERSION: "2.4.1.0"
     HC: "ghc"
     TEST: "--enable-tests"
     NOTEST: "--disable-tests"
     BENCH: "--enable-benchmarks"
-    NOBENCH: "--enable-benchmarks"
+    NOBENCH: "--disable-benchmarks"
   matrix:
     # We don't get many build bots with Appveyor so we only include the
     # latest for each major version.
@@ -30,13 +29,12 @@ cache:
 
 install:
  - "choco install -y ghc --version %GHC_VERSION%"
- - "choco install -y cabal --version %CABAL_VERSION%"
  - "refreshenv"
  - "%CABAL% --version"
  - "%HC% --version"
- - "%CABAL% new-update"
- - "%CABAL% new-build -w %HC% %TEST% %BENCH% --dep -j2 all"
- - "%CABAL% new-build -w %HC% %NOTEST% %NOBENCH% --dep -j2 all"
+ - "%CABAL% v2-update"
+ - "%CABAL% v2-build -w %HC% %TEST% %BENCH% --dep -j2 all"
+ - "%CABAL% v2-build -w %HC% %NOTEST% %NOBENCH% --dep -j2 all"
 
 build: off
 
@@ -44,13 +42,13 @@ build: off
 test_script:
  # show project file
  - "cat cabal.project || true"
- 
+
  # this builds all libraries and executables (without tests/benchmarks)
- - "%CABAL% new-build --disable-tests --disable-benchmarks all"
- 
+ - "%CABAL% v2-build --disable-tests --disable-benchmarks all"
+
  # build & run tests, build benchmarks
- - "%CABAL% new-build -w %HC% %TEST% %BENCH% all"
- - "%CABAL% new-test -w %HC% %TEST% %BENCH% all"
- 
+ - "%CABAL% v2-build -w %HC% %TEST% %BENCH% all"
+ - "%CABAL% v2-test -w %HC% %TEST% %BENCH% all"
+
  # haddock
- - "%CABAL% new-haddock -w %HC% %TEST% %BENCH% all"
+ - "%CABAL% v2-haddock -w %HC% %TEST% %BENCH% all"
