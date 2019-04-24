@@ -1,4 +1,4 @@
-hedgehog [![Hackage][hackage-shield]][hackage] [![Travis][travis-shield]][travis]
+hedgehog [![Hackage][hackage-shield]][hackage] [![Travis][travis-shield]][travis] [![AppVeyor][appveyor-shield]][appveyor]
 ========
 
 > Hedgehog will eat all your bugs.
@@ -81,6 +81,9 @@ You can then load the module in GHCi, and run it:
 
  [travis]: https://travis-ci.org/hedgehogqa/haskell-hedgehog
  [travis-shield]: https://travis-ci.org/hedgehogqa/haskell-hedgehog.svg?branch=master
+
+ [appveyor]: https://ci.appveyor.com/project/jystic/haskell-hedgehog
+ [appveyor-shield]: https://ci.appveyor.com/api/projects/status/o4rlstbc80sum3on/branch/master?svg=true
 
  [haddock-hedgehog]: http://hackage.haskell.org/package/hedgehog/docs/Hedgehog.html
  [haddock-hedgehog-gen]: http://hackage.haskell.org/package/hedgehog/docs/Hedgehog-Gen.html
