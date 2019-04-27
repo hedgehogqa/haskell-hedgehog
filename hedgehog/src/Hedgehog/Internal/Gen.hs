@@ -1,4 +1,5 @@
 {-# OPTIONS_HADDOCK not-home #-}
+{-# LANGUAGE ApplicativeDo #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveFunctor #-}

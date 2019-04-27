@@ -18,12 +18,9 @@ module Hedgehog.Internal.Source (
   , withFrozenCallStack
   ) where
 
-#if MIN_VERSION_base(4,9,0)
 import GHC.Stack (CallStack, HasCallStack, SrcLoc(..))
 import GHC.Stack (callStack, getCallStack, withFrozenCallStack)
-#else
-import GHC.Exts (Constraint)
-#endif
+
 
 newtype LineNo =
   LineNo {
@@ -44,25 +41,7 @@ data Span =
     , spanEndColumn :: !ColumnNo
     } deriving (Eq, Ord)
 
-#if !MIN_VERSION_base(4,9,0)
-type family HasCallStack :: Constraint where
-  HasCallStack = ()
-
-data CallStack =
-  CallStack
-  deriving (Show)
-
-callStack :: HasCallStack => CallStack
-callStack =
-  CallStack
-
-withFrozenCallStack :: HasCallStack => (HasCallStack => a) -> a
-withFrozenCallStack x =
-  x
-#endif
-
 getCaller :: CallStack -> Maybe Span
-#if MIN_VERSION_base(4,9,0)
 getCaller stack =
   case getCallStack stack of
     [] ->
@@ -74,10 +53,6 @@ getCaller stack =
         (fromIntegral $ srcLocStartCol x)
         (fromIntegral $ srcLocEndLine x)
         (fromIntegral $ srcLocEndCol x)
-#else
-getCaller _ =
-  Nothing
-#endif
 
 ------------------------------------------------------------------------
 -- Show instances

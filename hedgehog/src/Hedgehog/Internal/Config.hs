@@ -1,4 +1,5 @@
 {-# OPTIONS_HADDOCK not-home #-}
+{-# LANGUAGE DeriveLift #-}
 {-# LANGUAGE DoAndIfThenElse #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
@@ -24,7 +25,7 @@ import           Control.Monad.IO.Class (MonadIO(..))
 
 import qualified GHC.Conc as Conc
 
-import           Language.Haskell.TH.Lift (deriveLift)
+import           Language.Haskell.TH.Syntax (Lift)
 
 import           System.Console.ANSI (hSupportsANSI)
 import           System.Environment (lookupEnv)
@@ -40,7 +41,7 @@ data UseColor =
     -- ^ Disable ANSI colors in report output.
   | EnableColor
     -- ^ Enable ANSI colors in report output.
-    deriving (Eq, Ord, Show)
+    deriving (Eq, Ord, Show, Lift)
 
 -- | How verbose should the report output be.
 --
@@ -49,13 +50,13 @@ data Verbosity =
     -- ^ Only display the summary of the test run.
   | Normal
     -- ^ Display each property as it is running, as well as the summary.
-    deriving (Eq, Ord, Show)
+    deriving (Eq, Ord, Show, Lift)
 
 -- | The number of workers to use when running properties in parallel.
 --
 newtype WorkerCount =
   WorkerCount Int
-  deriving (Eq, Ord, Show, Num, Enum, Real, Integral)
+  deriving (Eq, Ord, Show, Num, Enum, Real, Integral, Lift)
 
 detectMark :: MonadIO m => m Bool
 detectMark = do
@@ -154,10 +155,3 @@ resolveWorkers = \case
     detectWorkers
   Just x ->
     pure x
-
-------------------------------------------------------------------------
--- FIXME Replace with DeriveLift when we drop 7.10 support.
-
-$(deriveLift ''UseColor)
-$(deriveLift ''Verbosity)
-$(deriveLift ''WorkerCount)
