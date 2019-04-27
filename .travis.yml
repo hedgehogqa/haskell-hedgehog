@@ -144,5 +144,14 @@ script:
   # Build without installed constraints for packages in global-db
   - rm -f cabal.project.local; ${CABAL} new-build -w ${HC} --disable-tests --disable-benchmarks all
 
+branches:
+  only:
+    # This is where pull requests from "bors r+" are built.
+    - staging
+    # This is where pull requests from "bors try" are built.
+    - trying
+    # Comment this to disable building pull requests.
+    - master
+
 # REGENDATA ["cabal.project"]
 # EOF
