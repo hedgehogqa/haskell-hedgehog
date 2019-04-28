@@ -1096,7 +1096,7 @@ label name =
   withFrozenCallStack $
     cover 0 name True
 
--- | Like 'label', but uses the 'Show'n value as the label.
+-- | Like 'label', but uses 'Show' to render its argument for display.
 --
 collect :: (MonadTest m, Show a, HasCallStack) => a -> m ()
 collect x =

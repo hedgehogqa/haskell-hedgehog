@@ -1,9 +1,6 @@
 module Hedgehog.Gen (
-  -- * Combinators
-    lift
-
   -- ** Shrinking
-  , shrink
+    shrink
   , prune
 
   -- ** Size

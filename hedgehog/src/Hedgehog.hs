@@ -56,8 +56,6 @@ module Hedgehog (
 
   , forAll
   , forAllWith
-  , classify
-  , cover
   , discard
 
   , check
@@ -112,6 +110,8 @@ module Hedgehog (
   , evalExceptT
 
   -- * Coverage
+  , classify
+  , cover
   , label
   , collect
 

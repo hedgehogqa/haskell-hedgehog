@@ -23,7 +23,7 @@ mkTree n =
 
 mkGen :: Int -> Gen Int
 mkGen =
-  Gen.liftTree . mkTree
+  Gen.fromTree . mkTree
 
 render :: Show a => HasCallStack => Tree a -> PropertyT IO ()
 render x =

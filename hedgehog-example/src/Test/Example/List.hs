@@ -49,8 +49,8 @@ prop_list =
         fmap show .
         fmap (\xs -> (cond xs, xs))
 
-    ts <- forAllWith renderTree (Gen.tree $ genList genInt)
-    xs0 <- forAll (Gen.liftTree ts)
+    ts <- forAllWith renderTree (Gen.toTree $ genList genInt)
+    xs0 <- forAll (Gen.fromTree ts)
 
     assert (cond xs0)
 
@@ -79,8 +79,8 @@ prop_state_list =
         fmap show .
         fmap (\xs -> (cond xs, xs))
 
-    ts <- forAllWith renderTree (Gen.tree $ hoist (`Lazy.evalStateT` 0) $ genList genStateInt)
-    xs0 <- forAll (Gen.liftTree ts)
+    ts <- forAllWith renderTree (Gen.toTree $ hoist (`Lazy.evalStateT` 0) $ genList genStateInt)
+    xs0 <- forAll (Gen.fromTree ts)
 
     assert (cond xs0)
 
@@ -121,8 +121,8 @@ prop_writer_list =
         Tree.render .
         fmap (\(ns, ws) -> show (cond ns, ns) ++ " (" ++ renderLog ws ++ ")")
 
-    ts <- forAllWith renderTree (Gen.tree . Lazy.runWriterT $ genWriterList genWriterInt)
-    (xs0, _) <- forAll (Gen.liftTree ts)
+    ts <- forAllWith renderTree (Gen.toTree . Lazy.runWriterT $ genWriterList genWriterInt)
+    (xs0, _) <- forAll (Gen.fromTree ts)
 
     assert (cond xs0)
 

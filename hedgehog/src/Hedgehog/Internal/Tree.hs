@@ -12,6 +12,7 @@ module Hedgehog.Internal.Tree (
     Tree
   , TreeT(..)
   , runTree
+  , mapTreeT
   , treeValue
   , treeChildren
 
@@ -94,6 +95,12 @@ runTree :: Tree a -> Node a
 runTree =
   runIdentity . runTreeT
 
+-- | Map between 'TreeT' computations.
+--
+mapTreeT :: (m (NodeT m a) -> m (NodeT m a)) -> TreeT m a -> TreeT m a
+mapTreeT f =
+  TreeT . f . runTreeT
+
 -- | Create a 'TreeT' from a 'NodeT'
 --
 fromNodeT :: Applicative m => NodeT m a -> TreeT m a
@@ -174,26 +181,6 @@ splits = \case
   x : xs ->
     ([], x, xs) :
     fmap (\(as, b, cs) -> (x : as, b, cs)) (splits xs)
-
-
---dropOne :: [Tree a] -> [Tree [a]]
---dropOne ts = do
---  (xs, _, zs) <- splits ts
---  pure $ interleave (xs ++ zs)
---
---shrinkOne :: [Tree a] -> [Tree [a]]
---shrinkOne ts = do
---  (xs, y0, zs) <- splits ts
---  y <- treeChildren y0
---  pure $ interleave (xs ++ [y] ++ zs)
---
---interleave :: [Tree a] -> Tree [a]
---interleave ts0 =
---  mkTree (fmap treeValue ts0) $
---    concat [
---        dropOne ts0
---      , shrinkOne ts0
---      ]
 
 dropOne :: Monad m => [NodeT m a] -> [TreeT m [a]]
 dropOne ts = do

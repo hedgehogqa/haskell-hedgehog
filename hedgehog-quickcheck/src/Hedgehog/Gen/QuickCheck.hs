@@ -16,7 +16,7 @@ import qualified Test.QuickCheck.Random as QuickCheck
 
 seedQCGen :: MonadGen m => m QuickCheck.QCGen
 seedQCGen =
-  QuickCheck.mkQCGen <$> Gen.lift (Gen.integral_ Range.constantBounded)
+  QuickCheck.mkQCGen <$> fromGenT (Gen.integral_ Range.constantBounded)
 
 -- | Create a Hedgehog 'Gen' from a QuickCheck 'QuickCheck.Gen'.
 --
