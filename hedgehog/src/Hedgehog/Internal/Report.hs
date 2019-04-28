@@ -67,6 +67,7 @@ import           System.Console.ANSI (ColorIntensity(..), Color(..))
 import           System.Console.ANSI (ConsoleLayer(..), ConsoleIntensity(..))
 import           System.Console.ANSI (SGR(..), setSGRCode)
 import           System.Directory (makeRelativeToCurrentDirectory)
+
 #if mingw32_HOST_OS
 import           System.IO (hSetEncoding, stdout, stderr, utf8)
 #endif

@@ -12,17 +12,10 @@ environment:
   matrix:
     # We don't get many build bots with Appveyor so we only include the
     # latest for each major version.
-    - GHC_VERSION: "8.6.4"
-    #- GHC_VERSION: "8.6.3"
-    #- GHC_VERSION: "8.6.2"
-    #- GHC_VERSION: "8.6.1"
-    - GHC_VERSION: "8.4.4"
-    #- GHC_VERSION: "8.4.3"
-    #- GHC_VERSION: "8.4.2"
-    #- GHC_VERSION: "8.4.1"
-    - GHC_VERSION: "8.2.2"
     - GHC_VERSION: "8.0.2"
-    #- GHC_VERSION: "8.0.1"
+    - GHC_VERSION: "8.2.2"
+    - GHC_VERSION: "8.4.4"
+    - GHC_VERSION: "8.6.4"
 
 cache:
  - "C:\\SR"

@@ -1,7 +1,9 @@
 {-# OPTIONS_HADDOCK not-home #-}
+{-# LANGUAGE ApplicativeDo #-}
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveLift #-}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE DoAndIfThenElse #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -151,7 +153,7 @@ import qualified Hedgehog.Internal.Gen as Gen
 import           Hedgehog.Internal.Show
 import           Hedgehog.Internal.Source
 
-import           Language.Haskell.TH.Lift (deriveLift)
+import           Language.Haskell.TH.Syntax (Lift)
 
 ------------------------------------------------------------------------
 
@@ -217,7 +219,7 @@ newtype TestT m a =
 newtype PropertyName =
   PropertyName {
       unPropertyName :: String
-    } deriving (Eq, Ord, Show, IsString, Semigroup)
+    } deriving (Eq, Ord, Show, IsString, Semigroup, Lift)
 
 -- | Configuration for a property test.
 --
@@ -227,7 +229,7 @@ data PropertyConfig =
     , propertyDiscardLimit :: !DiscardLimit
     , propertyShrinkLimit :: !ShrinkLimit
     , propertyShrinkRetries :: !ShrinkRetries
-    } deriving (Eq, Ord, Show)
+    } deriving (Eq, Ord, Show, Lift)
 
 -- | The number of successful tests that need to be run before a property test
 --   is considered successful.
@@ -240,7 +242,7 @@ data PropertyConfig =
 --
 newtype TestLimit =
   TestLimit Int
-  deriving (Eq, Ord, Show, Num, Enum, Real, Integral)
+  deriving (Eq, Ord, Show, Num, Enum, Real, Integral, Lift)
 
 -- | The number of tests a property ran successfully.
 --
@@ -265,7 +267,7 @@ newtype DiscardCount =
 --
 newtype DiscardLimit =
   DiscardLimit Int
-  deriving (Eq, Ord, Show, Num, Enum, Real, Integral)
+  deriving (Eq, Ord, Show, Num, Enum, Real, Integral, Lift)
 
 -- | The number of shrinks to try before giving up on shrinking.
 --
@@ -277,7 +279,7 @@ newtype DiscardLimit =
 --
 newtype ShrinkLimit =
   ShrinkLimit Int
-  deriving (Eq, Ord, Show, Num, Enum, Real, Integral)
+  deriving (Eq, Ord, Show, Num, Enum, Real, Integral, Lift)
 
 -- | The numbers of times a property was able to shrink after a failing test.
 --
@@ -302,7 +304,7 @@ newtype ShrinkCount =
 --
 newtype ShrinkRetries =
   ShrinkRetries Int
-  deriving (Eq, Ord, Show, Num, Enum, Real, Integral)
+  deriving (Eq, Ord, Show, Num, Enum, Real, Integral, Lift)
 
 -- | A named collection of property tests.
 --
@@ -323,7 +325,7 @@ data Group =
 newtype GroupName =
   GroupName {
       unGroupName :: String
-    } deriving (Eq, Ord, Show, IsString, Semigroup)
+    } deriving (Eq, Ord, Show, IsString, Semigroup, Lift)
 
 -- | The number of properties in a group.
 --
@@ -1100,17 +1102,6 @@ collect :: (MonadTest m, Show a, HasCallStack) => a -> m ()
 collect x =
   withFrozenCallStack $
     cover 0 (LabelName (show x)) True
-
-------------------------------------------------------------------------
--- FIXME Replace with DeriveLift when we drop 7.10 support.
-
-$(deriveLift ''GroupName)
-$(deriveLift ''PropertyName)
-$(deriveLift ''PropertyConfig)
-$(deriveLift ''TestLimit)
-$(deriveLift ''DiscardLimit)
-$(deriveLift ''ShrinkLimit)
-$(deriveLift ''ShrinkRetries)
 
 ------------------------------------------------------------------------
 -- Internal

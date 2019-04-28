@@ -1,6 +1,7 @@
 {-# OPTIONS_HADDOCK not-home #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE DeriveLift #-}
 {-# LANGUAGE DoAndIfThenElse #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
@@ -48,7 +49,7 @@ import qualified Hedgehog.Internal.Seed as Seed
 import           Hedgehog.Internal.Tree (TreeT(..), NodeT(..))
 import           Hedgehog.Range (Size)
 
-import           Language.Haskell.TH.Lift (deriveLift)
+import           Language.Haskell.TH.Syntax (Lift)
 
 #if mingw32_HOST_OS
 import           System.IO (hSetEncoding, stdout, stderr, utf8)
@@ -69,7 +70,7 @@ data RunnerConfig =
       -- | How verbose to be in the runner output. 'Nothing' means detect from
       --   the environment.
     , runnerVerbosity :: !(Maybe Verbosity)
-    } deriving (Eq, Ord, Show)
+    } deriving (Eq, Ord, Show, Lift)
 
 findM :: Monad m => [a] -> b -> (a -> m (Maybe b)) -> m b
 findM xs0 def p =
@@ -431,8 +432,3 @@ checkParallel =
       , runnerVerbosity =
           Nothing
       }
-
-------------------------------------------------------------------------
--- FIXME Replace with DeriveLift when we drop 7.10 support.
-
-$(deriveLift ''RunnerConfig)
