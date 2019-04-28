@@ -45,6 +45,7 @@ library
       Test.Example.Basic
     , Test.Example.Coverage
     , Test.Example.Exception
+    , Test.Example.List
     , Test.Example.QuickCheck
     , Test.Example.References
     , Test.Example.Registry

@@ -56,8 +56,6 @@ module Hedgehog (
 
   , forAll
   , forAllWith
-  , classify
-  , cover
   , discard
 
   , check
@@ -112,6 +110,8 @@ module Hedgehog (
   , evalExceptT
 
   -- * Coverage
+  , classify
+  , cover
   , label
   , collect
 
@@ -133,7 +133,7 @@ module Hedgehog (
   , Opaque(..)
 
   -- * Transformers
-  , distribute
+  , distributeT
 
   -- * Functors
   , HTraversable(..)
@@ -150,7 +150,7 @@ module Hedgehog (
 
 import           Data.Functor.Classes (Eq1, eq1, Ord1, compare1, Show1, showsPrec1)
 
-import           Hedgehog.Internal.Distributive (Distributive(..))
+import           Hedgehog.Internal.Distributive (distributeT)
 import           Hedgehog.Internal.Gen (Gen, GenT, MonadGen(..))
 import           Hedgehog.Internal.HTraversable (HTraversable(..))
 import           Hedgehog.Internal.Opaque (Opaque(..))
