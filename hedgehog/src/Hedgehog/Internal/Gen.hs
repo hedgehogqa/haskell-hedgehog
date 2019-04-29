@@ -95,7 +95,9 @@ module Hedgehog.Internal.Gen (
   , discard
   , ensure
   , filter
+  , filterT
   , just
+  , justT
 
   -- ** Collections
   , maybe
@@ -659,7 +661,7 @@ shrink f =
 --
 prune :: MonadGen m => m a -> m a
 prune =
-  withGenT $ mapGenT Tree.prune
+  withGenT $ mapGenT (Tree.prune 0)
 
 ------------------------------------------------------------------------
 -- Combinators - Size
@@ -1004,7 +1006,7 @@ latin1 =
 -- | Generates a Unicode character, excluding noncharacters and invalid standalone surrogates:
 --   @'\0'..'\1114111' (excluding '\55296'..'\57343')@
 --
-unicode :: MonadGen m => m Char
+unicode :: (MonadGen m, GenBase m ~ Identity) => m Char
 unicode =
   filter (not . isNoncharacter) $ filter (not . isSurrogate) unicodeAll
 
@@ -1202,22 +1204,39 @@ ensure p gen = do
 --   This is essentially:
 --
 -- @
--- filter p gen = 'mfilter' p gen '<|>' filter p gen
+--   filter p gen = 'mfilter' p gen '<|>' filter p gen
 -- @
 --
 --   It differs from the above in that we keep some state to avoid looping
 --   forever. If we trigger these limits then the whole generator is discarded.
 --
-filter :: MonadGen m => (a -> Bool) -> m a -> m a
-filter p gen =
+filter :: (MonadGen m, GenBase m ~ Identity) => (a -> Bool) -> m a -> m a
+filter p gen0 =
   let
     try k =
       if k > 100 then
         discard
       else do
-        x <- scale (2 * k +) gen
+        (x, gen) <- freeze $ scale (2 * k +) gen0
+
         if p x then
-          pure x
+          withGenT (mapGenT (Tree.filterMaybeT p)) gen
+        else
+          try (k + 1)
+  in
+    try 0
+
+filterT :: MonadGen m => (a -> Bool) -> m a -> m a
+filterT p gen0 =
+  let
+    try k =
+      if k > 100 then
+        discard
+      else do
+        (x, gen) <- freeze $ scale (2 * k +) gen0
+
+        if p x then
+          withGenT (mapGenT (Tree.filterT p)) gen
         else
           try (k + 1)
   in
@@ -1227,9 +1246,22 @@ filter p gen =
 --
 --   This is implemented using 'filter' and has the same caveats.
 --
-just :: MonadGen m => m (Maybe a) -> m a
+just :: (MonadGen m, GenBase m ~ Identity) => m (Maybe a) -> m a
 just g = do
   mx <- filter Maybe.isJust g
+  case mx of
+    Just x ->
+      pure x
+    Nothing ->
+      error "Hedgehog.Gen.just: internal error, unexpected Nothing"
+
+-- | Runs a 'Maybe' generator until it produces a 'Just'.
+--
+--   This is implemented using 'filter' and has the same caveats.
+--
+justT :: MonadGen m => m (Maybe a) -> m a
+justT g = do
+  mx <- filterT Maybe.isJust g
   case mx of
     Just x ->
       pure x
@@ -1254,7 +1286,6 @@ maybe gen =
 list :: MonadGen m => Range Int -> m a -> m [a]
 list range gen =
   let
-     --interleave :: Monad m => TreeT (MaybeT m) [TreeT (MaybeT m) a] -> TreeT (MaybeT m) [a]
      interleave =
        (interleaveTreeT . nodeValue =<<)
   in

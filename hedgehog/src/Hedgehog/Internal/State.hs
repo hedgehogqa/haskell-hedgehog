@@ -537,7 +537,7 @@ action ::
   => [Command gen m state]
   -> GenT (StateT (Context state) (GenBase gen)) (Action m state)
 action commands =
-  Gen.just $ do
+  Gen.justT $ do
     Context state0 _ <- get
 
     Command mgenInput exec callbacks <-

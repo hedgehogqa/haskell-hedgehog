@@ -1,15 +1,19 @@
 {-# OPTIONS_HADDOCK not-home #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE DoAndIfThenElse #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-} -- MonadBase
 module Hedgehog.Internal.Tree (
     Tree
+  , pattern Tree
   , TreeT(..)
   , runTree
   , mapTreeT
@@ -17,6 +21,7 @@ module Hedgehog.Internal.Tree (
   , treeChildren
 
   , Node
+  , pattern Node
   , NodeT(..)
   , fromNodeT
 
@@ -26,7 +31,11 @@ module Hedgehog.Internal.Tree (
   , expand
   , prune
 
+  , catMaybes
   , filter
+  , filterMaybeT
+  , filterT
+  , depth
   , interleave
 
   , render
@@ -36,14 +45,16 @@ module Hedgehog.Internal.Tree (
 import           Control.Applicative (Alternative(..), liftA2)
 import           Control.Monad (MonadPlus(..), join)
 import           Control.Monad.Base (MonadBase(..))
+import           Control.Monad.Trans.Control ()
 import           Control.Monad.Catch (MonadThrow(..), MonadCatch(..), Exception)
 import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Monad.IO.Class (MonadIO(..))
-import           Control.Monad.Morph (MFunctor(..), MMonad(..))
+import           Control.Monad.Morph (MFunctor(..), MMonad(..), generalize)
 import           Control.Monad.Primitive (PrimMonad(..))
 import           Control.Monad.Reader.Class (MonadReader(..))
 import           Control.Monad.State.Class (MonadState(..))
 import           Control.Monad.Trans.Class (MonadTrans(..))
+import           Control.Monad.Trans.Maybe (MaybeT(..))
 import           Control.Monad.Trans.Resource (MonadResource(..))
 import           Control.Monad.Writer.Class (MonadWriter(..))
 import           Control.Monad.Zip (MonadZip(..))
@@ -52,7 +63,7 @@ import           Data.Functor.Identity (Identity(..))
 import           Data.Functor.Classes (Eq1(..))
 import           Data.Functor.Classes (Show1(..), showsPrec1)
 import           Data.Functor.Classes (showsUnaryWith, showsBinaryWith)
-import           Data.Maybe (mapMaybe)
+import qualified Data.Maybe as Maybe
 
 import           Hedgehog.Internal.Distributive
 
@@ -64,6 +75,13 @@ import           Prelude hiding (filter)
 --
 type Tree =
   TreeT Identity
+
+-- | Pattern to ease construction / deconstruction of pure trees.
+--
+pattern Tree :: NodeT Identity a -> Tree a
+pattern Tree node =
+  TreeT (Identity node)
+{-# COMPLETE Tree #-}
 
 -- | An effectful tree, each node in the tree can have an effect before it is
 --   produced.
@@ -77,6 +95,13 @@ newtype TreeT m a =
 --
 type Node =
   NodeT Identity
+{-# COMPLETE Node #-}
+
+-- | Pattern to ease construction / deconstruction of pure nodes.
+--
+pattern Node :: a -> [Tree a] -> Node a
+pattern Node x xs =
+  NodeT x xs
 
 -- | A node in an effectful tree, as well as its unevaluated children.
 --
@@ -141,27 +166,121 @@ expand f m =
     pure . NodeT x $
       fmap (expand f) xs ++ unfoldForest f x
 
--- | Throw away a tree's children.
+-- | Throw away @n@ levels of a tree's children.
 --
-prune :: Monad m => TreeT m a -> TreeT m a
-prune m =
-  TreeT $ do
-    NodeT x _ <- runTreeT m
-    pure $ NodeT x []
+--   /@prune 0@ will throw away all of a tree's children./
+--
+prune :: Monad m => Int -> TreeT m a -> TreeT m a
+prune n m =
+  if n <= 0 then
+    TreeT $ do
+      NodeT x _ <- runTreeT m
+      pure $ NodeT x []
+  else
+    TreeT $ do
+      NodeT x xs0 <- runTreeT m
+      pure . NodeT x $
+        fmap (prune (n - 1)) xs0
+
+-- | Returns the depth of the deepest leaf node in the tree.
+--
+depth :: Tree a -> Int
+depth m =
+  let
+    NodeT _ xs =
+      runTree m
+
+    n =
+      if null xs then
+        0
+      else
+        maximum (fmap depth xs)
+  in
+    1 + n
+
+-- | Takes a tree of 'Maybe's and returns a tree of all the 'Just' values.
+--
+--   If the root of the tree is 'Nothing' then 'Nothing' is returned.
+--
+catMaybes :: Tree (Maybe a) -> Maybe (Tree a)
+catMaybes m =
+  let
+    NodeT mx mxs =
+      runTree m
+  in
+    case mx of
+      Nothing -> do
+        case Maybe.mapMaybe catMaybes mxs of
+          [] ->
+            Nothing
+          Tree (NodeT x xs0) : xs1 ->
+            Just . Tree $
+              Node x (xs0 ++ xs1)
+      Just x ->
+        Just . Tree $
+          Node x (Maybe.mapMaybe catMaybes mxs)
 
 -- | Returns a tree containing only elements that match the predicate.
 --
+--   If the root of the tree does not match the predicate then 'Nothing' is
+--   returned.
+--
 filter :: (a -> Bool) -> Tree a -> Maybe (Tree a)
-filter p m =
+filter p =
+  catMaybes .
+  runTreeMaybeT .
+  filterMaybeT p .
+  hoist lift
+
+runTreeMaybeT :: Monad m => TreeT (MaybeT m) a -> TreeT m (Maybe a)
+runTreeMaybeT =
+  runMaybeT .
+  distributeT
+
+-- | Returns a tree containing only elements that match the predicate.
+--
+--   If the root of the tree does not match the predicate then 'Nothing' is
+--   returned.
+--
+filterMaybeT :: (a -> Bool) -> TreeT (MaybeT Identity) a -> TreeT (MaybeT Identity) a
+filterMaybeT p t =
+  case runTreeMaybeT t of
+    Tree (Node Nothing _) ->
+      TreeT . MaybeT . Identity $ Nothing
+    Tree (Node (Just x) xs) ->
+      hoist generalize $
+        Tree . Node x $
+          concatMap (flattenTree (maybe False p)) xs
+
+flattenTree :: (Maybe a -> Bool) -> Tree (Maybe a) -> [Tree a]
+flattenTree p (Tree (Node mx mxs0)) =
   let
-    NodeT x xs =
-      runTree m
+    mxs =
+      concatMap (flattenTree p) mxs0
   in
-    if p x then
-      Just . TreeT . pure . NodeT x $
-        mapMaybe (filter p) xs
+    if p mx then
+      case mx of
+        Nothing ->
+          []
+        Just x ->
+          [Tree (Node x mxs)]
     else
-      Nothing
+      mxs
+
+-- | Returns a tree containing only elements that match the predicate.
+--
+--   When an element does not match the predicate its node is replaced with
+--   'empty'.
+--
+filterT :: (Monad m, Alternative m) => (a -> Bool) -> TreeT m a -> TreeT m a
+filterT p m =
+  TreeT $ do
+    NodeT x xs <- runTreeT m
+    if p x then
+      pure $
+        NodeT x (fmap (filterT p) xs)
+    else
+      empty
 
 ------------------------------------------------------------------------
 
