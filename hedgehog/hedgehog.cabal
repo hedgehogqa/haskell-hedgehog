@@ -122,6 +122,8 @@ test-suite test
     test
 
   other-modules:
+    Test.Hedgehog.Applicative
+    Test.Hedgehog.Filter
     Test.Hedgehog.Seed
     Test.Hedgehog.Text
     Test.Hedgehog.Zip
@@ -130,6 +132,7 @@ test-suite test
       hedgehog
     , base                            >= 3          && < 5
     , containers                      >= 0.4        && < 0.7
+    , mmorph                          >= 1.0        && < 1.2
     , mtl                             >= 2.1        && < 2.3
     , pretty-show                     >= 1.6        && < 1.10
     , semigroups                      >= 0.16       && < 0.19
