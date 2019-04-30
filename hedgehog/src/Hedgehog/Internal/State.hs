@@ -71,6 +71,7 @@ import qualified Data.Map as Map
 import qualified Data.Maybe as Maybe
 import           Data.Typeable (Typeable, TypeRep, Proxy(..), typeRep)
 
+import           Hedgehog.Internal.Distributive (distributeT)
 import           Hedgehog.Internal.Gen (MonadGen, GenT, GenBase)
 import qualified Hedgehog.Internal.Gen as Gen
 import           Hedgehog.Internal.HTraversable (HTraversable(..))
@@ -572,7 +573,7 @@ genActions ::
   -> Context state
   -> gen ([Action m state], Context state)
 genActions range commands ctx = do
-  xs <- Gen.fromGenT . hoist (`evalStateT` ctx) $ Gen.list range (action commands)
+  xs <- Gen.fromGenT . (`evalStateT` ctx) . distributeT $ Gen.list range (action commands)
   pure $
     dropInvalid xs `runState` ctx
 

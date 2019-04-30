@@ -334,6 +334,14 @@ instance Foldable Node where
   foldMap f (NodeT x xs) =
     f x `mappend` mconcat (fmap (foldMap f) xs)
 
+instance Traversable Tree where
+  traverse f (TreeT mx) =
+    TreeT <$> traverse (traverse f) mx
+
+instance Traversable Node where
+  traverse f (NodeT x xs) =
+    NodeT <$> f x <*> traverse (traverse f) xs
+
 ------------------------------------------------------------------------
 -- NodeT/TreeT instances
 

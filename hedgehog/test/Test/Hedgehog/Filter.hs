@@ -3,21 +3,14 @@
 {-# LANGUAGE FlexibleContexts #-}
 module Test.Hedgehog.Filter where
 
-import           Control.Monad (join)
-import           Control.Monad.Trans.Maybe (MaybeT(..))
-import           Control.Monad.Morph (hoist, generalize)
-
 import           Data.Foldable (toList)
-import           Data.Functor.Identity (Identity(..))
 import qualified Data.Set as Set
 
 import           Hedgehog
 import qualified Hedgehog.Range as Range
 
 import qualified Hedgehog.Internal.Gen as Gen
-import qualified Hedgehog.Internal.Shrink as Shrink
-import           Hedgehog.Internal.Source (HasCallStack, withFrozenCallStack)
-import           Hedgehog.Internal.Tree (Tree, TreeT(..), NodeT(..))
+import           Hedgehog.Internal.Tree (NodeT(..))
 import qualified Hedgehog.Internal.Tree as Tree
 
 -- | Prevent this bug from returning:
@@ -98,7 +91,6 @@ prop_filter_even =
 
     annotateShow missing
     required === actual
-    failure
 
 tests :: IO Bool
 tests =
