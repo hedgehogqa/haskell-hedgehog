@@ -8,6 +8,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
+
 module Hedgehog.Internal.Report (
   -- * Report
     Summary(..)
@@ -209,6 +210,7 @@ data Markup =
   | SuccessText
   | CoverageIcon
   | CoverageText
+  | CoverageFill
   | DeclarationLocation
   | StyledLineNo !Style
   | StyledBorder !Style
@@ -767,7 +769,7 @@ ppCoverage tests x =
 data ColumnWidth =
   ColumnWidth {
       widthPercentage :: !Int
-    , _widthMinimum :: !Int
+    , widthMinimum :: !Int
     , widthName :: !Int
     , _widthNameFail :: !Int
     }
@@ -800,9 +802,12 @@ labelWidth tests x =
       labelAnnotation x
 
     minimum_ =
-      length .
-      renderCoverPercentage $
-      labelMinimum x
+      if labelMinimum x == 0 then
+        0
+      else
+        length .
+        renderCoverPercentage $
+        labelMinimum x
 
     name =
       length .
@@ -832,34 +837,66 @@ ppLeftPad n doc =
 ppLabel :: TestCount -> ColumnWidth -> Label CoverCount -> Doc Markup
 ppLabel tests w x@(MkLabel name _ minimum_ count) =
   let
-    wcover =
-      ppLeftPad (widthPercentage w) $
+    covered =
+      labelCovered tests x
+
+    ltext =
+      if not covered then
+        WL.annotate CoverageText
+      else
+        id
+
+    lborder =
+      WL.annotate (StyledBorder StyleDefault)
+
+    licon =
+      if not covered then
+        WL.annotate CoverageText "⚠ "
+      else
+        "  "
+
+    lname =
+      WL.fill (widthName w) (ppLabelName name)
+
+    wminimum =
+      ppLeftPad (widthMinimum w) $
+        ppCoverPercentage minimum_
+
+    wcover i =
+      ppLeftPad (widthPercentage w + length i) $
+        WL.text i <>
         ppCoverPercentage (coverPercentage tests count)
 
-    wname =
-      WL.fill (widthName w) (ppLabelName name)
+    lminimum =
+      if widthMinimum w == 0 then
+        mempty
+      else if not covered then
+        " ✗ " <> wminimum
+      else if minimum_ == 0 then
+        "   " <> ppLeftPad (widthMinimum w) ""
+      else
+        " ✓ " <> wminimum
+
+    lcover =
+      if widthMinimum w == 0 then
+        wcover ""
+      else if not covered then
+        wcover ""
+      else if minimum_ == 0 then
+        wcover ""
+      else
+        wcover ""
   in
-    if labelCovered tests x then
-      WL.hcat [
-          "  "
-        , wcover
-        , " "
-        , wname
-        , if minimum_ == 0 then
-            mempty
-          else
-            " ✓ " <> ppCoverPercentage minimum_
-        ]
-    else
-      WL.annotate CoverageText $
-      WL.hcat [
-          "⚠ "
-        , wcover
-        , " "
-        , wname
-        , " ✗ "
-        , ppCoverPercentage minimum_
-        ]
+    WL.hcat [
+        licon
+      , ltext lname
+      , lborder " "
+      , ltext lcover
+      , lborder " "
+      , ltext $ ppCoverBar (coverPercentage tests count) minimum_
+      , lborder "" -- "│"
+      , ltext lminimum
+      ]
 
 ppLabelName :: LabelName -> Doc a
 ppLabelName (LabelName name) =
@@ -868,6 +905,93 @@ ppLabelName (LabelName name) =
 ppCoverPercentage :: CoverPercentage -> Doc Markup
 ppCoverPercentage =
   WL.text . renderCoverPercentage
+
+ppCoverBar :: CoverPercentage -> CoverPercentage -> Doc Markup
+ppCoverBar (CoverPercentage percentage) (CoverPercentage minimum_) =
+  let
+    barWidth :: Int
+    barWidth =
+      20
+
+    coverageRatio :: Double
+    coverageRatio =
+      percentage / 100.0
+
+    coverageWidth_ :: Int
+    coverageWidth_ =
+      floor $
+        coverageRatio * fromIntegral barWidth
+
+    minimumRatio :: Double
+    minimumRatio =
+      minimum_ / 100.0
+
+    minimumWidth :: Int
+    minimumWidth =
+      floor $
+        minimumRatio * fromIntegral barWidth
+
+    index :: [a] -> Int
+    index xs =
+      floor $
+        ((coverageRatio * fromIntegral barWidth) - fromIntegral coverageWidth_) *
+        fromIntegral (length xs)
+
+    part xs =
+      xs !! index xs
+
+    fillWidth =
+      barWidth - coverageWidth_ - 1
+
+    fillErrorWidth =
+      max 0 (minimumWidth - coverageWidth_ - 1)
+
+    fillSurplusWidth =
+      fillWidth - fillErrorWidth
+
+    bar :: (Char, [Char]) -> Doc Markup
+    bar (full, parts) =
+      WL.hcat [
+        WL.text $ replicate coverageWidth_ full
+      , if fillWidth >= 0 then
+          if index parts == 0 then
+            if fillErrorWidth > 0 then
+              WL.annotate FailedText $ WL.text [part parts]
+            else
+              WL.annotate CoverageFill $ WL.text [part parts]
+          else
+            WL.text [part parts]
+        else
+          ""
+      , WL.annotate FailedText . WL.text $
+          replicate fillErrorWidth (head parts)
+      , WL.annotate CoverageFill . WL.text $
+          replicate fillSurplusWidth (head parts)
+      --
+      -- Uncomment when debugging:
+      --
+      -- , WL.annotate CoverageFill . WL.text $
+      --        " " ++ show barWidth
+      --     ++ " " ++ show coverageWidth_
+      --     ++ " " ++ show minimumWidth
+      --     ++ " " ++ "/"
+      --     ++ " " ++ show fillErrorWidth
+      --     ++ " " ++ "+"
+      --     ++ " " ++ show fillSurplusWidth
+      --     ++ " " ++ "="
+      --     ++ " " ++ show fillWidth
+      ]
+  in
+    bar ('█', ['·', '▏', '▎', '▍', '▌', '▋', '▊', '▉'])
+
+    -- FIXME Maybe this should be configurable?
+    -- Alternative histogram bars:
+    --bar ('⣿', ['·', '⡀', '⡄', '⡆', '⡇', '⣇', '⣧', '⣷'])
+    --bar ('⣿', ['⢕', '⡀', '⣀', '⣄', '⣤', '⣦', '⣶', '⣷'])
+    --bar ('⣿', ['⢕', '⡵', '⢗', '⣗', '⣟'])
+    --bar ('⣿', [' ', '⡵', '⢗', '⣗', '⣟'])
+    --bar ('█', ['░','▓'])
+    --bar ('█', ['░'])
 
 renderCoverPercentage :: CoverPercentage -> String
 renderCoverPercentage (CoverPercentage percentage) =
@@ -974,6 +1098,8 @@ renderDoc mcolor doc = do
         setSGRCode [dull Yellow]
       CoverageText ->
         setSGRCode [dull Yellow]
+      CoverageFill ->
+        setSGRCode [vivid Black]
 
       DeclarationLocation ->
         setSGRCode []
