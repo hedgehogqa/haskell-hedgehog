@@ -1,11 +1,16 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
-
 module Test.Example.Resource where
 
+import           Control.Monad (replicateM)
 import           Control.Monad.IO.Class (MonadIO(..))
 import           Control.Monad.Morph (hoist)
 import           Control.Monad.Trans.Except (ExceptT, throwE)
 import           Control.Monad.Trans.Resource (runResourceT)
+
+import           Data.IORef (IORef)
+import qualified Data.IORef as IORef
+import qualified Data.List as List
 
 import           Hedgehog
 import qualified Hedgehog.Gen as Gen
@@ -55,8 +60,102 @@ prop_unix_sort =
 
     values0 === values
 
+--
+-- Run this test to get an idea of how and when actions are executed during
+-- shrinking.
+--
+-- You should see that the following cases are possible:
+--
+-- @
+--   -- normal test run
+--   runResourceT {
+--     forAll:before
+--     forAll:after
+--     inner:hoist {
+--       inner:action
+--     }
+--   }
+-- @
+--
+-- @
+--   -- during shrinking
+--   runResourceT {
+--     forAll:after
+--     inner:hoist {
+--       inner:action
+--     }
+--   }
+-- @
+--
+-- @
+--   -- during shrinking (discard)
+--   runResourceT {
+--   }
+-- @
+--
+prop_logged_unix_sort :: IORef [String] -> Property
+prop_logged_unix_sort ref =
+  property . hoist (bracketLog ref 0 "runResourceT") . hoist runResourceT $ do
+    normalLog ref 2 "forAll:before"
+
+    values0 <- forAll $
+      Gen.list (Range.constant 1 2) $
+      Gen.string (Range.constant 1 2) Gen.alpha
+
+    normalLog ref 2 "forAll:after"
+
+    hoist (bracketLog ref 2 "inner:hoist") $ do
+      normalLog ref 4 "inner:action"
+
+      (_, dir) <- Temp.createTempDirectory Nothing "prop_dir"
+
+      let input = dir </> "input"
+          output = dir </> "output"
+
+      liftIO $ writeFile input (unlines values0)
+      evalExceptT $ unixSort input output
+      values <- liftIO . fmap lines $ readFile output
+
+      values0 === values
+
+bracketLog :: MonadIO m => IORef [String] -> Int -> String -> m a -> m a
+bracketLog ref indent x io = do
+  liftIO $ IORef.modifyIORef ref (++ [replicate indent ' ' ++ x ++ " {"])
+  z <- io
+  liftIO $ IORef.modifyIORef ref (++ [replicate indent ' ' ++ "}"])
+  pure z
+
+normalLog :: MonadIO m => IORef [String] -> Int -> String -> m ()
+normalLog ref indent x = do
+  liftIO $ IORef.modifyIORef ref (++ [replicate indent ' ' ++ x])
+
+joinBlocks :: [String] -> [String]
+joinBlocks = \case
+  [] ->
+    []
+  xs0 ->
+    let
+      (xs, x : ys) =
+        List.span (/= "}") xs0
+    in
+      concat (List.intersperse "\n" (xs ++ [x])) : joinBlocks ys
+
 tests :: IO Bool
-tests =
-  checkSequential $ Group "Test.Example.Resource" [
-      ("prop_unix_sort", prop_unix_sort)
-    ]
+tests = do
+  ref <- IORef.newIORef []
+
+  result <-
+    checkSequential $ Group "Test.Example.Resource" [
+        ("prop_unix_sort", prop_logged_unix_sort ref)
+      , ("prop_logged_unix_sort", prop_logged_unix_sort ref)
+      ]
+
+  -- Print only unique blocks, remove 'List.nub' to see the complete log.
+  liftIO $
+    putStr .
+    unlines .
+    List.nub .
+    joinBlocks =<<
+    IORef.readIORef ref
+
+  pure result
