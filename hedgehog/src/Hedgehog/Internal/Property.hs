@@ -874,14 +874,9 @@ discard =
 --   instance at the expense of not being able to generate additional inputs
 --   using 'forAll'.
 --
---   One use case for this is writing tests which use 'ResourceT':
---
--- @
---   property $ do
---     n <- forAll $ Gen.int64 Range.linearBounded
---     test . runResourceT $ do
---       -- test with resource usage here
--- @
+--   An example where this is useful is parallel state machine testing, as
+--   'Hedgehog.Internal.State.executeParallel' requires 'MonadBaseControl' 'IO'
+--   in order to be able to spawn threads in 'MonadTest'.
 --
 test :: Monad m => TestT m a -> PropertyT m a
 test =
