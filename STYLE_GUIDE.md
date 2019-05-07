@@ -300,13 +300,28 @@ single letter aliases.
 
 ```haskell
 import qualified GHC.Conc as Conc
+import qualified Text.Read as Read
+import qualified Data.Text as Text
 ```
 
 If necessary you can include periods in the alias name:
 
 ```haskell
-import qualified Text.Read as Base.Text
-import qualified Data.Text as Data.Text
+import qualified Data.ByteString as ByteString
+import qualified Data.ByteString.Lazy as ByteString.Lazy
+import qualified Data.Text as Text
+import qualified Data.Text.Lazy as Text.Lazy
+```
+
+In cases where the API doesn't overlap, this is better:
+
+```haskell
+import qualified Control.Monad.Trans.State.Lazy as Lazy
+import qualified Control.Monad.Trans.State.Strict as Strict
+import qualified Control.Monad.Trans.Writer.Lazy as Lazy
+import qualified Control.Monad.Trans.Writer.Strict as Strict
+import qualified Data.ByteString as Strict
+import qualified Data.ByteString.Lazy as Lazy
 ```
 
 If you need to use types from a module then they should be in their own import
