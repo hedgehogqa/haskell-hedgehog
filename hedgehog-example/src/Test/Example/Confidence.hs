@@ -10,11 +10,14 @@ import qualified Hedgehog.Internal.Gen as Gen
 -- Example 0: This test will certify that it is impossible to get 100%
 --            coverage for the property label "number == 1"
 --
+--            Note that it will abort running once it knows its task is
+--            impossible - it will not run 1000000 tests
+--
 prop_without_confidence :: Property
 prop_without_confidence =
-  withConfidence (10^9) . withTests 100 . property $ do
+  withConfidence (10^9) . withTests 1000000 . property $ do
     number <- forAll (Gen.int $ Range.linear 1 10)
-    cover 100 "number == 1" $ number == 1
+    cover 60 "number == 1" $ number == 1
 
 ------------------------------------------------------------------------
 tests :: IO Bool

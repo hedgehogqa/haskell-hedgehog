@@ -191,6 +191,19 @@ checkReport cfg size0 seed0 test0 updateUI =
         -- size has reached limit, reset to 0
         loop tests discards 0 seed coverage0
 
+      else if failureVerified tests coverage0 then
+        -- tests have been verified to not reach coverage for at least one label
+        pure . Report tests discards coverage0 . Failed $
+          mkFailure
+            size
+            seed
+            0
+            (Just coverage0)
+            Nothing
+            "Test coverage cannot be reached, aborted"
+            Nothing
+            []
+
       else if tests >= fromIntegral (propertyTestLimit cfg) then
         -- we've hit the test limit
         if successVerified tests coverage0 then
@@ -207,10 +220,7 @@ checkReport cfg size0 seed0 test0 updateUI =
               0
               (Just coverage0)
               Nothing
-              (if failureVerified tests coverage0 then
-                "Could not meet confidence criteria."
-              else
-                "Insufficient coverage.")
+              "Insufficient coverage."
               Nothing
               []
 
