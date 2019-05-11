@@ -12,6 +12,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -31,7 +32,6 @@ module Hedgehog.Internal.Property (
   , ShrinkLimit(..)
   , ShrinkCount(..)
   , ShrinkRetries(..)
-  , withConfidence
   , withTests
   , withDiscards
   , withShrinks
@@ -93,6 +93,12 @@ module Hedgehog.Internal.Property (
   , CoverPercentage(..)
   , toCoverCount
 
+  -- * Confidence
+  , Confidence(..)
+  , confidenceSuccess
+  , confidenceFailure
+  , withConfidence
+
   -- * Internal
   -- $internal
   , defaultConfig
@@ -142,6 +148,7 @@ import qualified Data.Char as Char
 import           Data.Functor.Identity (Identity(..))
 import           Data.Map (Map)
 import qualified Data.Map.Strict as Map
+import           Data.Number.Erf (invnormcdf)
 import qualified Data.List as List
 import           Data.Semigroup (Semigroup(..))
 import           Data.String (IsString)
@@ -228,7 +235,7 @@ newtype PropertyName =
 --   for 1 in 10^9 tests.
 newtype Confidence =
   Confidence {
-    unConfidence :: Int
+    unConfidence :: Integer
   } deriving (Eq, Ord, Show, Num, Lift)
 
 -- | Configuration for a property test.
@@ -919,6 +926,9 @@ mapConfig :: (PropertyConfig -> PropertyConfig) -> Property -> Property
 mapConfig f (Property cfg t) =
   Property (f cfg) t
 
+-- | Make sure that the result is statistically significant in accordance to
+--   the passed 'Confidence'
+--
 withConfidence :: Confidence -> Property -> Property
 withConfidence c =
   mapConfig $ \config -> config { propertyConfidence = Just c }
@@ -1037,6 +1047,58 @@ coverageSuccess tests =
 coverageFailures :: TestCount -> Coverage CoverCount -> [Label CoverCount]
 coverageFailures tests (Coverage kvs) =
   filter (not . labelCovered tests) (Map.elems kvs)
+
+-- | Is true when the test coverage satisfies the specified 'Confidence'
+--   contstraint for all 'Coverage CoverCount's
+confidenceSuccess :: TestCount -> Confidence -> Coverage CoverCount -> Bool
+confidenceSuccess tests confidence =
+  let
+    assertLow :: Label CoverCount -> Bool
+    assertLow MkLabel{..} =
+      wilsonLowerBound
+        (fromIntegral $ unCoverCount labelAnnotation)
+        (fromIntegral tests)
+        (1 / fromIntegral (unConfidence confidence))
+      >= 0.9 * (unCoverPercentage labelMinimum / 100.0)
+  in
+    and . fmap assertLow . Map.elems . coverageLabels
+
+-- | Is true when there exists a label that is sure to have failed according to
+--   the 'Confidence' constraint
+confidenceFailure :: TestCount -> Confidence -> Coverage CoverCount -> Bool
+confidenceFailure tests confidence =
+  let
+    assertHigh :: Label CoverCount -> Bool
+    assertHigh MkLabel{..} =
+      wilsonUpperBound
+        (fromIntegral $ unCoverCount labelAnnotation)
+        (fromIntegral tests)
+        (1 / fromIntegral (unConfidence confidence))
+      < (unCoverPercentage labelMinimum / 100.0)
+  in
+    or . fmap assertHigh . Map.elems . coverageLabels
+
+-- In order to get an accurate measurement with small sample sizes, we're
+-- using the Wilson score interval
+-- (<https://en.wikipedia.org/wiki/Binomial_proportion_confidence_interval#Wilson_score_interval
+-- wikipedia>) instead of a normal approximation interval.
+wilson :: Integer -> Integer -> Double -> Double
+wilson k n z =
+  let
+    nf = fromIntegral n
+    p = fromIntegral k / fromIntegral n
+  in
+    (p + z * z/(2 * nf) + z * sqrt (p * (1 - p) / nf + z * z / (4 * nf * nf)))
+    /
+    (1 + z * z / nf)
+
+wilsonLowerBound :: Integer -> Integer -> Double -> Double
+wilsonLowerBound k n a =
+  wilson k n $ invnormcdf (a / 2)
+
+wilsonUpperBound :: Integer -> Integer -> Double -> Double
+wilsonUpperBound k n a =
+  wilson k n $ invnormcdf (1 - a / 2)
 
 fromLabel :: Label a -> Coverage a
 fromLabel x =

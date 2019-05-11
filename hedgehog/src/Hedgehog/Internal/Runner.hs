@@ -41,6 +41,7 @@ import           Hedgehog.Internal.Property (PropertyT(..), Failure(..), runTest
 import           Hedgehog.Internal.Property (ShrinkLimit, ShrinkRetries, withTests)
 import           Hedgehog.Internal.Property (TestCount(..), PropertyCount(..))
 import           Hedgehog.Internal.Property (coverageSuccess, journalCoverage)
+import           Hedgehog.Internal.Property (confidenceSuccess, confidenceFailure)
 import           Hedgehog.Internal.Queue
 import           Hedgehog.Internal.Region
 import           Hedgehog.Internal.Report
@@ -160,6 +161,22 @@ checkReport cfg size0 seed0 test0 updateUI =
     test =
       catchAll test0 (fail . show)
 
+    confidence =
+      propertyConfidence cfg
+
+    successVerified count coverage =
+      -- If the user wants a statistically significant result, this function
+      -- will run a confidence check. Otherwise, it will default to checking
+      -- the percentage of encountered labels
+      maybe
+        (coverageSuccess count coverage)
+        (\c -> confidenceSuccess count c coverage) confidence
+
+    failureVerified count coverage =
+      -- Will be true if we can statistically verify that our coverage was
+      -- inadequate
+      maybe False (\c -> confidenceFailure count c coverage) confidence
+
     loop ::
          TestCount
       -> DiscardCount
@@ -176,12 +193,13 @@ checkReport cfg size0 seed0 test0 updateUI =
 
       else if tests >= fromIntegral (propertyTestLimit cfg) then
         -- we've hit the test limit
-        if coverageSuccess tests coverage0 then
+        if successVerified tests coverage0 then
           -- all classifiers satisfied, test was successful
           pure $ Report tests discards coverage0 OK
 
         else
-          -- some classifiers unsatisfied, test was successful
+          -- some classifiers unsatisfied or confidence criteria not met, test
+          -- was successful
           pure . Report tests discards coverage0 . Failed $
             mkFailure
               size
@@ -189,7 +207,10 @@ checkReport cfg size0 seed0 test0 updateUI =
               0
               (Just coverage0)
               Nothing
-              "Insufficient coverage."
+              (if failureVerified tests coverage0 then
+                "Could not meet confidence criteria."
+              else
+                "Insufficient coverage.")
               Nothing
               []
 

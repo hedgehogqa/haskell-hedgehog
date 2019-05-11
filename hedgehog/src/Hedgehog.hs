@@ -66,6 +66,9 @@ module Hedgehog (
   , checkParallel
   , checkSequential
 
+  , Confidence
+  , withConfidence
+
   , withTests
   , TestLimit
 
@@ -167,6 +170,7 @@ import           Hedgehog.Internal.Property (forAll, forAllWith)
 import           Hedgehog.Internal.Property (LabelName, MonadTest(..))
 import           Hedgehog.Internal.Property (Property, PropertyT, PropertyName)
 import           Hedgehog.Internal.Property (Group(..), GroupName)
+import           Hedgehog.Internal.Property (Confidence, withConfidence)
 import           Hedgehog.Internal.Property (ShrinkLimit, withShrinks)
 import           Hedgehog.Internal.Property (ShrinkRetries, withRetries)
 import           Hedgehog.Internal.Property (Test, TestT, property, test)
