@@ -31,6 +31,7 @@ module Hedgehog.Internal.Property (
   , ShrinkLimit(..)
   , ShrinkCount(..)
   , ShrinkRetries(..)
+  , withConfidence
   , withTests
   , withDiscards
   , withShrinks
@@ -221,6 +222,15 @@ newtype PropertyName =
       unPropertyName :: String
     } deriving (Eq, Ord, Show, IsString, Semigroup, Lift)
 
+-- | The acceptable occurrence of false positives
+--
+--   Example, @Confidence 10^9@ would mean that you'd accept a false positive
+--   for 1 in 10^9 tests.
+newtype Confidence =
+  Confidence {
+    unConfidence :: Int
+  } deriving (Eq, Ord, Show, Num, Lift)
+
 -- | Configuration for a property test.
 --
 data PropertyConfig =
@@ -229,6 +239,7 @@ data PropertyConfig =
     , propertyDiscardLimit :: !DiscardLimit
     , propertyShrinkLimit :: !ShrinkLimit
     , propertyShrinkRetries :: !ShrinkRetries
+    , propertyConfidence :: !(Maybe Confidence)
     } deriving (Eq, Ord, Show, Lift)
 
 -- | The number of successful tests that need to be run before a property test
@@ -898,6 +909,8 @@ defaultConfig =
         1000
     , propertyShrinkRetries =
         0
+    , propertyConfidence =
+        Nothing
     }
 
 -- | Map a config modification function over a property.
@@ -905,6 +918,10 @@ defaultConfig =
 mapConfig :: (PropertyConfig -> PropertyConfig) -> Property -> Property
 mapConfig f (Property cfg t) =
   Property (f cfg) t
+
+withConfidence :: Confidence -> Property -> Property
+withConfidence c =
+  mapConfig $ \config -> config { propertyConfidence = Just c }
 
 -- | Set the number of times a property should be executed before it is considered
 --   successful.
