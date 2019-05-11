@@ -168,9 +168,7 @@ checkReport cfg size0 seed0 test0 updateUI =
       -- If the user wants a statistically significant result, this function
       -- will run a confidence check. Otherwise, it will default to checking
       -- the percentage of encountered labels
-      maybe
-        (coverageSuccess count coverage)
-        (\c -> confidenceSuccess count c coverage) confidence
+      maybe False (\c -> confidenceSuccess count c coverage) confidence
 
     failureVerified count coverage =
       -- Will be true if we can statistically verify that our coverage was
@@ -191,6 +189,10 @@ checkReport cfg size0 seed0 test0 updateUI =
         -- size has reached limit, reset to 0
         loop tests discards 0 seed coverage0
 
+      else if tests > 0 && successVerified tests coverage0 then
+        -- tests have been verified to reach coverage for all labels
+        pure $ Report tests discards coverage0 OK
+
       else if failureVerified tests coverage0 then
         -- tests have been verified to not reach coverage for at least one label
         pure . Report tests discards coverage0 . Failed $
@@ -206,7 +208,7 @@ checkReport cfg size0 seed0 test0 updateUI =
 
       else if tests >= fromIntegral (propertyTestLimit cfg) then
         -- we've hit the test limit
-        if successVerified tests coverage0 then
+        if coverageSuccess tests coverage0 then
           -- all classifiers satisfied, test was successful
           pure $ Report tests discards coverage0 OK
 
