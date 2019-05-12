@@ -28,29 +28,29 @@
 
 ## Version 0.5 (2017-07-16)
 
-- Parallel state machine testing, allows detection of commands which are not-atomic ([#98][98], [@jystic][jystic])
-- Easier to use variables for state machine testing ([#94][94], [@jystic][jystic])
-- `MonadGen` class allows the use of transformers like `ReaderT` and `StateT` on the outside of generators ([#99][99], [@jystic][jystic])
-- Better error messages for tests which throw exceptions ([#95][95], [@jystic][jystic])
-- Separated test input generation and assertions in to `PropertyT` and `TestT` respectively, this allows `TestT` to have a `MonadBaseControl` instance ([#96][96], [@jystic][jystic])
+- Parallel state machine testing, allows detection of commands which are not-atomic ([#98][98], [@jacobstanley][jacobstanley])
+- Easier to use variables for state machine testing ([#94][94], [@jacobstanley][jacobstanley])
+- `MonadGen` class allows the use of transformers like `ReaderT` and `StateT` on the outside of generators ([#99][99], [@jacobstanley][jacobstanley])
+- Better error messages for tests which throw exceptions ([#95][95], [@jacobstanley][jacobstanley])
+- Separated test input generation and assertions in to `PropertyT` and `TestT` respectively, this allows `TestT` to have a `MonadBaseControl` instance ([#96][96], [@jacobstanley][jacobstanley])
 - This document grew links to the pull requests which introduced various changes ([#93][93], [@moodmosaic][moodmosaic])
 
 ## Version 0.4.1 (2017-06-28)
 
-- Fixed runtime type error that could occur when shrinking state machine commands ([#91][91], [@jystic][jystic])
+- Fixed runtime type error that could occur when shrinking state machine commands ([#91][91], [@jacobstanley][jacobstanley])
 
 ## Version 0.4 (2017-06-28)
 
-- Abstract state machine testing, check out Tim Humphries' great [blog post](http://teh.id.au/posts/2017/07/15/state-machine-testing) or the [process registry example](https://github.com/hedgehogqa/haskell-hedgehog/blob/master/hedgehog-example/test/Test/Example/Registry.hs) to see how it works ([#89][89], [@jystic][jystic])
-- `liftCatch`, `liftCatchIO`, `withCatch` functions for isolating exceptions during tests ([#89][89], [@jystic][jystic])
+- Abstract state machine testing, check out Tim Humphries' great [blog post](http://teh.id.au/posts/2017/07/15/state-machine-testing) or the [process registry example](https://github.com/hedgehogqa/haskell-hedgehog/blob/master/hedgehog-example/test/Test/Example/Registry.hs) to see how it works ([#89][89], [@jacobstanley][jacobstanley])
+- `liftCatch`, `liftCatchIO`, `withCatch` functions for isolating exceptions during tests ([#89][89], [@jacobstanley][jacobstanley])
 
 ## Version 0.3 (2017-06-11)
 
 - Exponential range combinators ([#43][43], [@chris-martin][chris-martin])
 - Roundtrip example, check out the [blog post](http://teh.id.au/posts/2017/06/07/round-trip-property/) ([#85][85], [@thumphries][thumphries])
-- `tripping` now displays intermediate value ([#85][85], [@jystic][jystic])
-- `distribute` function for pulling a transformer out to the top level ([#83][83], [@jystic][jystic])
-- `withExceptT` function for executing tests with an inner `ExceptT` (e.g. `Test (ExceptT x m) a`) ([#83][83], [@jystic][jystic])
+- `tripping` now displays intermediate value ([#85][85], [@jacobstanley][jacobstanley])
+- `distribute` function for pulling a transformer out to the top level ([#83][83], [@jacobstanley][jacobstanley])
+- `withExceptT` function for executing tests with an inner `ExceptT` (e.g. `Test (ExceptT x m) a`) ([#83][83], [@jacobstanley][jacobstanley])
 
 ## Version 0.2.2 (2017-05-16)
 
@@ -61,24 +61,24 @@
 
 ## Version 0.2.1 (2017-05-09)
 
-- Added `ascii`, `latin1`, `unicode` character generators ([#73][73], [@jystic][jystic])
+- Added `ascii`, `latin1`, `unicode` character generators ([#73][73], [@jacobstanley][jacobstanley])
 
 ## Version 0.2 (2017-05-06)
 
-- Added a quiet test runner which can be activated by setting `HEDGEHOG_VERBOSITY=0` ([@jystic][jystic])
-- Concurrent test runner does not display tests until they are executing ([@jystic][jystic])
-- Test runner now outputs a summary of how many successful / failed tests were run ([@jystic][jystic])
-- `checkSequential` and `checkParallel` now allow for tests to be run without Template Haskell ([@jystic][jystic])
-- Auto-discovery of properties is now available via `discover` instead of being baked in ([@jystic][jystic])
-- `annotate` allows source code to be annotated inline with extra information ([@jystic][jystic])
-- `forAllWith` can be used to generate values without a `Show` instance ([@jystic][jystic])
-- Removed uses of `Typeable` to allow for generating types which cannot implement it ([@jystic][jystic])
+- Added a quiet test runner which can be activated by setting `HEDGEHOG_VERBOSITY=0` ([@jacobstanley][jacobstanley])
+- Concurrent test runner does not display tests until they are executing ([@jacobstanley][jacobstanley])
+- Test runner now outputs a summary of how many successful / failed tests were run ([@jacobstanley][jacobstanley])
+- `checkSequential` and `checkParallel` now allow for tests to be run without Template Haskell ([@jacobstanley][jacobstanley])
+- Auto-discovery of properties is now available via `discover` instead of being baked in ([@jacobstanley][jacobstanley])
+- `annotate` allows source code to be annotated inline with extra information ([@jacobstanley][jacobstanley])
+- `forAllWith` can be used to generate values without a `Show` instance ([@jacobstanley][jacobstanley])
+- Removed uses of `Typeable` to allow for generating types which cannot implement it ([@jacobstanley][jacobstanley])
 
 [Dieharder]:
   https://webhome.phy.duke.edu/~rgb/General/dieharder.php
 
-[jystic]:
-  https://github.com/jystic
+[jacobstanley]:
+  https://github.com/jacobstanley
 [chris-martin]:
   https://github.com/chris-martin
 [thumphries]:
