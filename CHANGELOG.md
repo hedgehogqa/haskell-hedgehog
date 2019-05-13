@@ -1,6 +1,28 @@
+## Version 1.0 (2019-05-13)
+- Add histograms to labels / coverage ([#289][289], [@jacobstanley][jacobstanley])
+- Improved shrinking of lists ([#276][276], [@jacobstanley][jacobstanley] / [@edsko][edsko])
+- Simplify `MonadGen`, this breaks the use of `StateT` on the outside of a `GenT` for the time being, it still works fine on the inside though and you can use `distributeT` to run it ([#276][276], [@jacobstanley][jacobstanley])
+- Change `Applicative` `GenT` to use zipping ([#272][272], [@jacobstanley][jacobstanley] / [@edsko][edsko])
+- Rename `Tree` -> `TreeT`, `Node` -> `NodeT` ([#272][272], [@jacobstanley][jacobstanley])
+- `diff` function which takes any `a -> a -> Bool` comparison function ([#196][196], [@chessai][chessai] / [@jacobstanley][jacobstanley])
+- Labelling of test runs via `label`, `collect` ([#262][262], [@ruhatch][ruhatch] / [@jacobstanley][jacobstanley])
+- Classification of test runs via `cover`, `classify` ([#253][253], [@felixmulder][felixmulder] / [@jacobstanley][jacobstanley])
+- Define proper `Applicative` instances for `NodeT`, `TreeT` and `GenT` ([#173][173][@sjakobi][sjakobi]
+- `MonadFail` instance for `PropertyT` ([#267][267], [@geigerzaehler][geigerzaehler])
+- `MonadResource` instance for `PropertyT` ([#268][268], [@geigerzaehler][geigerzaehler])
+- Example for the `tripping` function ([#258][258], [@HuwCampbell][HuwCampbell])
+- Improve documentation for state machine testing ([#252][252], [@endgame][endgame])
+- `runTests` function for running tests from a top level executable, this was later renamed to `defaultMain` as is the de facto convention ([#168][168], [@erikd][erikd])
+- Show output variables when parallel state machine testing fails to linearise ([#235][235], [@HuwCampbell][HuwCampbell])
+- Note about `enumBounded` danger ([#202][202], [@thumphries][thumphries])
+- Expose `discoverPrefix` to find prefixed properties ([#229][229], [@ruhatch][ruhatch])
+- Remove use of `unix` package and replace with `lookupEnv` ([#226][226], [@puffnfresh][puffnfresh])
+
 ## Version 0.6.1 (2018-09-22)
 
-- Set stdout/stderr encoding to UTF-8 on Windows ([#218][218], [@moodmosaic][moodmosaic])
+- Fix UTF-8 related rendering bugs on Windows ([#218][218], [@moodmosaic][moodmosaic])
+- Verify that our SplitMix/Seed avoids pathological γ-values ([#207][207], [@moodmosaic][moodmosaic])
+- Avoid weak gamma values in Hedgehog.Internal.Seed ([#198][198], [@moodmosaic][moodmosaic])
 
 ## Version 0.6 (2018-05-14)
 
@@ -105,13 +127,59 @@
   https://github.com/dredozubov
 [fisx]:
   https://github.com/fisx
+[puffnfresh]:
+  https://github.com/puffnfresh
+[ruhatch]:
+  https://github.com/ruhatch
+[HuwCampbell]:
+  https://github.com/HuwCampbell
+[endgame]:
+  https://github.com/endgame
+[geigerzaehler]:
+  https://github.com/geigerzaehler
+[sjakobi]:
+  https://github.com/sjakobi
+[felixmulder]:
+  https://github.com/felixmulder
+[edsko]:
+  https://github.com/edsko
 
+[289]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/289
+[276]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/276
+[272]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/272
+[268]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/268
+[262]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/262
+[258]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/258
+[253]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/253
+[252]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/252
+[235]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/235
+[229]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/229
+[226]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/226
 [218]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/218
+[207]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/207
+[202]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/202
+[198]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/198
 [185]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/185
 [184]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/184
+[168]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/168
 [162]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/162
 [157]:
