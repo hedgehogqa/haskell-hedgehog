@@ -7,7 +7,7 @@
 - `diff` function which takes any `a -> a -> Bool` comparison function ([#196][196], [@chessai][chessai] / [@jacobstanley][jacobstanley])
 - Labelling of test runs via `label`, `collect` ([#262][262], [@ruhatch][ruhatch] / [@jacobstanley][jacobstanley])
 - Classification of test runs via `cover`, `classify` ([#253][253], [@felixmulder][felixmulder] / [@jacobstanley][jacobstanley])
-- Define proper `Applicative` instances for `NodeT`, `TreeT` and `GenT` ([#173][173][@sjakobi][sjakobi]
+- Define proper `Applicative` instances for `NodeT`, `TreeT` and `GenT` ([#173][173][@sjakobi][sjakobi])
 - `MonadFail` instance for `PropertyT` ([#267][267], [@geigerzaehler][geigerzaehler])
 - `MonadResource` instance for `PropertyT` ([#268][268], [@geigerzaehler][geigerzaehler])
 - Example for the `tripping` function ([#258][258], [@HuwCampbell][HuwCampbell])
@@ -141,6 +141,8 @@
   https://github.com/sjakobi
 [felixmulder]:
   https://github.com/felixmulder
+[chessai]:
+  https://github.com/chessai
 [edsko]:
   https://github.com/edsko
 
@@ -152,6 +154,8 @@
   https://github.com/hedgehogqa/haskell-hedgehog/pull/272
 [268]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/268
+[267]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/267
 [262]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/262
 [258]:
@@ -174,10 +178,14 @@
   https://github.com/hedgehogqa/haskell-hedgehog/pull/202
 [198]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/198
+[196]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/196
 [185]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/185
 [184]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/184
+[173]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/173
 [168]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/168
 [162]:

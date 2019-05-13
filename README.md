@@ -1,4 +1,10 @@
-<!-- horrendous hacks, this tag is never closed :maniacal_laughing: -->
+<!--
+Apologies to those who are able to read this. Unfortunately, Hackage
+doesn't seem to render the HTML portion of the markdown spec so you may
+be better off paying us a visit on GitHub instead:
+https://github.com/hedgehogqa/haskell-hedgehog
+-->
+
 <div align="center">
 
 <img width="400" src="https://github.com/hedgehogqa/haskell-hedgehog/raw/master/img/hedgehog-text-logo.png" />
@@ -7,12 +13,11 @@
 
 [![Hackage][hackage-shield]][hackage] [![Travis][travis-shield]][travis] [![AppVeyor][appveyor-shield]][appveyor]
 
-<!-- this one isn't either! :D -->
 <div align="left">
 
-<!-- end of horrendous hacks, or is it? -->
+[Hedgehog](http://hedgehog.qa/) automatically generates a comprehensive array of test cases, exercising your software in ways human testers would never imagine.
 
-[Hedgehog](http://hedgehog.qa/) automatically generates a comprehensive array of test cases, exercising your software in ways human testers would never imagine. Generate hundreds of test cases automatically, exposing even the most insidious of corner cases. Failures are automatically simplified, giving developers coherent, intelligible error messages.
+Generate hundreds of test cases automatically, exposing even the most insidious of corner cases. Failures are automatically simplified, giving developers coherent, intelligible error messages.
 
 ## Features
 
@@ -82,7 +87,6 @@ You can then load the module in GHCi, and run it:
 
 ```
 
-<!-- more horendous hacks :) -->
 <div align="center">
 <br />
 <img width="307" src="https://github.com/hedgehogqa/haskell-hedgehog/raw/master/img/hedgehog-logo-grey.png" />
