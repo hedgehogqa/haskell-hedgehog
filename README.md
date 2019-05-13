@@ -1,13 +1,18 @@
-hedgehog [![Hackage][hackage-shield]][hackage] [![Travis][travis-shield]][travis] [![AppVeyor][appveyor-shield]][appveyor]
-========
+<!-- horrendous hacks, this tag is never closed :maniacal_laughing: -->
+<div align="center">
 
-> Hedgehog will eat all your bugs.
+<img width="400" src="https://github.com/hedgehogqa/haskell-hedgehog/raw/master/img/hedgehog-text-logo.png" />
 
-<img src="https://github.com/hedgehogqa/haskell-hedgehog/raw/master/img/hedgehog-logo.png" width="307" align="right"/>
+# Release with confidence.
 
-[Hedgehog](http://hedgehog.qa/) is a modern property-based testing
-system, in the spirit of QuickCheck. Hedgehog uses integrated shrinking,
-so shrinks obey the invariants of generated values by construction.
+[![Hackage][hackage-shield]][hackage] [![Travis][travis-shield]][travis] [![AppVeyor][appveyor-shield]][appveyor]
+
+<!-- this one isn't either! :D -->
+<div align="left">
+
+<!-- end of horrendous hacks, or is it? -->
+
+[Hedgehog](http://hedgehog.qa/) automatically generates a comprehensive array of test cases, exercising your software in ways human testers would never imagine. Generate hundreds of test cases automatically, exposing even the most insidious of corner cases. Failures are automatically simplified, giving developers coherent, intelligible error messages.
 
 ## Features
 
@@ -27,6 +32,7 @@ It is designed to be used alongside [Hedgehog.Gen][haddock-hedgehog-gen]
 and [Hedgehog.Range][haddock-hedgehog-range] which should be imported
 qualified. You also need to enable Template Haskell so the Hedgehog test
 runner can find your properties.
+
 
 ```hs
 {-# LANGUAGE TemplateHaskell #-}
@@ -76,8 +82,13 @@ You can then load the module in GHCi, and run it:
 
 ```
 
+<!-- more horendous hacks :) -->
+<div align="center">
+<br />
+<img width="307" src="https://github.com/hedgehogqa/haskell-hedgehog/raw/master/img/hedgehog-logo-grey.png" />
+
  [hackage]: http://hackage.haskell.org/package/hedgehog
- [hackage-shield]: https://img.shields.io/badge/hackage-v0.6.1-blue.svg
+ [hackage-shield]: https://img.shields.io/badge/hackage-v1.0-blue.svg
 
  [travis]: https://travis-ci.org/hedgehogqa/haskell-hedgehog
  [travis-shield]: https://travis-ci.org/hedgehogqa/haskell-hedgehog.svg?branch=master
