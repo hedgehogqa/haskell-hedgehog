@@ -46,6 +46,7 @@ import           Hedgehog.Internal.Region
 import           Hedgehog.Internal.Report
 import           Hedgehog.Internal.Seed (Seed)
 import qualified Hedgehog.Internal.Seed as Seed
+import           Hedgehog.Internal.Show (unicode)
 import           Hedgehog.Internal.Tree (TreeT(..), NodeT(..))
 import           Hedgehog.Range (Size)
 
@@ -304,7 +305,7 @@ checkGroup config (Group group props) =
     hSetEncoding stderr utf8
 #endif
 
-    putStrLn $ "━━━ " ++ unGroupName group ++ " ━━━"
+    putStrLn $ unicode "━━━ " "=== " ++ unGroupName group ++ unicode " ━━━" " ==="
 
     verbosity <- resolveVerbosity (runnerVerbosity config)
     summary <- checkGroupWith n verbosity (runnerColor config) props

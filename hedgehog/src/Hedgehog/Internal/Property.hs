@@ -638,21 +638,21 @@ failDiff x y =
         failWith Nothing $
         unlines $ [
             "Failed"
-          , "━━ lhs ━━"
+          , unicode "━━ lhs ━━" "-- lhs --"
           , showPretty x
-          , "━━ rhs ━━"
+          , unicode "━━ rhs ━━" "-- lhs --"
           , showPretty y
           ]
 
     Just vdiff@(ValueSame _) ->
       withFrozenCallStack $
         failWith (Just $
-          Diff "━━━ Failed ("  "" "no differences" "" ") ━━━" vdiff) ""
+          Diff (unicode "━━━ Failed (" "=== Failed (")  "" "no differences" "" (unicode ") ━━━" ") ===") vdiff) ""
 
     Just vdiff ->
       withFrozenCallStack $
         failWith (Just $
-          Diff "━━━ Failed (" "- lhs" ") (" "+ rhs" ") ━━━" vdiff) ""
+          Diff (unicode "━━━ Failed (" "=== Failed (") "- lhs" ") (" "+ rhs" (unicode ") ━━━" ") ===") vdiff) ""
 
 -- | Fails with an error which renders the type of an exception and its error
 --   message.
@@ -661,7 +661,7 @@ failException :: (MonadTest m, HasCallStack) => SomeException -> m a
 failException (SomeException x) =
   withFrozenCallStack $
     failWith Nothing $ unlines [
-        "━━━ Exception (" ++ show (typeOf x) ++ ") ━━━"
+        unicode "━━━ Exception (" "=== Exception (" ++ show (typeOf x) ++ unicode ") ━━━" ") ==="
       , List.dropWhileEnd Char.isSpace (displayException x)
       ]
 

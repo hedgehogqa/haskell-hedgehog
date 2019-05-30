@@ -78,7 +78,7 @@ import           Hedgehog.Internal.HTraversable (HTraversable(..))
 import           Hedgehog.Internal.Opaque (Opaque(..))
 import           Hedgehog.Internal.Property (MonadTest(..), Test, evalEither, evalM, success, runTest, failWith, annotate)
 import           Hedgehog.Internal.Range (Range)
-import           Hedgehog.Internal.Show (showPretty)
+import           Hedgehog.Internal.Show (showPretty, unicode)
 import           Hedgehog.Internal.Source (HasCallStack, withFrozenCallStack)
 
 
@@ -667,11 +667,11 @@ instance Show (Parallel m state) where
 renderParallel :: (Action m state -> [String]) -> Parallel m state -> String
 renderParallel render (Parallel pre xs ys) =
   unlines $ concat [
-      ["━━━ Prefix ━━━"]
+      [unicode "━━━ Prefix ━━━" "=== Prefix ==="]
     , concatMap render pre
-    , ["", "━━━ Branch 1 ━━━"]
+    , ["", unicode "━━━ Branch 1 ━━━" "=== Branch 1 ==="]
     , concatMap render xs
-    , ["", "━━━ Branch 2 ━━━"]
+    , ["", unicode "━━━ Branch 2 ━━━" "=== Branch 2 ==="]
     , concatMap render ys
     ]
 

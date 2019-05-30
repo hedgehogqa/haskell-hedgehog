@@ -430,7 +430,7 @@ ppFailedInputDeclaration (FailedAnnotation msloc val) =
     let
       ppValLine =
         WL.indent startCol .
-          (markup AnnotationGutter (WL.text "│ ") <>) .
+          (markup AnnotationGutter (WL.text $ unicode "│ " "| ") <>) .
           markup AnnotationValue .
           WL.text
 
@@ -507,7 +507,7 @@ ppFailureLocation msgs mdiff sloc =
 
       ppFailure x =
         WL.indent startCol $
-          markup FailureGutter (WL.text "│ ") <> x
+          markup FailureGutter (WL.text $ unicode "│ " "| ") <> x
 
       msgDocs =
         fmap ((StyleFailure, ) . ppFailure . markup FailureMessage) msgs
@@ -546,9 +546,9 @@ ppDeclaration decl =
       let
         ppLocation =
           WL.indent (digits + 1) $
-            markup (StyledBorder StyleDefault) "┏━━" <+>
+            markup (StyledBorder StyleDefault) (unicode "┏━━" ",--") <+>
             markup DeclarationLocation (WL.text (declarationFile decl)) <+>
-            markup (StyledBorder StyleDefault) "━━━"
+            markup (StyledBorder StyleDefault) (unicode "━━━" "---")
 
         digits =
           length . show . unLineNo $ lineNumber lastLine
@@ -561,12 +561,12 @@ ppDeclaration decl =
 
         ppSource style n src =
           markup (StyledLineNo style) (ppLineNo n) <+>
-          markup (StyledBorder style) "┃" <+>
+          markup (StyledBorder style) (unicode "┃" "|") <+>
           markup (StyledSource style) (WL.text src)
 
         ppAnnot (style, doc) =
           markup (StyledLineNo style) ppEmptyNo <+>
-          markup (StyledBorder style) "┃" <+>
+          markup (StyledBorder style) (unicode "┃" "|") <+>
           doc
 
         ppLines = do
@@ -702,7 +702,7 @@ ppProgress name (Report tests discards coverage status) =
   case status of
     Running ->
       pure . WL.vsep $ [
-          icon RunningIcon '●' . WL.annotate RunningHeader $
+          icon RunningIcon (unicode '●' '>') . WL.annotate RunningHeader $
             ppName name <+>
             "passed" <+>
             ppTestCount tests <>
@@ -712,7 +712,7 @@ ppProgress name (Report tests discards coverage status) =
         ppCoverage tests coverage
 
     Shrinking failure ->
-      pure . icon ShrinkingIcon '↯' . WL.annotate ShrinkingHeader $
+      pure . icon ShrinkingIcon (unicode '↯' '%') . WL.annotate ShrinkingHeader $
         ppName name <+>
         "failed after" <+>
         ppTestCount tests <>
@@ -725,7 +725,7 @@ ppResult name (Report tests discards coverage result) = do
     Failed failure -> do
       pfailure <- ppFailureReport name tests failure
       pure . WL.vsep $ [
-          icon FailedIcon '✗' . WL.annotate FailedText $
+          icon FailedIcon (unicode '✗' 'X') . WL.annotate FailedText $
             ppName name <+>
             "failed after" <+>
             ppTestCount tests <>
@@ -737,7 +737,7 @@ ppResult name (Report tests discards coverage result) = do
 
     GaveUp ->
       pure . WL.vsep $ [
-          icon GaveUpIcon '⚐' . WL.annotate GaveUpText $
+          icon GaveUpIcon (unicode '⚐' '?') . WL.annotate GaveUpText $
             ppName name <+>
             "gave up after" <+>
             ppDiscardCount discards <>
@@ -749,7 +749,7 @@ ppResult name (Report tests discards coverage result) = do
 
     OK ->
       pure . WL.vsep $ [
-          icon SuccessIcon '✓' . WL.annotate SuccessText $
+          icon SuccessIcon (unicode '✓' '~') . WL.annotate SuccessText $
             ppName name <+>
             "passed" <+>
             ppTestCount tests <>
@@ -851,7 +851,7 @@ ppLabel tests w x@(MkLabel name _ minimum_ count) =
 
     licon =
       if not covered then
-        WL.annotate CoverageText "⚠ "
+        WL.annotate CoverageText $ unicode "⚠ " "! "
       else
         "  "
 
@@ -871,11 +871,11 @@ ppLabel tests w x@(MkLabel name _ minimum_ count) =
       if widthMinimum w == 0 then
         mempty
       else if not covered then
-        " ✗ " <> wminimum
+        unicode " ✗ " " X " <> wminimum
       else if minimum_ == 0 then
         "   " <> ppLeftPad (widthMinimum w) ""
       else
-        " ✓ " <> wminimum
+        unicode " ✓ " " ~ " <> wminimum
 
     lcover =
       if widthMinimum w == 0 then
@@ -894,7 +894,7 @@ ppLabel tests w x@(MkLabel name _ minimum_ count) =
       , ltext lcover
       , lborder " "
       , ltext $ ppCoverBar (coverPercentage tests count) minimum_
-      , lborder "" -- "│"
+      , lborder "" -- unicode "│" "|"
       , ltext lminimum
       ]
 
@@ -982,16 +982,16 @@ ppCoverBar (CoverPercentage percentage) (CoverPercentage minimum_) =
       --     ++ " " ++ show fillWidth
       ]
   in
-    bar ('█', ['·', '▏', '▎', '▍', '▌', '▋', '▊', '▉'])
+    bar $ unicode ('█', "·▏▎▍▌▋▊▉") ('@', ".:-=+*#%")
 
     -- FIXME Maybe this should be configurable?
     -- Alternative histogram bars:
-    --bar ('⣿', ['·', '⡀', '⡄', '⡆', '⡇', '⣇', '⣧', '⣷'])
-    --bar ('⣿', ['⢕', '⡀', '⣀', '⣄', '⣤', '⣦', '⣶', '⣷'])
-    --bar ('⣿', ['⢕', '⡵', '⢗', '⣗', '⣟'])
-    --bar ('⣿', [' ', '⡵', '⢗', '⣗', '⣟'])
-    --bar ('█', ['░','▓'])
-    --bar ('█', ['░'])
+    --bar $ unicode ('⣿', "·⡀⡄⡆⡇⣇⣧⣷") _
+    --bar $ unicode ('⣿', "⢕⡀⣀⣄⣤⣦⣶⣷") _
+    --bar $ unicode ('⣿', "⢕⡵⢗⣗⣟") _
+    --bar $ unicode ('⣿', " ⡵⢗⣗⣟") _
+    --bar $ unicode ('█', "░▓") _
+    --bar $ unicode ('█', "░") _
 
 renderCoverPercentage :: CoverPercentage -> String
 renderCoverPercentage (CoverPercentage percentage) =
@@ -1007,13 +1007,13 @@ ppWhenNonZero suffix n =
 annotateSummary :: Summary -> Doc Markup -> Doc Markup
 annotateSummary summary =
   if summaryFailed summary > 0 then
-    icon FailedIcon '✗' . WL.annotate FailedText
+    icon FailedIcon (unicode '✗' 'X') . WL.annotate FailedText
   else if summaryGaveUp summary > 0 then
-    icon GaveUpIcon '⚐' . WL.annotate GaveUpText
+    icon GaveUpIcon (unicode '⚐' '?') . WL.annotate GaveUpText
   else if summaryWaiting summary > 0 || summaryRunning summary > 0 then
-    icon WaitingIcon '○' . WL.annotate WaitingHeader
+    icon WaitingIcon (unicode '○' '.') . WL.annotate WaitingHeader
   else
-    icon SuccessIcon '✓' . WL.annotate SuccessText
+    icon SuccessIcon (unicode '✓' '~') . WL.annotate SuccessText
 
 ppSummary :: MonadIO m => Summary -> m (Doc Markup)
 ppSummary summary =

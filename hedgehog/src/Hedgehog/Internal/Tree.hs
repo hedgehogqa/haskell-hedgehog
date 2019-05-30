@@ -66,6 +66,7 @@ import           Data.Functor.Classes (showsUnaryWith, showsBinaryWith)
 import qualified Data.Maybe as Maybe
 
 import           Hedgehog.Internal.Distributive
+import           Hedgehog.Internal.Show
 
 import           Prelude hiding (filter)
 
@@ -642,13 +643,13 @@ renderForestLines xs0 =
       [x] -> do
         s <- renderTreeTLines x
         pure $
-          shift " └╼" "   " s
+          shift (unicode " └╼" " `-") "   " s
 
       x : xs -> do
         s <- renderTreeTLines x
         ss <- renderForestLines xs
         pure $
-          shift " ├╼" " │ " s ++ ss
+          shift (unicode " ├╼" " +-") (unicode " │ " " | ") s ++ ss
 
 -- | Render a tree of strings.
 --

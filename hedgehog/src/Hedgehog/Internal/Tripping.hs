@@ -4,7 +4,7 @@ module Hedgehog.Internal.Tripping (
   ) where
 
 import           Hedgehog.Internal.Property (MonadTest, Diff(..), success, failWith)
-import           Hedgehog.Internal.Show (valueDiff, mkValue, showPretty)
+import           Hedgehog.Internal.Show (valueDiff, mkValue, showPretty, unicode)
 import           Hedgehog.Internal.Source (HasCallStack, withFrozenCallStack)
 
 
@@ -45,11 +45,11 @@ tripping x encode decode =
         Nothing ->
           withFrozenCallStack $
             failWith Nothing $ unlines [
-                "━━━ Original ━━━"
+                unicode "━━━ Original ━━━" "=== Original ==="
               , showPretty mx
-              , "━━━ Intermediate ━━━"
+              , unicode "━━━ Intermediate ━━━" "=== Intermediate ==="
               , showPretty i
-              , "━━━ Roundtrip ━━━"
+              , unicode "━━━ Roundtrip ━━━" "=== Roundtrip ==="
               , showPretty my
               ]
 
@@ -57,8 +57,8 @@ tripping x encode decode =
           withFrozenCallStack $
             failWith
               (Just $
-                Diff "━━━ " "- Original" ") (" "+ Roundtrip" " ━━━" diff) $
+                Diff (unicode "━━━ " "=== ") "- Original" ") (" "+ Roundtrip" (unicode " ━━━" " ===") diff) $
               unlines [
-                  "━━━ Intermediate ━━━"
+                  unicode "━━━ Intermediate ━━━" "=== Intermediate ==="
                 , showPretty i
                 ]

@@ -20,11 +20,15 @@ module Hedgehog.Internal.Show (
 
   , takeLeft
   , takeRight
+
+  , unicode
   ) where
 
 import           Data.Bifunctor (second)
 
 import           Text.Show.Pretty (Value(..), Name, reify, valToStr, ppShow)
+
+import           System.IO (localeEncoding, utf8, utf8_bom, utf16, utf16le, utf16be, utf32, utf32le, utf32be)
 
 
 data ValueDiff =
@@ -273,3 +277,10 @@ removed indent =
 added :: Int -> String -> [DocDiff]
 added indent =
   fmap (DocAdded indent) . lines
+
+unicode :: a -> a -> a
+unicode unicodeStr asciiStr =
+  if show localeEncoding `elem` map show [utf8, utf8_bom, utf16, utf16le, utf16be, utf32, utf32le, utf32be] then
+    unicodeStr
+  else
+    asciiStr
