@@ -416,7 +416,7 @@ newtype CoverPercentage =
 newtype LabelName =
   LabelName {
       unLabelName :: String
-    } deriving (Eq, Ord, Show, IsString)
+    } deriving (Eq, Monoid, Ord, Semigroup, Show, IsString)
 
 -- | The extent to which a test is covered by a classifier.
 --
