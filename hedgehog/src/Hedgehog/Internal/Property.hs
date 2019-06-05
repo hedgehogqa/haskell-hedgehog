@@ -210,7 +210,7 @@ newtype TestT m a =
 
 -- | The name of a property.
 --
---   Can be constructed using `OverloadedStrings`:
+--   Should be constructed using `OverloadedStrings`:
 --
 -- @
 --   "apples" :: PropertyName
@@ -316,7 +316,7 @@ data Group =
 
 -- | The name of a group of properties.
 --
---   Can be constructed using `OverloadedStrings`:
+--   Should be constructed using `OverloadedStrings`:
 --
 -- @
 --   "fruit" :: GroupName
@@ -407,7 +407,7 @@ newtype CoverPercentage =
 
 -- | The name of a classifier.
 --
---   Can be constructed using `OverloadedStrings`:
+--   Should be constructed using `OverloadedStrings`:
 --
 -- @
 --   "apples" :: LabelName
@@ -416,7 +416,7 @@ newtype CoverPercentage =
 newtype LabelName =
   LabelName {
       unLabelName :: String
-    } deriving (Eq, Ord, Show, IsString)
+    } deriving (Eq, Monoid, Ord, Semigroup, Show, IsString)
 
 -- | The extent to which a test is covered by a classifier.
 --
