@@ -1004,11 +1004,19 @@ latin1 =
   enum '\0' '\255'
 
 -- | Generates a Unicode character, excluding noncharacters and invalid standalone surrogates:
---   @'\0'..'\1114111' (excluding '\55296'..'\57343')@
+--   @'\0'..'\1114111' (excluding '\55296'..'\57343', '\65534', '\65535')@
 --
-unicode :: (MonadGen m, GenBase m ~ Identity) => m Char
+unicode :: (MonadGen m) => m Char
 unicode =
-  filter (not . isNoncharacter) $ filter (not . isSurrogate) unicodeAll
+  let
+    s1 =
+      (55296, enum '\0' '\55295')
+    s2 =
+      (8190, enum '\57344' '\65533')
+    s3 =
+      (1048576, enum '\65536' '\1114111')
+  in
+    frequency [s1, s2, s3]
 
 -- | Generates a Unicode character, including noncharacters and invalid standalone surrogates:
 --   @'\0'..'\1114111'@
