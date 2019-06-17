@@ -29,11 +29,13 @@ module Hedgehog.Internal.Property (
   , DiscardLimit(..)
   , DiscardCount(..)
   , ShrinkLimit(..)
+  , SizeLimit(..)
   , ShrinkCount(..)
   , ShrinkRetries(..)
   , withTests
   , withDiscards
   , withShrinks
+  , withSize
   , withRetries
   , property
   , test
@@ -137,6 +139,7 @@ import qualified Control.Monad.Trans.State.Strict as Strict
 import qualified Control.Monad.Trans.Writer.Lazy as Lazy
 import qualified Control.Monad.Trans.Writer.Strict as Strict
 
+import           Data.Int (Int64)
 import qualified Data.Char as Char
 import           Data.Functor.Identity (Identity(..))
 import           Data.Map (Map)
@@ -229,6 +232,7 @@ data PropertyConfig =
     , propertyDiscardLimit :: !DiscardLimit
     , propertyShrinkLimit :: !ShrinkLimit
     , propertyShrinkRetries :: !ShrinkRetries
+    , propertySizeLimit :: !SizeLimit
     } deriving (Eq, Ord, Show, Lift)
 
 -- | The number of successful tests that need to be run before a property test
@@ -241,13 +245,13 @@ data PropertyConfig =
 -- @
 --
 newtype TestLimit =
-  TestLimit Int
+  TestLimit Int64
   deriving (Eq, Ord, Show, Num, Enum, Real, Integral, Lift)
 
 -- | The number of tests a property ran successfully.
 --
 newtype TestCount =
-  TestCount Int
+  TestCount Int64
   deriving (Eq, Ord, Show, Num, Enum, Real, Integral)
 
 -- | The number of tests a property had to discard.
@@ -266,7 +270,7 @@ newtype DiscardCount =
 --
 --
 newtype DiscardLimit =
-  DiscardLimit Int
+  DiscardLimit Int64
   deriving (Eq, Ord, Show, Num, Enum, Real, Integral, Lift)
 
 -- | The number of shrinks to try before giving up on shrinking.
@@ -278,13 +282,13 @@ newtype DiscardLimit =
 -- @
 --
 newtype ShrinkLimit =
-  ShrinkLimit Int
+  ShrinkLimit Int64
   deriving (Eq, Ord, Show, Num, Enum, Real, Integral, Lift)
 
 -- | The numbers of times a property was able to shrink after a failing test.
 --
 newtype ShrinkCount =
-  ShrinkCount Int
+  ShrinkCount Int64
   deriving (Eq, Ord, Show, Num, Enum, Real, Integral)
 
 -- | The number of times to re-run a test during shrinking. This is useful if
@@ -303,7 +307,19 @@ newtype ShrinkCount =
 -- @
 --
 newtype ShrinkRetries =
-  ShrinkRetries Int
+  ShrinkRetries Int64
+  deriving (Eq, Ord, Show, Num, Enum, Real, Integral, Lift)
+
+-- | The maximum size to use in tests before restarting at a size of 0
+--
+--   Can be constructed using numeric literals:
+--
+-- @
+--   200 :: SizeLimit
+-- @
+--
+newtype SizeLimit =
+  SizeLimit Int64
   deriving (Eq, Ord, Show, Num, Enum, Real, Integral, Lift)
 
 -- | A named collection of property tests.
@@ -896,6 +912,8 @@ defaultConfig =
         100
     , propertyShrinkLimit =
         1000
+    , propertySizeLimit =
+        99
     , propertyShrinkRetries =
         0
     }
@@ -930,6 +948,13 @@ withDiscards n =
 withShrinks :: ShrinkLimit -> Property -> Property
 withShrinks n =
   mapConfig $ \config -> config { propertyShrinkLimit = n }
+
+-- | Set the maximum size to reach in a test before restarting at 0
+--   The default is 99
+--
+withSize :: SizeLimit -> Property -> Property
+withSize n =
+  mapConfig $ \config -> config { propertySizeLimit = n }
 
 -- | Set the number of times a property will be executed for each shrink before
 --   the test runner gives up and tries a different shrink. See 'ShrinkRetries'

@@ -170,7 +170,7 @@ checkReport cfg size0 seed0 test0 updateUI =
     loop !tests !discards !size !seed !coverage0 = do
       updateUI $ Report tests discards coverage0 Running
 
-      if size > 99 then
+      if size > fromIntegral (propertySizeLimit cfg) then
         -- size has reached limit, reset to 0
         loop tests discards 0 seed coverage0
 
