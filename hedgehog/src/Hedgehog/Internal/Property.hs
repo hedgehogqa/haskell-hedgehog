@@ -139,7 +139,6 @@ import qualified Control.Monad.Trans.State.Strict as Strict
 import qualified Control.Monad.Trans.Writer.Lazy as Lazy
 import qualified Control.Monad.Trans.Writer.Strict as Strict
 
-import           Data.Int (Int64)
 import qualified Data.Char as Char
 import           Data.Functor.Identity (Identity(..))
 import           Data.Map (Map)
@@ -245,13 +244,13 @@ data PropertyConfig =
 -- @
 --
 newtype TestLimit =
-  TestLimit Int64
+  TestLimit Int
   deriving (Eq, Ord, Show, Num, Enum, Real, Integral, Lift)
 
 -- | The number of tests a property ran successfully.
 --
 newtype TestCount =
-  TestCount Int64
+  TestCount Int
   deriving (Eq, Ord, Show, Num, Enum, Real, Integral)
 
 -- | The number of tests a property had to discard.
@@ -270,7 +269,7 @@ newtype DiscardCount =
 --
 --
 newtype DiscardLimit =
-  DiscardLimit Int64
+  DiscardLimit Int
   deriving (Eq, Ord, Show, Num, Enum, Real, Integral, Lift)
 
 -- | The number of shrinks to try before giving up on shrinking.
@@ -282,13 +281,13 @@ newtype DiscardLimit =
 -- @
 --
 newtype ShrinkLimit =
-  ShrinkLimit Int64
+  ShrinkLimit Int
   deriving (Eq, Ord, Show, Num, Enum, Real, Integral, Lift)
 
 -- | The numbers of times a property was able to shrink after a failing test.
 --
 newtype ShrinkCount =
-  ShrinkCount Int64
+  ShrinkCount Int
   deriving (Eq, Ord, Show, Num, Enum, Real, Integral)
 
 -- | The number of times to re-run a test during shrinking. This is useful if
@@ -307,7 +306,7 @@ newtype ShrinkCount =
 -- @
 --
 newtype ShrinkRetries =
-  ShrinkRetries Int64
+  ShrinkRetries Int
   deriving (Eq, Ord, Show, Num, Enum, Real, Integral, Lift)
 
 -- | The maximum size to use in tests before restarting at a size of 0
@@ -319,7 +318,7 @@ newtype ShrinkRetries =
 -- @
 --
 newtype SizeLimit =
-  SizeLimit Int64
+  SizeLimit Int
   deriving (Eq, Ord, Show, Num, Enum, Real, Integral, Lift)
 
 -- | A named collection of property tests.

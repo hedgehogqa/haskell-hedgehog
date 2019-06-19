@@ -40,7 +40,6 @@ module Hedgehog.Internal.Range (
   , scaleExponentialFloat
   ) where
 
-import           Data.Int (Int64)
 import           Data.Bifunctor (bimap)
 
 import           Prelude hiding (minimum, maximum)
@@ -54,7 +53,7 @@ import           Prelude hiding (minimum, maximum)
 --
 newtype Size =
   Size {
-      unSize :: Int64
+      unSize :: Int
     } deriving (Eq, Ord, Num, Real, Enum, Integral)
 
 instance Show Size where
