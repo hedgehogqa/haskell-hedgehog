@@ -760,12 +760,14 @@ ppResult name (Report tests discards coverage result) = do
         ppCoverage tests coverage
 
 ppFailedAtLocation :: Maybe Span -> Doc Markup
-ppFailedAtLocation (Just span') =
-  "at" <+>
-  WL.text (spanFile span') <> ":" <>
-  WL.pretty (unLineNo (spanStartLine span')) <> ":" <>
-  WL.pretty (unColumnNo (spanStartColumn span'))
-ppFailedAtLocation Nothing = mempty
+ppFailedAtLocation = \case
+  Just x ->
+    "at" <+>
+    WL.text (spanFile x) <> ":" <>
+    WL.pretty (unLineNo (spanStartLine x)) <> ":" <>
+    WL.pretty (unColumnNo (spanStartColumn x))
+  Nothing ->
+    mempty
 
 ppCoverage :: TestCount -> Coverage CoverCount -> [Doc Markup]
 ppCoverage tests x =
