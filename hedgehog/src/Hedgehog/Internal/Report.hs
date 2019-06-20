@@ -73,7 +73,7 @@ import           System.Directory (makeRelativeToCurrentDirectory)
 import           System.IO (hSetEncoding, stdout, stderr, utf8)
 #endif
 
-import           Text.PrettyPrint.Annotated.WL (Doc, (<+>))
+import           Text.PrettyPrint.Annotated.WL (Doc, (<#>), (<+>))
 import qualified Text.PrettyPrint.Annotated.WL as WL
 import           Text.Printf (printf)
 
@@ -714,7 +714,8 @@ ppProgress name (Report tests discards coverage status) =
     Shrinking failure ->
       pure . icon ShrinkingIcon '↯' . WL.annotate ShrinkingHeader $
         ppName name <+>
-        "failed after" <+>
+        "failed" <+> ppFailedAtLocation (failureLocation failure) <#>
+        "after" <+>
         ppTestCount tests <>
         ppShrinkDiscard (failureShrinks failure) discards <+>
         "(shrinking)"
@@ -725,9 +726,10 @@ ppResult name (Report tests discards coverage result) = do
     Failed failure -> do
       pfailure <- ppFailureReport name tests failure
       pure . WL.vsep $ [
-          icon FailedIcon '✗' . WL.annotate FailedText $
+          icon FailedIcon '✗' . WL.align . WL.annotate FailedText $
             ppName name <+>
-            "failed after" <+>
+            "failed" <+> ppFailedAtLocation (failureLocation failure) <#>
+            "after" <+>
             ppTestCount tests <>
             ppShrinkDiscard (failureShrinks failure) discards <>
             "."
@@ -756,6 +758,14 @@ ppResult name (Report tests discards coverage result) = do
             "."
         ] ++
         ppCoverage tests coverage
+
+ppFailedAtLocation :: Maybe Span -> Doc Markup
+ppFailedAtLocation (Just span') =
+  "at" <+>
+  WL.text (spanFile span') <> ":" <>
+  WL.pretty (unLineNo (spanStartLine span')) <> ":" <>
+  WL.pretty (unColumnNo (spanStartColumn span'))
+ppFailedAtLocation Nothing = mempty
 
 ppCoverage :: TestCount -> Coverage CoverCount -> [Doc Markup]
 ppCoverage tests x =
