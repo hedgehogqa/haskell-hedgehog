@@ -75,6 +75,9 @@ module Hedgehog (
   , withShrinks
   , ShrinkLimit
 
+  , withSize
+  , SizeLimit
+
   , withRetries
   , ShrinkRetries
 
@@ -168,6 +171,7 @@ import           Hedgehog.Internal.Property (LabelName, MonadTest(..))
 import           Hedgehog.Internal.Property (Property, PropertyT, PropertyName)
 import           Hedgehog.Internal.Property (Group(..), GroupName)
 import           Hedgehog.Internal.Property (ShrinkLimit, withShrinks)
+import           Hedgehog.Internal.Property (SizeLimit, withSize)
 import           Hedgehog.Internal.Property (ShrinkRetries, withRetries)
 import           Hedgehog.Internal.Property (Test, TestT, property, test)
 import           Hedgehog.Internal.Property (TestLimit, withTests)

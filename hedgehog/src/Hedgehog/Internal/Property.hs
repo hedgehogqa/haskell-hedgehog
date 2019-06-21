@@ -29,11 +29,13 @@ module Hedgehog.Internal.Property (
   , DiscardLimit(..)
   , DiscardCount(..)
   , ShrinkLimit(..)
+  , SizeLimit(..)
   , ShrinkCount(..)
   , ShrinkRetries(..)
   , withTests
   , withDiscards
   , withShrinks
+  , withSize
   , withRetries
   , property
   , test
@@ -229,6 +231,7 @@ data PropertyConfig =
     , propertyDiscardLimit :: !DiscardLimit
     , propertyShrinkLimit :: !ShrinkLimit
     , propertyShrinkRetries :: !ShrinkRetries
+    , propertySizeLimit :: !SizeLimit
     } deriving (Eq, Ord, Show, Lift)
 
 -- | The number of successful tests that need to be run before a property test
@@ -304,6 +307,18 @@ newtype ShrinkCount =
 --
 newtype ShrinkRetries =
   ShrinkRetries Int
+  deriving (Eq, Ord, Show, Num, Enum, Real, Integral, Lift)
+
+-- | The maximum size to use in tests before restarting at a size of 0
+--
+--   Can be constructed using numeric literals:
+--
+-- @
+--   200 :: SizeLimit
+-- @
+--
+newtype SizeLimit =
+  SizeLimit Int
   deriving (Eq, Ord, Show, Num, Enum, Real, Integral, Lift)
 
 -- | A named collection of property tests.
@@ -896,6 +911,8 @@ defaultConfig =
         100
     , propertyShrinkLimit =
         1000
+    , propertySizeLimit =
+        99
     , propertyShrinkRetries =
         0
     }
@@ -930,6 +947,13 @@ withDiscards n =
 withShrinks :: ShrinkLimit -> Property -> Property
 withShrinks n =
   mapConfig $ \config -> config { propertyShrinkLimit = n }
+
+-- | Set the maximum size to reach in a test before restarting at 0
+--   The default is 99
+--
+withSize :: SizeLimit -> Property -> Property
+withSize n =
+  mapConfig $ \config -> config { propertySizeLimit = n }
 
 -- | Set the number of times a property will be executed for each shrink before
 --   the test runner gives up and tries a different shrink. See 'ShrinkRetries'
