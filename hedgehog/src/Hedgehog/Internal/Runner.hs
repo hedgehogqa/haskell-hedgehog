@@ -30,6 +30,7 @@ import           Control.Monad.Catch (MonadCatch(..), catchAll)
 import           Control.Monad.IO.Class (MonadIO(..))
 
 import           Data.Semigroup ((<>))
+import           Data.Maybe (fromMaybe, isNothing)
 
 import           Hedgehog.Internal.Config
 import           Hedgehog.Internal.Gen (evalGenT)
@@ -42,6 +43,7 @@ import           Hedgehog.Internal.Property (ShrinkLimit, ShrinkRetries, withTes
 import           Hedgehog.Internal.Property (TestCount(..), PropertyCount(..))
 import           Hedgehog.Internal.Property (coverageSuccess, journalCoverage)
 import           Hedgehog.Internal.Property (confidenceSuccess, confidenceFailure)
+import           Hedgehog.Internal.Property (allowsEarlyStop)
 import           Hedgehog.Internal.Queue
 import           Hedgehog.Internal.Region
 import           Hedgehog.Internal.Report
@@ -165,12 +167,14 @@ checkReport cfg size0 seed0 test0 updateUI =
       propertyConfidence cfg
 
     successVerified count coverage =
+      count > 0 &&
       -- If the user wants a statistically significant result, this function
       -- will run a confidence check. Otherwise, it will default to checking
       -- the percentage of encountered labels
       maybe False (\c -> confidenceSuccess count c coverage) confidence
 
     failureVerified count coverage =
+      count > 0 &&
       -- Will be true if we can statistically verify that our coverage was
       -- inadequate
       maybe False (\c -> confidenceFailure count c coverage) confidence
@@ -185,11 +189,22 @@ checkReport cfg size0 seed0 test0 updateUI =
     loop !tests !discards !size !seed !coverage0 = do
       updateUI $ Report tests discards coverage0 Running
 
+      let
+        testLimit =
+          propertyTestLimit cfg
+        defaultMinTests =
+          100
+        hasReachedCoverage =
+          successVerified tests coverage0
+        enoughTestsRun =
+          tests >= fromIntegral (fromMaybe defaultMinTests testLimit) &&
+          (isNothing (propertyConfidence cfg) || hasReachedCoverage)
+
       if size > 99 then
         -- size has reached limit, reset to 0
         loop tests discards 0 seed coverage0
 
-      else if tests > 0 && successVerified tests coverage0 then
+      else if allowsEarlyStop cfg && hasReachedCoverage then
         -- tests have been verified to reach coverage for all labels
         pure $ Report tests discards coverage0 OK
 
@@ -206,7 +221,7 @@ checkReport cfg size0 seed0 test0 updateUI =
             Nothing
             []
 
-      else if tests >= fromIntegral (propertyTestLimit cfg) then
+      else if enoughTestsRun then
         -- we've hit the test limit
         if coverageSuccess tests coverage0 then
           -- all classifiers satisfied, test was successful

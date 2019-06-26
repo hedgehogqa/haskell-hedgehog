@@ -103,6 +103,7 @@ module Hedgehog.Internal.Property (
   -- $internal
   , defaultConfig
   , mapConfig
+  , allowsEarlyStop
   , failDiff
   , failException
   , failWith
@@ -146,8 +147,10 @@ import qualified Control.Monad.Trans.Writer.Strict as Strict
 
 import qualified Data.Char as Char
 import           Data.Functor.Identity (Identity(..))
+import           Data.Int (Int64)
 import           Data.Map (Map)
 import qualified Data.Map.Strict as Map
+import           Data.Maybe (isJust, isNothing)
 import           Data.Number.Erf (invnormcdf)
 import qualified Data.List as List
 import           Data.Semigroup (Semigroup(..))
@@ -235,14 +238,14 @@ newtype PropertyName =
 --   for 1 in 10^9 tests.
 newtype Confidence =
   Confidence {
-    unConfidence :: Integer
+    unConfidence :: Int64
   } deriving (Eq, Ord, Show, Num, Lift)
 
 -- | Configuration for a property test.
 --
 data PropertyConfig =
   PropertyConfig {
-      propertyTestLimit :: !TestLimit
+      propertyTestLimit :: !(Maybe TestLimit)
     , propertyDiscardLimit :: !DiscardLimit
     , propertyShrinkLimit :: !ShrinkLimit
     , propertyShrinkRetries :: !ShrinkRetries
@@ -909,7 +912,7 @@ defaultConfig :: PropertyConfig
 defaultConfig =
   PropertyConfig {
       propertyTestLimit =
-        100
+        Nothing
     , propertyDiscardLimit =
         100
     , propertyShrinkLimit =
@@ -919,6 +922,14 @@ defaultConfig =
     , propertyConfidence =
         Nothing
     }
+
+-- | The configuration allows stopping the testing early in case of met
+--   confidence level
+--
+allowsEarlyStop :: PropertyConfig -> Bool
+allowsEarlyStop cfg =
+  isJust (propertyConfidence cfg) &&
+  isNothing (propertyTestLimit cfg)
 
 -- | Map a config modification function over a property.
 --
@@ -942,7 +953,7 @@ withConfidence c =
 --
 withTests :: TestLimit -> Property -> Property
 withTests n =
-  mapConfig $ \config -> config { propertyTestLimit = n }
+  mapConfig $ \config -> config { propertyTestLimit = Just n }
 
 -- | Set the number of times a property is allowed to discard before the test
 --   runner gives up.
