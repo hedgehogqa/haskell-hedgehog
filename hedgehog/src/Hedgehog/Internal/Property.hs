@@ -1105,7 +1105,7 @@ wilson k n z =
 
 wilsonLowerBound :: Integer -> Integer -> Double -> Double
 wilsonLowerBound k n a =
-  wilson k n $ invnormcdf (a / 2)
+  wilson k n $ invnormcdf (1 - (1 - a / 2))
 
 wilsonUpperBound :: Integer -> Integer -> Double -> Double
 wilsonUpperBound k n a =
