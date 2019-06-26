@@ -1064,13 +1064,16 @@ coverageFailures tests (Coverage kvs) =
 confidenceSuccess :: TestCount -> Confidence -> Coverage CoverCount -> Bool
 confidenceSuccess tests confidence =
   let
+    -- FIXME this tolerance could be customizable in `Confidence`, barring
+    -- making the API less intuitive
+    tolerance = 0.9
     assertLow :: Label CoverCount -> Bool
     assertLow MkLabel{..} =
       wilsonLowerBound
         (fromIntegral $ unCoverCount labelAnnotation)
         (fromIntegral tests)
         (1 / fromIntegral (unConfidence confidence))
-      >= 0.9 * (unCoverPercentage labelMinimum / 100.0)
+      >= tolerance * (unCoverPercentage labelMinimum / 100.0)
   in
     and . fmap assertLow . Map.elems . coverageLabels
 
