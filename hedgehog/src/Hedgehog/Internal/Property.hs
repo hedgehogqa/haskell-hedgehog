@@ -1068,12 +1068,10 @@ confidenceSuccess tests confidence =
     -- making the API less intuitive
     tolerance = 0.9
     assertLow :: Label CoverCount -> Bool
-    assertLow MkLabel{..} =
-      wilsonLowerBound
-        (fromIntegral $ unCoverCount labelAnnotation)
-        (fromIntegral tests)
-        (1 / fromIntegral (unConfidence confidence))
-      >= tolerance * (unCoverPercentage labelMinimum / 100.0)
+    assertLow coverCount@MkLabel{..} =
+      fst (boundsForLabel tests confidence coverCount)
+      >=
+      tolerance * (unCoverPercentage labelMinimum / 100.0)
   in
     and . fmap assertLow . Map.elems . coverageLabels
 
@@ -1083,36 +1081,37 @@ confidenceFailure :: TestCount -> Confidence -> Coverage CoverCount -> Bool
 confidenceFailure tests confidence =
   let
     assertHigh :: Label CoverCount -> Bool
-    assertHigh MkLabel{..} =
-      wilsonUpperBound
-        (fromIntegral $ unCoverCount labelAnnotation)
-        (fromIntegral tests)
-        (1 / fromIntegral (unConfidence confidence))
-      < (unCoverPercentage labelMinimum / 100.0)
+    assertHigh coverCount@MkLabel{..} =
+      snd (boundsForLabel tests confidence coverCount)
+      <
+      (unCoverPercentage labelMinimum / 100.0)
   in
     or . fmap assertHigh . Map.elems . coverageLabels
+
+boundsForLabel :: TestCount -> Confidence -> Label CoverCount -> (Double, Double)
+boundsForLabel tests confidence MkLabel{..} =
+  wilsonBounds
+    (fromIntegral $ unCoverCount labelAnnotation)
+    (fromIntegral tests)
+    (1 / fromIntegral (unConfidence confidence))
 
 -- In order to get an accurate measurement with small sample sizes, we're
 -- using the Wilson score interval
 -- (<https://en.wikipedia.org/wiki/Binomial_proportion_confidence_interval#Wilson_score_interval
 -- wikipedia>) instead of a normal approximation interval.
-wilson :: Integer -> Integer -> Double -> Double
-wilson k n z =
+wilsonBounds :: Integer -> Integer -> Double -> (Double, Double)
+wilsonBounds k n a =
   let
-    nf = fromIntegral n
     p = fromIntegral k / fromIntegral n
+    nf = fromIntegral n
+    wilson z =
+      (p + z * z/(2 * nf) + z * sqrt (p * (1 - p) / nf + z * z / (4 * nf * nf)))
+      /
+      (1 + z * z / nf)
+    low = wilson . invnormcdf $ 1 - (1 - a) / 2
+    high = wilson . invnormcdf $ 1 - a / 2
   in
-    (p + z * z/(2 * nf) + z * sqrt (p * (1 - p) / nf + z * z / (4 * nf * nf)))
-    /
-    (1 + z * z / nf)
-
-wilsonLowerBound :: Integer -> Integer -> Double -> Double
-wilsonLowerBound k n a =
-  wilson k n $ invnormcdf (1 - (1 - a / 2))
-
-wilsonUpperBound :: Integer -> Integer -> Double -> Double
-wilsonUpperBound k n a =
-  wilson k n $ invnormcdf (1 - a / 2)
+    (low, high)
 
 fromLabel :: Label a -> Coverage a
 fromLabel x =
