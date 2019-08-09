@@ -301,11 +301,30 @@ splits = \case
     ([], x, xs) :
     fmap (\(as, b, cs) -> (x : as, b, cs)) (splits xs)
 
-dropOne :: Monad m => [NodeT m a] -> [TreeT m [a]]
-dropOne ts = do
-  (xs, _y, zs) <- splits ts
-  pure . TreeT . pure $
-    interleave (xs ++ zs)
+-- | @removes n@ computes all ways we can remove chunks of size @n@ from a list
+--
+-- Examples
+--
+-- > removes 1 [1..3] == [[2,3],[1,3],[1,2]]
+-- > removes 2 [1..4] == [[3,4],[1,2]]
+-- > removes 2 [1..5] == [[3,4,5],[1,2,5],[1,2,3,4]]
+-- > removes 3 [1..5] == [[4,5],[1,2,3]]
+--
+-- Note that the last chunk we delete might have fewer elements than @n@.
+removes :: forall a. Int -> [a] -> [[a]]
+removes k = \xs -> go xs
+  where
+    go :: [a] -> [[a]]
+    go [] = []
+    go xs = xs2 : map (xs1 ++) (go xs2)
+      where
+        (xs1, xs2) = splitAt k xs
+
+dropSome :: Monad m => [NodeT m a] -> [TreeT m [a]]
+dropSome ts = do
+  n   <- takeWhile (> 0) $ iterate (`div` 2) (length ts)
+  ts' <- removes n ts
+  pure . TreeT . pure $ interleave ts'
 
 shrinkOne :: Monad m => [NodeT m a] -> [TreeT m [a]]
 shrinkOne ts = do
@@ -320,7 +339,7 @@ interleave :: forall m a. Monad m => [NodeT m a] -> NodeT m [a]
 interleave ts =
   NodeT (fmap nodeValue ts) $
     concat [
-        dropOne ts
+        dropSome ts
       , shrinkOne ts
       ]
 
