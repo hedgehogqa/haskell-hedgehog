@@ -155,6 +155,7 @@ import           Data.Number.Erf (invnormcdf)
 import qualified Data.List as List
 import           Data.Semigroup (Semigroup(..))
 import           Data.String (IsString)
+import           Data.Ratio ((%))
 import           Data.Typeable (typeOf)
 
 import           Hedgehog.Internal.Distributive
@@ -1100,16 +1101,29 @@ boundsForLabel tests confidence MkLabel{..} =
 -- (<https://en.wikipedia.org/wiki/Binomial_proportion_confidence_interval#Wilson_score_interval
 -- wikipedia>) instead of a normal approximation interval.
 wilsonBounds :: Integer -> Integer -> Double -> (Double, Double)
-wilsonBounds k n a =
+wilsonBounds positives count acceptance =
   let
-    p = fromIntegral k / fromIntegral n
-    nf = fromIntegral n
-    wilson z =
-      (p + z * z/(2 * nf) + z * sqrt (p * (1 - p) / nf + z * z / (4 * nf * nf)))
-      /
-      (1 + z * z / nf)
-    low = wilson . invnormcdf $ 1 - (1 - a) / 2
-    high = wilson . invnormcdf $ 1 - a / 2
+    p =
+      fromRational $ positives % count
+    n =
+      fromIntegral count
+    z =
+      invnormcdf $ 1 - acceptance / 2
+
+    midpoint =
+      p + z * z / (2 * n)
+
+    offset =
+      z / (1 + z ** 2 / n) * sqrt (p * (1 - p) / n + z ** 2 / (4 * n ** 2))
+
+    denominator =
+      1 + z * z / n
+
+    low =
+      (midpoint - offset) / denominator
+
+    high =
+      (midpoint + offset) / denominator
   in
     (low, high)
 
