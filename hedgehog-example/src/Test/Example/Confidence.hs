@@ -16,7 +16,7 @@ import qualified Hedgehog.Internal.Gen as Gen
 prop_without_confidence :: Property
 prop_without_confidence =
   withConfidence (10^9) . withTests 1000000 . property $ do
-    number <- forAll (Gen.int $ Range.linear 1 10)
+    number <- forAll (Gen.int $ Range.constant 1 2)
     cover 60 "number == 1" $ number == 1
 
 ------------------------------------------------------------------------

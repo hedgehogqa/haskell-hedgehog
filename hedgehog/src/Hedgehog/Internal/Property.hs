@@ -113,6 +113,8 @@ module Hedgehog.Internal.Property (
   , mkTestT
   , runTest
   , runTestT
+
+  , wilsonBounds
   ) where
 
 import           Control.Applicative (Alternative(..))
@@ -425,7 +427,7 @@ newtype CoverCount =
 newtype CoverPercentage =
   CoverPercentage {
       unCoverPercentage :: Double
-    } deriving (Eq, Ord, Show, Num)
+    } deriving (Eq, Ord, Show, Num, Fractional)
 
 -- | The name of a classifier.
 --
@@ -1067,12 +1069,10 @@ confidenceSuccess tests confidence =
   let
     -- FIXME this tolerance could be customizable in `Confidence`, barring
     -- making the API less intuitive
-    tolerance = 0.9
     assertLow :: Label CoverCount -> Bool
     assertLow coverCount@MkLabel{..} =
       fst (boundsForLabel tests confidence coverCount)
-      >=
-      tolerance * (unCoverPercentage labelMinimum / 100.0)
+        >= unCoverPercentage labelMinimum / 100.0
   in
     and . fmap assertLow . Map.elems . coverageLabels
 
@@ -1084,8 +1084,7 @@ confidenceFailure tests confidence =
     assertHigh :: Label CoverCount -> Bool
     assertHigh coverCount@MkLabel{..} =
       snd (boundsForLabel tests confidence coverCount)
-      <
-      (unCoverPercentage labelMinimum / 100.0)
+        < (unCoverPercentage labelMinimum / 100.0)
   in
     or . fmap assertHigh . Map.elems . coverageLabels
 

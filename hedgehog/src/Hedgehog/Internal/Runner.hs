@@ -167,16 +167,18 @@ checkReport cfg size0 seed0 test0 updateUI =
       propertyConfidence cfg
 
     successVerified count coverage =
-      count > 0 &&
+      count `mod` 100 == 0 &&
       -- If the user wants a statistically significant result, this function
       -- will run a confidence check. Otherwise, it will default to checking
       -- the percentage of encountered labels
       maybe False (\c -> confidenceSuccess count c coverage) confidence
 
     failureVerified count coverage =
-      count > 0 &&
       -- Will be true if we can statistically verify that our coverage was
-      -- inadequate
+      -- inadequate.
+      -- Testing only on 100s to minimise repeated measurement statistical
+      -- errors.
+      count `mod` 100 == 0 &&
       maybe False (\c -> confidenceFailure count c coverage) confidence
 
     loop ::
@@ -198,7 +200,7 @@ checkReport cfg size0 seed0 test0 updateUI =
           successVerified tests coverage0
         enoughTestsRun =
           tests >= fromIntegral (fromMaybe defaultMinTests testLimit) &&
-          (isNothing (propertyConfidence cfg) || hasReachedCoverage)
+            (isNothing (propertyConfidence cfg) || hasReachedCoverage)
 
       if size > 99 then
         -- size has reached limit, reset to 0
@@ -217,7 +219,7 @@ checkReport cfg size0 seed0 test0 updateUI =
             0
             (Just coverage0)
             Nothing
-            "Test coverage cannot be reached, aborted"
+            ("Test coverage cannot be reached after " <> show tests <> " tests")
             Nothing
             []
 
