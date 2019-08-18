@@ -1067,8 +1067,6 @@ coverageFailures tests (Coverage kvs) =
 confidenceSuccess :: TestCount -> Confidence -> Coverage CoverCount -> Bool
 confidenceSuccess tests confidence =
   let
-    -- FIXME this tolerance could be customizable in `Confidence`, barring
-    -- making the API less intuitive
     assertLow :: Label CoverCount -> Bool
     assertLow coverCount@MkLabel{..} =
       fst (boundsForLabel tests confidence coverCount)
