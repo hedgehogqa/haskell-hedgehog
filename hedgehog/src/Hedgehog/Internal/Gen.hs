@@ -1,5 +1,6 @@
 {-# OPTIONS_HADDOCK not-home #-}
 {-# LANGUAGE ApplicativeDo #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveFunctor #-}
@@ -486,8 +487,11 @@ instance Monad m => Monad (GenT m) where
           runGenT size sk . k =<<
           runGenT size sm m
 
+#if MIN_VERSION_base(4, 13, 0)
+#else
   fail =
     Fail.fail
+#endif
 
 instance Monad m => MonadFail (GenT m) where
   fail =
