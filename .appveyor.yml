@@ -15,7 +15,8 @@ environment:
     - GHC_VERSION: "8.0.2"
     - GHC_VERSION: "8.2.2"
     - GHC_VERSION: "8.4.4"
-    - GHC_VERSION: "8.6.4"
+    - GHC_VERSION: "8.6.5"
+    - GHC_VERSION: "8.8.1"
 
 cache:
  - "C:\\SR"
