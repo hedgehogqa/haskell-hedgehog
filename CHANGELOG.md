@@ -1,3 +1,9 @@
+## Version 1.0.1 (2019-09-16)
+- Add compatibility with GHC 8.8 ([#319][319], [@erikd][erikd])
+- Include location of failed assertion in report. This enables editors to more easily parse the location of failed test assertions, and provide links/jump functionality ([#308][308], [@owickstrom][owickstrom])
+- Stop using filter to define unicode ([#303][303], [@ajmcmiddlin][ajmcmiddlin])
+- Export LabelName from main module ([#299][299], [@erikd][erikd])
+
 ## Version 1.0 (2019-05-13)
 - Add histograms to labels / coverage ([#289][289], [@jacobstanley][jacobstanley])
 - Improved shrinking of lists ([#276][276], [@jacobstanley][jacobstanley] / [@edsko][edsko])
@@ -145,7 +151,19 @@
   https://github.com/chessai
 [edsko]:
   https://github.com/edsko
+[ajmcmiddlin]:
+  https://github.com/ajmcmiddlin
+[owickstrom]:
+  https://github.com/owickstrom
 
+[319]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/319
+[308]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/308
+[303]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/303
+[299]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/299
 [289]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/289
 [276]:
