@@ -49,7 +49,7 @@ library
   build-depends:
    -- GHC 8.0.1 / base-4.9.0.0 (May 2016)
       base                            >= 4.9        && < 5
-    , ansi-terminal                   >= 0.6        && < 0.10
+    , ansi-terminal                   >= 0.6        && < 0.11
     , async                           >= 2.0        && < 2.3
     , bytestring                      >= 0.10       && < 0.11
     , concurrent-output               >= 1.7        && < 1.11
