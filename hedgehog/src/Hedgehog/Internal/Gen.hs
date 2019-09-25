@@ -18,6 +18,9 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-} -- MonadBase
+#if __GLASGOW_HASKELL__ >= 806
+{-# LANGUAGE DerivingVia #-}
+#endif
 module Hedgehog.Internal.Gen (
   -- * Transformer
     Gen
@@ -165,6 +168,7 @@ module Hedgehog.Internal.Gen (
 import           Control.Applicative (Alternative(..),liftA2)
 import           Control.Monad (MonadPlus(..), filterM, replicateM, join)
 import           Control.Monad.Base (MonadBase(..))
+import           Control.Monad.Trans.Control (MonadBaseControl(..))
 import           Control.Monad.Catch (MonadThrow(..), MonadCatch(..))
 import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Monad.Fail (MonadFail (..))
@@ -190,6 +194,9 @@ import           Data.Bifunctor (first)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString
 import qualified Data.Char as Char
+#if __GLASGOW_HASKELL__ < 806
+import           Data.Coerce (coerce)
+#endif
 import           Data.Foldable (for_, toList)
 import           Data.Functor.Identity (Identity(..))
 import           Data.Int (Int8, Int16, Int32, Int64)
@@ -586,6 +593,24 @@ instance MonadIO m => MonadIO (GenT m) where
 instance MonadBase b m => MonadBase b (GenT m) where
   liftBase =
     lift . liftBase
+
+#if __GLASGOW_HASKELL__ >= 806
+deriving via (ReaderT Size (ReaderT Seed (TreeT (MaybeT m))))
+  instance MonadBaseControl b m => MonadBaseControl b (GenT m)
+#else
+instance MonadBaseControl b m => MonadBaseControl b (GenT m) where
+  type StM (GenT m) a = StM (GloopT m) a
+  liftBaseWith g = gloopToGen $ liftBaseWith $ \q -> g (\gen -> q (genToGloop gen))
+  restoreM = gloopToGen . restoreM
+
+type GloopT m = ReaderT Size (ReaderT Seed (TreeT (MaybeT m)))
+
+gloopToGen :: GloopT m a -> GenT m a
+gloopToGen = coerce
+
+genToGloop :: GenT m a -> GloopT m a
+genToGloop = coerce
+#endif
 
 instance MonadThrow m => MonadThrow (GenT m) where
   throwM =
