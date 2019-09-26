@@ -100,7 +100,7 @@ module Hedgehog.Internal.Property (
   , confidenceSuccess
   , confidenceFailure
   , withConfidence
-  , terminateEarly
+  , verifiedTermination
   , defaultConfidence
 
   -- * Internal
@@ -964,8 +964,8 @@ withConfidence c =
             setConfidence propertyTerminationCriteria
         }
 
-terminateEarly :: Property -> Property
-terminateEarly =
+verifiedTermination :: Property -> Property
+verifiedTermination =
   mapConfig $ \config@PropertyConfig{..} ->
     let
       newTerminationCriteria = case propertyTerminationCriteria of
