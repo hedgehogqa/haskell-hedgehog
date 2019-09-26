@@ -42,6 +42,7 @@ module Hedgehog.Internal.Property (
   , forAllT
   , forAllWith
   , forAllWithT
+  , defaultMinTests
   , discard
 
   -- * Group
@@ -95,15 +96,17 @@ module Hedgehog.Internal.Property (
 
   -- * Confidence
   , Confidence(..)
+  , TerminationCriteria(..)
   , confidenceSuccess
   , confidenceFailure
   , withConfidence
+  , terminateEarly
+  , defaultConfidence
 
   -- * Internal
   -- $internal
   , defaultConfig
   , mapConfig
-  , allowsEarlyStop
   , failDiff
   , failException
   , failWith
@@ -152,7 +155,6 @@ import           Data.Functor.Identity (Identity(..))
 import           Data.Int (Int64)
 import           Data.Map (Map)
 import qualified Data.Map.Strict as Map
-import           Data.Maybe (isJust, isNothing)
 import           Data.Number.Erf (invnormcdf)
 import qualified Data.List as List
 import           Data.Semigroup (Semigroup(..))
@@ -248,11 +250,10 @@ newtype Confidence =
 --
 data PropertyConfig =
   PropertyConfig {
-      propertyTestLimit :: !(Maybe TestLimit)
-    , propertyDiscardLimit :: !DiscardLimit
+      propertyDiscardLimit :: !DiscardLimit
     , propertyShrinkLimit :: !ShrinkLimit
     , propertyShrinkRetries :: !ShrinkRetries
-    , propertyConfidence :: !(Maybe Confidence)
+    , propertyTerminationCriteria :: !TerminationCriteria
     } deriving (Eq, Ord, Show, Lift)
 
 -- | The number of successful tests that need to be run before a property test
@@ -356,6 +357,12 @@ newtype GroupName =
 newtype PropertyCount =
   PropertyCount Int
   deriving (Eq, Ord, Show, Num, Enum, Real, Integral)
+
+data TerminationCriteria =
+    EarlyTermination Confidence TestLimit
+  | NoEarlyTermination Confidence TestLimit
+  | NoConfidenceTermination TestLimit
+  deriving (Eq, Ord, Show, Lift)
 
 --
 -- FIXME This whole Log/Failure thing could be a lot more structured to allow
@@ -914,25 +921,25 @@ test =
 defaultConfig :: PropertyConfig
 defaultConfig =
   PropertyConfig {
-      propertyTestLimit =
-        Nothing
-    , propertyDiscardLimit =
+      propertyDiscardLimit =
         100
     , propertyShrinkLimit =
         1000
     , propertyShrinkRetries =
         0
-    , propertyConfidence =
-        Nothing
+    , propertyTerminationCriteria =
+        NoConfidenceTermination defaultMinTests
     }
 
--- | The configuration allows stopping the testing early in case of met
---   confidence level
+-- | The minimum amount of tests to run for a 'Property'
 --
-allowsEarlyStop :: PropertyConfig -> Bool
-allowsEarlyStop cfg =
-  isJust (propertyConfidence cfg) &&
-  isNothing (propertyTestLimit cfg)
+defaultMinTests :: TestLimit
+defaultMinTests = 100
+
+-- | The default confidence allows one false positive in 10^9 tests
+--
+defaultConfidence :: Confidence
+defaultConfidence = 10 ^ (9 :: Int)
 
 -- | Map a config modification function over a property.
 --
@@ -945,7 +952,28 @@ mapConfig f (Property cfg t) =
 --
 withConfidence :: Confidence -> Property -> Property
 withConfidence c =
-  mapConfig $ \config -> config { propertyConfidence = Just c }
+  let
+    setConfidence = \case
+      NoEarlyTermination _ tests -> NoEarlyTermination c tests
+      NoConfidenceTermination tests -> NoEarlyTermination c tests
+      EarlyTermination _ tests -> EarlyTermination c tests
+  in
+    mapConfig $ \config@PropertyConfig{..} ->
+      config
+        { propertyTerminationCriteria =
+            setConfidence propertyTerminationCriteria
+        }
+
+terminateEarly :: Property -> Property
+terminateEarly =
+  mapConfig $ \config@PropertyConfig{..} ->
+    let
+      newTerminationCriteria = case propertyTerminationCriteria of
+        NoEarlyTermination c tests -> EarlyTermination c tests
+        NoConfidenceTermination tests -> EarlyTermination defaultConfidence tests
+        EarlyTermination c tests -> EarlyTermination c tests
+    in
+      config { propertyTerminationCriteria = newTerminationCriteria }
 
 -- | Set the number of times a property should be executed before it is considered
 --   successful.
@@ -956,7 +984,14 @@ withConfidence c =
 --
 withTests :: TestLimit -> Property -> Property
 withTests n =
-  mapConfig $ \config -> config { propertyTestLimit = Just n }
+  let
+    setTestLimit tests = \case
+      NoEarlyTermination c _ -> NoEarlyTermination c tests
+      NoConfidenceTermination _ -> NoConfidenceTermination tests
+      EarlyTermination c _ -> EarlyTermination c tests
+  in
+    mapConfig $ \config@PropertyConfig{..} ->
+      config { propertyTerminationCriteria = setTestLimit n propertyTerminationCriteria }
 
 -- | Set the number of times a property is allowed to discard before the test
 --   runner gives up.
@@ -1054,6 +1089,7 @@ labelCovered :: TestCount -> Label CoverCount -> Bool
 labelCovered tests (MkLabel _ _ minimum_ population) =
   coverPercentage tests population >= minimum_
 
+-- | All labels are covered
 coverageSuccess :: TestCount -> Coverage CoverCount -> Bool
 coverageSuccess tests =
   null . coverageFailures tests
