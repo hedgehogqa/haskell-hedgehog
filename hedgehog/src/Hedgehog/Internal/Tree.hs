@@ -66,6 +66,7 @@ import           Data.Functor.Classes (showsUnaryWith, showsBinaryWith)
 import qualified Data.Maybe as Maybe
 
 import           Hedgehog.Internal.Distributive
+import           Control.Monad.Trans.Control (MonadBaseControl (..))
 
 import           Prelude hiding (filter)
 
@@ -90,6 +91,11 @@ newtype TreeT m a =
   TreeT {
       runTreeT :: m (NodeT m a)
     }
+
+instance MonadBaseControl b m => MonadBaseControl b (TreeT m) where
+  type StM (TreeT m) a = StM m (NodeT m a)
+  liftBaseWith f = TreeT $ liftBaseWith (\g -> pure <$> f (g . runTreeT))
+  restoreM = TreeT . restoreM
 
 -- | A node in a rose tree.
 --

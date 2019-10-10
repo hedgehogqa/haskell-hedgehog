@@ -1,6 +1,7 @@
 {-# OPTIONS_HADDOCK not-home #-}
 {-# LANGUAGE ApplicativeDo #-}
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveLift #-}
@@ -202,6 +203,16 @@ newtype PropertyT m a =
     )
 -- NOTE: Move this to the deriving list above when we drop 7.10
 deriving instance MonadResource m => MonadResource (PropertyT m)
+
+-- NOTE: Move this to the deriving list above when we drop 8.0
+#if __GLASGOW_HASKELL__ >= 802
+deriving instance MonadBaseControl b m => MonadBaseControl b (PropertyT m)
+#else
+instance MonadBaseControl b m => MonadBaseControl b (PropertyT m) where
+  type StM (PropertyT m) a = StM (TestT (GenT m)) a
+  liftBaseWith f = PropertyT $ liftBaseWith $ \rib -> f (rib . unPropertyT)
+  restoreM = PropertyT . restoreM
+#endif
 
 -- | A test monad allows the assertion of expectations.
 --
