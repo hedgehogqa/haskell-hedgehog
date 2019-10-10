@@ -899,7 +899,7 @@ word64 =
 
 -- | Generates a random floating-point number in the @[inclusive,exclusive)@ range.
 --
---   This generator works the same as 'integral', but for floating point numbers.
+--   /This generator works the same as 'integral', but for floating point numbers./
 --
 realFloat :: (MonadGen m, RealFloat a) => Range a -> m a
 realFloat range =
@@ -963,8 +963,8 @@ enum lo hi =
 -- enumBounded :: 'Gen' 'Bool'
 -- @
 --
---   /This is implemented in terms of the 'Enum' class, and thus may be
---    partial for integral types larger than 'Int', e.g. 'Word64'./
+--   /This is implemented in terms of the 'Enum' class, and thus may be/
+--   /partial for integral types larger than 'Int', e.g. 'Word64'./
 enumBounded :: (MonadGen m, Enum a, Bounded a) => m a
 enumBounded =
   enum minBound maxBound
@@ -1303,7 +1303,7 @@ filterT p gen0 =
 
 -- | Runs a 'Maybe' generator until it produces a 'Just'.
 --
---   This is implemented using 'filter' and has the same caveats.
+--   /This is implemented using 'filter' and has the same caveats./
 --
 just :: (MonadGen m, GenBase m ~ Identity) => m (Maybe a) -> m a
 just g = do
@@ -1316,7 +1316,7 @@ just g = do
 
 -- | Runs a 'Maybe' generator until it produces a 'Just'.
 --
---   This is implemented using 'filter' and has the same caveats.
+--   /This is implemented using 'filter' and has the same caveats./
 --
 justT :: MonadGen m => m (Maybe a) -> m a
 justT g = do
@@ -1572,8 +1572,8 @@ subsequence xs =
 
 -- | Generates a random permutation of a list.
 --
---   This shrinks towards the order of the list being identical to the input
---   list.
+--   /This shrinks towards the order of the list being identical to the input/
+--   /list./
 --
 shuffle :: MonadGen m => [a] -> m [a]
 shuffle = \case

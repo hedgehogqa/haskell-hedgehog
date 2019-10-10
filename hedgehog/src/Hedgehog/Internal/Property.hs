@@ -462,8 +462,8 @@ newtype LabelName =
 
 -- | The extent to which a test is covered by a classifier.
 --
---   /When a classifier's coverage does not exceed the required minimum, the
---   test will be failed./
+--   /When a classifier's coverage does not exceed the required minimum, the/
+--   /test will be failed./
 --
 data Label a =
   MkLabel {
@@ -475,8 +475,8 @@ data Label a =
 
 -- | The extent to which all classifiers cover a test.
 --
---   /When a given classification's coverage does not exceed the required
---   minimum, the test will be failed./
+--   /When a given classification's coverage does not exceed the required/
+--   /minimum, the test will be failed./
 --
 newtype Coverage a =
   Coverage {
@@ -741,10 +741,10 @@ assert b = do
 --   diff x (<=) 'r'
 -- @
 --
---   /This function behaves like the unix `diff` tool, which gives a `0` exit
---   code if the compared files are identical, or a `1` exit code code
---   otherwise. Like unix `diff`, if the arguments fail the comparison, a diff
---   is shown./
+--   /This function behaves like the unix `diff` tool, which gives a `0` exit/
+--   /code if the compared files are identical, or a `1` exit code code/
+--   /otherwise. Like unix `diff`, if the arguments fail the comparison, a diff/
+--   /is shown./
 --
 diff :: (MonadTest m, Show a, Show b, HasCallStack) => a -> (a -> b -> Bool) -> b -> m ()
 diff x op y = do
@@ -1223,7 +1223,7 @@ cover minimum_ name covered =
 --    prop_with_classifier =
 --      property $ do
 --        xs <- forAll $ Gen.list (Range.linear 0 100) Gen.alpha
---        for_ xs $ \x -> do
+--        for_ xs $ \\x -> do
 --          classify "newborns" $ x == 0
 --          classify "children" $ x > 0 && x < 13
 --          classify "teens" $ x > 12 && x < 20
