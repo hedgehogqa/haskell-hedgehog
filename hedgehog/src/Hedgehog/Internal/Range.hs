@@ -253,7 +253,7 @@ linearBounded =
 -- | Construct a range which scales the second bound relative to the size
 --   parameter.
 --
---   This works the same as 'linear', but for fractional values.
+--   /This works the same as 'linear', but for fractional values./
 --
 linearFrac :: (Fractional a, Ord a) => a -> a -> Range a
 linearFrac x y =
@@ -261,7 +261,7 @@ linearFrac x y =
 
 -- | Construct a range which scales the bounds relative to the size parameter.
 --
---   This works the same as 'linearFrom', but for fractional values.
+--   /This works the same as 'linearFrom', but for fractional values./
 --
 linearFracFrom :: (Fractional a, Ord a) => a -> a -> a -> Range a
 linearFracFrom z x y =
@@ -400,7 +400,7 @@ exponentialBounded =
 -- | Construct a range which scales the second bound exponentially relative to
 --   the size parameter.
 --
---   This works the same as 'exponential', but for floating-point values.
+--   /This works the same as 'exponential', but for floating-point values./
 --
 --   >>> bounds 0 $ exponentialFloat 0 10
 --   (0.0,0.0)
@@ -418,7 +418,7 @@ exponentialFloat x y =
 -- | Construct a range which scales the bounds exponentially relative to the
 --   size parameter.
 --
---   This works the same as 'exponentialFrom', but for floating-point values.
+--   /This works the same as 'exponentialFrom', but for floating-point values./
 --
 --   >>> bounds 0 $ exponentialFloatFrom 0 (-10) 20
 --   (0.0,0.0)

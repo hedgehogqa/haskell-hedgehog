@@ -852,7 +852,7 @@ word64 =
 
 -- | Generates a random floating-point number in the @[inclusive,exclusive)@ range.
 --
---   This generator works the same as 'integral', but for floating point numbers.
+--   /This generator works the same as 'integral', but for floating point numbers./
 --
 realFloat :: (MonadGen m, RealFloat a) => Range a -> m a
 realFloat range =
@@ -1256,7 +1256,7 @@ filterT p gen0 =
 
 -- | Runs a 'Maybe' generator until it produces a 'Just'.
 --
---   This is implemented using 'filter' and has the same caveats.
+--   /This is implemented using 'filter' and has the same caveats./
 --
 just :: (MonadGen m, GenBase m ~ Identity) => m (Maybe a) -> m a
 just g = do
@@ -1269,7 +1269,7 @@ just g = do
 
 -- | Runs a 'Maybe' generator until it produces a 'Just'.
 --
---   This is implemented using 'filter' and has the same caveats.
+--   /This is implemented using 'filter' and has the same caveats./
 --
 justT :: MonadGen m => m (Maybe a) -> m a
 justT g = do
@@ -1525,8 +1525,8 @@ subsequence xs =
 
 -- | Generates a random permutation of a list.
 --
---   This shrinks towards the order of the list being identical to the input
---   list.
+--   /This shrinks towards the order of the list being identical to the input/
+--   /list./
 --
 shuffle :: MonadGen m => [a] -> m [a]
 shuffle = \case
