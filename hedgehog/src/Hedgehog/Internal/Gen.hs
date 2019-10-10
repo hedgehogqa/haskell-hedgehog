@@ -185,6 +185,8 @@ import           Control.Monad.Trans.Identity (IdentityT(..))
 import           Control.Monad.Trans.Maybe (MaybeT(..))
 import           Control.Monad.Trans.Reader (ReaderT(..))
 import           Control.Monad.Trans.Resource (MonadResource(..))
+import qualified Control.Monad.Trans.State.Lazy as Lazy
+import qualified Control.Monad.Trans.State.Strict as Strict
 import qualified Control.Monad.Trans.Writer.Lazy as Lazy
 import qualified Control.Monad.Trans.Writer.Strict as Strict
 import           Control.Monad.Writer.Class (MonadWriter(..))
@@ -409,6 +411,26 @@ instance MonadGen m => MonadGen (ExceptT x m) where
 instance MonadGen m => MonadGen (ReaderT r m) where
   type GenBase (ReaderT r m) =
     ReaderT r (GenBase m)
+
+  toGenT =
+    distributeT . hoist toGenT
+
+  fromGenT =
+    hoist fromGenT . distributeT
+
+instance MonadGen m => MonadGen (Lazy.StateT r m) where
+  type GenBase (Lazy.StateT r m) =
+    Lazy.StateT r (GenBase m)
+
+  toGenT =
+    distributeT . hoist toGenT
+
+  fromGenT =
+    hoist fromGenT . distributeT
+
+instance MonadGen m => MonadGen (Strict.StateT r m) where
+  type GenBase (Strict.StateT r m) =
+    Strict.StateT r (GenBase m)
 
   toGenT =
     distributeT . hoist toGenT
