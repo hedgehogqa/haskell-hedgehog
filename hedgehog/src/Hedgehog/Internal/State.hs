@@ -97,7 +97,7 @@ instance Show Name where
 --   previous action in a generator without knowing the value of the result
 --   (e.g., to get the ID of a previously-created user).
 --
---   Symmbolic variables provide a token to stand in for the actual variables at
+--   Symbolic variables provide a token to stand in for the actual variables at
 --   generation time (and in 'Require'/'Update' callbacks). At execution time,
 --   real values are available, so your execute actions work on 'Concrete'
 --   variables.
