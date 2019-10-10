@@ -12,6 +12,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -41,6 +42,7 @@ module Hedgehog.Internal.Property (
   , forAllT
   , forAllWith
   , forAllWithT
+  , defaultMinTests
   , discard
 
   -- * Group
@@ -92,6 +94,15 @@ module Hedgehog.Internal.Property (
   , CoverPercentage(..)
   , toCoverCount
 
+  -- * Confidence
+  , Confidence(..)
+  , TerminationCriteria(..)
+  , confidenceSuccess
+  , confidenceFailure
+  , withConfidence
+  , verifiedTermination
+  , defaultConfidence
+
   -- * Internal
   -- $internal
   , defaultConfig
@@ -105,6 +116,8 @@ module Hedgehog.Internal.Property (
   , mkTestT
   , runTest
   , runTestT
+
+  , wilsonBounds
   ) where
 
 import           Control.Applicative (Alternative(..))
@@ -139,11 +152,14 @@ import qualified Control.Monad.Trans.Writer.Strict as Strict
 
 import qualified Data.Char as Char
 import           Data.Functor.Identity (Identity(..))
+import           Data.Int (Int64)
 import           Data.Map (Map)
 import qualified Data.Map.Strict as Map
+import           Data.Number.Erf (invnormcdf)
 import qualified Data.List as List
 import           Data.Semigroup (Semigroup(..))
 import           Data.String (IsString)
+import           Data.Ratio ((%))
 import           Data.Typeable (typeOf)
 
 import           Hedgehog.Internal.Distributive
@@ -221,14 +237,23 @@ newtype PropertyName =
       unPropertyName :: String
     } deriving (Eq, Ord, Show, IsString, Semigroup, Lift)
 
+-- | The acceptable occurrence of false positives
+--
+--   Example, @Confidence 10^9@ would mean that you'd accept a false positive
+--   for 1 in 10^9 tests.
+newtype Confidence =
+  Confidence {
+    unConfidence :: Int64
+  } deriving (Eq, Ord, Show, Num, Lift)
+
 -- | Configuration for a property test.
 --
 data PropertyConfig =
   PropertyConfig {
-      propertyTestLimit :: !TestLimit
-    , propertyDiscardLimit :: !DiscardLimit
+      propertyDiscardLimit :: !DiscardLimit
     , propertyShrinkLimit :: !ShrinkLimit
     , propertyShrinkRetries :: !ShrinkRetries
+    , propertyTerminationCriteria :: !TerminationCriteria
     } deriving (Eq, Ord, Show, Lift)
 
 -- | The number of successful tests that need to be run before a property test
@@ -333,6 +358,12 @@ newtype PropertyCount =
   PropertyCount Int
   deriving (Eq, Ord, Show, Num, Enum, Real, Integral)
 
+data TerminationCriteria =
+    EarlyTermination Confidence TestLimit
+  | NoEarlyTermination Confidence TestLimit
+  | NoConfidenceTermination TestLimit
+  deriving (Eq, Ord, Show, Lift)
+
 --
 -- FIXME This whole Log/Failure thing could be a lot more structured to allow
 -- FIXME for richer user controlled error messages, think Doc. Ideally we'd
@@ -403,7 +434,7 @@ newtype CoverCount =
 newtype CoverPercentage =
   CoverPercentage {
       unCoverPercentage :: Double
-    } deriving (Eq, Ord, Show, Num)
+    } deriving (Eq, Ord, Show, Num, Fractional)
 
 -- | The name of a classifier.
 --
@@ -890,21 +921,59 @@ test =
 defaultConfig :: PropertyConfig
 defaultConfig =
   PropertyConfig {
-      propertyTestLimit =
-        100
-    , propertyDiscardLimit =
+      propertyDiscardLimit =
         100
     , propertyShrinkLimit =
         1000
     , propertyShrinkRetries =
         0
+    , propertyTerminationCriteria =
+        NoConfidenceTermination defaultMinTests
     }
+
+-- | The minimum amount of tests to run for a 'Property'
+--
+defaultMinTests :: TestLimit
+defaultMinTests = 100
+
+-- | The default confidence allows one false positive in 10^9 tests
+--
+defaultConfidence :: Confidence
+defaultConfidence = 10 ^ (9 :: Int)
 
 -- | Map a config modification function over a property.
 --
 mapConfig :: (PropertyConfig -> PropertyConfig) -> Property -> Property
 mapConfig f (Property cfg t) =
   Property (f cfg) t
+
+-- | Make sure that the result is statistically significant in accordance to
+--   the passed 'Confidence'
+--
+withConfidence :: Confidence -> Property -> Property
+withConfidence c =
+  let
+    setConfidence = \case
+      NoEarlyTermination _ tests -> NoEarlyTermination c tests
+      NoConfidenceTermination tests -> NoEarlyTermination c tests
+      EarlyTermination _ tests -> EarlyTermination c tests
+  in
+    mapConfig $ \config@PropertyConfig{..} ->
+      config
+        { propertyTerminationCriteria =
+            setConfidence propertyTerminationCriteria
+        }
+
+verifiedTermination :: Property -> Property
+verifiedTermination =
+  mapConfig $ \config@PropertyConfig{..} ->
+    let
+      newTerminationCriteria = case propertyTerminationCriteria of
+        NoEarlyTermination c tests -> EarlyTermination c tests
+        NoConfidenceTermination tests -> EarlyTermination defaultConfidence tests
+        EarlyTermination c tests -> EarlyTermination c tests
+    in
+      config { propertyTerminationCriteria = newTerminationCriteria }
 
 -- | Set the number of times a property should be executed before it is considered
 --   successful.
@@ -915,7 +984,14 @@ mapConfig f (Property cfg t) =
 --
 withTests :: TestLimit -> Property -> Property
 withTests n =
-  mapConfig $ \config -> config { propertyTestLimit = n }
+  let
+    setTestLimit tests = \case
+      NoEarlyTermination c _ -> NoEarlyTermination c tests
+      NoConfidenceTermination _ -> NoConfidenceTermination tests
+      EarlyTermination c _ -> EarlyTermination c tests
+  in
+    mapConfig $ \config@PropertyConfig{..} ->
+      config { propertyTerminationCriteria = setTestLimit n propertyTerminationCriteria }
 
 -- | Set the number of times a property is allowed to discard before the test
 --   runner gives up.
@@ -1013,6 +1089,7 @@ labelCovered :: TestCount -> Label CoverCount -> Bool
 labelCovered tests (MkLabel _ _ minimum_ population) =
   coverPercentage tests population >= minimum_
 
+-- | All labels are covered
 coverageSuccess :: TestCount -> Coverage CoverCount -> Bool
 coverageSuccess tests =
   null . coverageFailures tests
@@ -1020,6 +1097,68 @@ coverageSuccess tests =
 coverageFailures :: TestCount -> Coverage CoverCount -> [Label CoverCount]
 coverageFailures tests (Coverage kvs) =
   filter (not . labelCovered tests) (Map.elems kvs)
+
+-- | Is true when the test coverage satisfies the specified 'Confidence'
+--   contstraint for all 'Coverage CoverCount's
+confidenceSuccess :: TestCount -> Confidence -> Coverage CoverCount -> Bool
+confidenceSuccess tests confidence =
+  let
+    assertLow :: Label CoverCount -> Bool
+    assertLow coverCount@MkLabel{..} =
+      fst (boundsForLabel tests confidence coverCount)
+        >= unCoverPercentage labelMinimum / 100.0
+  in
+    and . fmap assertLow . Map.elems . coverageLabels
+
+-- | Is true when there exists a label that is sure to have failed according to
+--   the 'Confidence' constraint
+confidenceFailure :: TestCount -> Confidence -> Coverage CoverCount -> Bool
+confidenceFailure tests confidence =
+  let
+    assertHigh :: Label CoverCount -> Bool
+    assertHigh coverCount@MkLabel{..} =
+      snd (boundsForLabel tests confidence coverCount)
+        < (unCoverPercentage labelMinimum / 100.0)
+  in
+    or . fmap assertHigh . Map.elems . coverageLabels
+
+boundsForLabel :: TestCount -> Confidence -> Label CoverCount -> (Double, Double)
+boundsForLabel tests confidence MkLabel{..} =
+  wilsonBounds
+    (fromIntegral $ unCoverCount labelAnnotation)
+    (fromIntegral tests)
+    (1 / fromIntegral (unConfidence confidence))
+
+-- In order to get an accurate measurement with small sample sizes, we're
+-- using the Wilson score interval
+-- (<https://en.wikipedia.org/wiki/Binomial_proportion_confidence_interval#Wilson_score_interval
+-- wikipedia>) instead of a normal approximation interval.
+wilsonBounds :: Integer -> Integer -> Double -> (Double, Double)
+wilsonBounds positives count acceptance =
+  let
+    p =
+      fromRational $ positives % count
+    n =
+      fromIntegral count
+    z =
+      invnormcdf $ 1 - acceptance / 2
+
+    midpoint =
+      p + z * z / (2 * n)
+
+    offset =
+      z / (1 + z ** 2 / n) * sqrt (p * (1 - p) / n + z ** 2 / (4 * n ** 2))
+
+    denominator =
+      1 + z * z / n
+
+    low =
+      (midpoint - offset) / denominator
+
+    high =
+      (midpoint + offset) / denominator
+  in
+    (low, high)
 
 fromLabel :: Label a -> Coverage a
 fromLabel x =

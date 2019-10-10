@@ -40,7 +40,10 @@ import           Hedgehog.Internal.Property (Property(..), PropertyConfig(..), P
 import           Hedgehog.Internal.Property (PropertyT(..), Failure(..), runTestT)
 import           Hedgehog.Internal.Property (ShrinkLimit, ShrinkRetries, withTests)
 import           Hedgehog.Internal.Property (TestCount(..), PropertyCount(..))
+import           Hedgehog.Internal.Property (TerminationCriteria(..))
 import           Hedgehog.Internal.Property (coverageSuccess, journalCoverage)
+import           Hedgehog.Internal.Property (confidenceSuccess, confidenceFailure)
+import           Hedgehog.Internal.Property (defaultMinTests)
 import           Hedgehog.Internal.Queue
 import           Hedgehog.Internal.Region
 import           Hedgehog.Internal.Report
@@ -160,6 +163,30 @@ checkReport cfg size0 seed0 test0 updateUI =
     test =
       catchAll test0 (fail . show)
 
+    terminationCriteria =
+      propertyTerminationCriteria cfg
+
+    (confidence, minTests) =
+      case terminationCriteria of
+        EarlyTermination c t -> (Just c, t)
+        NoEarlyTermination c t -> (Just c, t)
+        NoConfidenceTermination t -> (Nothing, t)
+
+    successVerified count coverage =
+      count `mod` 100 == 0 &&
+      -- If the user wants a statistically significant result, this function
+      -- will run a confidence check. Otherwise, it will default to checking
+      -- the percentage of encountered labels
+      maybe False (\c -> confidenceSuccess count c coverage) confidence
+
+    failureVerified count coverage =
+      -- Will be true if we can statistically verify that our coverage was
+      -- inadequate.
+      -- Testing only on 100s to minimise repeated measurement statistical
+      -- errors.
+      count `mod` 100 == 0 &&
+      maybe False (\c -> confidenceFailure count c coverage) confidence
+
     loop ::
          TestCount
       -> DiscardCount
@@ -170,28 +197,65 @@ checkReport cfg size0 seed0 test0 updateUI =
     loop !tests !discards !size !seed !coverage0 = do
       updateUI $ Report tests discards coverage0 Running
 
+      let
+        coverageReached =
+          successVerified tests coverage0
+
+        coverageUnreachable =
+          failureVerified tests coverage0
+
+        enoughTestsRun =
+          case terminationCriteria of
+            EarlyTermination _ _ ->
+              tests >= fromIntegral defaultMinTests &&
+                (coverageReached || coverageUnreachable)
+            NoEarlyTermination _ _ ->
+              tests >= fromIntegral minTests
+            NoConfidenceTermination _ ->
+              tests >= fromIntegral minTests
+
+        labelsCovered =
+          coverageSuccess tests coverage0
+
+        successReport =
+          Report tests discards coverage0 OK
+
+        failureReport message =
+          Report tests discards coverage0 . Failed $ mkFailure
+            size
+            seed
+            0
+            (Just coverage0)
+            Nothing
+            message
+            Nothing
+            []
+
+        confidenceReport =
+          if coverageReached && labelsCovered then
+            successReport
+          else
+            failureReport $
+              "Test coverage cannot be reached after " <> show tests <> " tests"
+
       if size > 99 then
         -- size has reached limit, reset to 0
         loop tests discards 0 seed coverage0
 
-      else if tests >= fromIntegral (propertyTestLimit cfg) then
-        -- we've hit the test limit
-        if coverageSuccess tests coverage0 then
-          -- all classifiers satisfied, test was successful
-          pure $ Report tests discards coverage0 OK
-
-        else
-          -- some classifiers unsatisfied, test was successful
-          pure . Report tests discards coverage0 . Failed $
-            mkFailure
-              size
-              seed
-              0
-              (Just coverage0)
-              Nothing
-              "Insufficient coverage."
-              Nothing
-              []
+      else if enoughTestsRun then
+        -- at this point, we know that enough tests have been run in order to
+        -- make a decision on if this was a successful run or not
+        --
+        -- If we have early termination, then we need to check coverageReached / coverageUnreachable
+        pure $ case terminationCriteria of
+          EarlyTermination _ _ -> confidenceReport
+          NoEarlyTermination _ _ -> confidenceReport
+          NoConfidenceTermination _ ->
+            if labelsCovered then
+              successReport
+            else
+              failureReport $
+                "Labels not sufficently covered after " <> show tests <> " tests"
 
       else if discards >= fromIntegral (propertyDiscardLimit cfg) then
         -- we've hit the discard limit, give up

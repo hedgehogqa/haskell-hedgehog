@@ -1,14 +1,15 @@
 import           System.IO (BufferMode(..), hSetBuffering, stdout, stderr)
 
-import qualified Test.Example.Basic as Test.Example.Basic
-import qualified Test.Example.Coverage as Test.Example.Coverage
-import qualified Test.Example.Exception as Test.Example.Exception
-import qualified Test.Example.QuickCheck as Test.Example.QuickCheck
-import qualified Test.Example.References as Test.Example.References
-import qualified Test.Example.Registry as Test.Example.Registry
-import qualified Test.Example.Resource as Test.Example.Resource
-import qualified Test.Example.Roundtrip as Test.Example.Roundtrip
-import qualified Test.Example.STLC as Test.Example.STLC
+import qualified Test.Example.Basic
+import qualified Test.Example.Confidence
+import qualified Test.Example.Coverage
+import qualified Test.Example.Exception
+import qualified Test.Example.QuickCheck
+import qualified Test.Example.References
+import qualified Test.Example.Registry
+import qualified Test.Example.Resource
+import qualified Test.Example.Roundtrip
+import qualified Test.Example.STLC
 
 main :: IO ()
 main = do
@@ -17,6 +18,7 @@ main = do
 
   _results <- sequence [
       Test.Example.Basic.tests
+    , Test.Example.Confidence.tests
     , Test.Example.Coverage.tests
     , Test.Example.Exception.tests
     , Test.Example.QuickCheck.tests
