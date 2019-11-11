@@ -1174,20 +1174,25 @@ choice = \case
 --
 --   This generator shrinks towards the first generator in the list.
 --
---   /The sum of the frequencies must be at least @1@ and at most @'maxBound' :: 'Int'@.
---   No frequency may be negative./
+--   The sum of the frequencies must be at least @1@ and at most @'maxBound' :: 'Int'@.
 --
+--   No frequency may be negative.
+--
+--   If all frequencies are zero, then nothing is generated.
 frequency :: MonadGen m => [(Int, m a)] -> m a
 -- We calculate a running sum of the individual frequencies and build
 -- an IntMap mapping the results to the generators. This makes the
 -- resulting generator much faster than a naive list-based one when
 -- the input list is long, and not much slower when it's short.
-frequency xs0 =
-  do
-    n <- integral $ Range.constant 1 total
-    case IM.lookupGE n sum_map of
-      Just (_, a) -> a
-      Nothing -> error "Hedgehog.Gen.frequency: Something went wrong."
+frequency xs0
+  | Just (total, _) <- IM.lookupMax sum_map
+  = do
+      n <- integral $ Range.constant 1 total
+      case IM.lookupGE n sum_map of
+        Just (_, a) -> a
+        Nothing -> error "Hedgehog.Gen.frequency: Something went wrong."
+  | otherwise
+  = discard
     where
       --[(1, x), (7, y), (10, z)]  In
       --[(1, x), (8, y), (18, z)]  Out
@@ -1201,11 +1206,6 @@ frequency xs0 =
             | k > 0 = Just ((nk, x), (nk, xs))
             | otherwise = go (n, xs)
             where !nk = n + fromIntegral k
-      total
-         | Just (mx, _) <- IM.lookupMax sum_map
-         = mx
-         | otherwise
-         = error "Hedgehog.Gen.frequency: frequencies sum to zero"
 
 -- | Modifies combinators which choose from a list of generators, like 'choice'
 --   or 'frequency', so that they can be used in recursive scenarios.
