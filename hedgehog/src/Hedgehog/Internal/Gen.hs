@@ -99,7 +99,9 @@ module Hedgehog.Internal.Gen (
   , discard
   , ensure
   , filter
+  , mapMaybe
   , filterT
+  , mapMaybeT
   , just
   , justT
 
@@ -218,6 +220,7 @@ import qualified Data.Text.Encoding as Text
 import           Data.Word (Word8, Word16, Word32, Word64)
 
 import           Hedgehog.Internal.Distributive (MonadTransDistributive(..))
+import           Hedgehog.Internal.Predicate (fromPred)
 import           Hedgehog.Internal.Seed (Seed)
 import qualified Hedgehog.Internal.Seed as Seed
 import qualified Hedgehog.Internal.Shrink as Shrink
@@ -256,8 +259,7 @@ runGenT size seed (GenT m) =
 --
 evalGen :: Size -> Seed -> Gen a -> Maybe (Tree a)
 evalGen size seed =
-  fmap (fmap Maybe.fromJust) .
-  Tree.filter Maybe.isJust .
+  Tree.mapMaybe id .
   evalGenT size seed
 
 -- | Runs a generator, producing its shrink tree.
@@ -320,8 +322,7 @@ toTreeMaybeT =
 --
 runDiscardEffect :: TreeT (MaybeT Identity) a -> Maybe (Tree a)
 runDiscardEffect =
-  fmap (fmap Maybe.fromJust) .
-  Tree.filter Maybe.isJust .
+  Tree.mapMaybe id .
   runDiscardEffectT
 
 -- | Run the discard effects through the tree and reify them as 'Maybe' values
@@ -1270,7 +1271,10 @@ ensure p gen = do
 --   forever. If we trigger these limits then the whole generator is discarded.
 --
 filter :: (MonadGen m, GenBase m ~ Identity) => (a -> Bool) -> m a -> m a
-filter p gen0 =
+filter p = mapMaybe (fromPred p)
+
+mapMaybe :: (MonadGen m, GenBase m ~ Identity) => (a -> Maybe b) -> m a -> m b
+mapMaybe p gen0 =
   let
     try k =
       if k > 100 then
@@ -1278,15 +1282,17 @@ filter p gen0 =
       else do
         (x, gen) <- freeze $ scale (2 * k +) gen0
 
-        if p x then
-          withGenT (mapGenT (Tree.filterMaybeT p)) gen
-        else
-          try (k + 1)
+        case p x of
+          Just _ -> withGenT (mapGenT (Tree.mapMaybeMaybeT p)) gen
+          Nothing -> try (k + 1)
   in
     try 0
 
 filterT :: MonadGen m => (a -> Bool) -> m a -> m a
-filterT p gen0 =
+filterT p = mapMaybeT (fromPred p)
+
+mapMaybeT :: MonadGen m => (a -> Maybe b) -> m a -> m b
+mapMaybeT p gen0 =
   let
     try k =
       if k > 100 then
@@ -1294,10 +1300,9 @@ filterT p gen0 =
       else do
         (x, gen) <- freeze $ scale (2 * k +) gen0
 
-        if p x then
-          withGenT (mapGenT (Tree.filterT p)) gen
-        else
-          try (k + 1)
+        case p x of
+          Just _ -> withGenT (mapGenT (Tree.mapMaybeT p)) gen
+          Nothing -> try (k + 1)
   in
     try 0
 

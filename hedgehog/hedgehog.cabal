@@ -112,6 +112,11 @@ library
     Hedgehog.Internal.Tree
     Hedgehog.Internal.Tripping
 
+  other-modules:
+    -- This has nothing to do with Hedgehog proper, and it's
+    -- too trivial to bother exposing.
+    Hedgehog.Internal.Predicate
+
 test-suite test
   type:
     exitcode-stdio-1.0
