@@ -204,7 +204,7 @@ import           Data.Coerce (coerce)
 import           Data.Foldable (for_, toList)
 import           Data.Functor.Identity (Identity(..))
 import           Data.Int (Int8, Int16, Int32, Int64)
-import qualified Data.IntMap.Strict as IM
+import qualified Data.IntMap.Lazy as IM
 import qualified Data.List as List
 import           Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
@@ -1185,18 +1185,24 @@ frequency :: MonadGen m => [(Int, m a)] -> m a
 -- resulting generator much faster than a naive list-based one when
 -- the input list is long, and not much slower when it's short.
 frequency xs0
-  | Just (total, _) <- IM.lookupMax sum_map
+  | Just ((total, final), sum_map) <- IM.maxViewWithKey sum_map'
   = do
       n <- integral $ Range.constant 1 total
       case IM.lookupGE n sum_map of
         Just (_, a) -> a
-        Nothing -> error "Hedgehog.Gen.frequency: Something went wrong."
+        Nothing -> final
   | otherwise
-  = discard
+  = discard -- All frequencies were 0, so we discard.
+            -- Alternatively, we could throw an error here.
     where
       --[(1, x), (7, y), (10, z)]  In
       --[(1, x), (8, y), (18, z)]  Out
-      sum_map = IM.fromDistinctAscList $ List.unfoldr go (0, xs0)
+      --
+      -- We convert the whole list to an IntMap, but then we
+      -- chop off the last element and use it as a "fall-through".
+      -- This avoids an "impossible" error and may make generation
+      -- ever so slightly faster when the list is short.
+      sum_map' = IM.fromDistinctAscList $ List.unfoldr go (0, xs0)
         where
           go (_, []) = Nothing
           go (n, (k, x) : xs)
