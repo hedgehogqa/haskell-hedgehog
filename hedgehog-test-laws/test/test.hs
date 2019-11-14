@@ -10,6 +10,7 @@ import           Hedgehog.Internal.Gen (GenT(..))
 import           Hedgehog.Internal.Range (Size(..))
 import           Hedgehog.Internal.Seed (Seed(..))
 import           Hedgehog.Internal.Tree (TreeT(..), NodeT(..))
+import           Hedgehog.Internal.TestCount (TestCount(..))
 
 import           Test.QuickCheck (Arbitrary(..), Arbitrary1(..), CoArbitrary(..))
 import           Test.QuickCheck (choose, vector, coarbitraryIntegral, property)
@@ -76,6 +77,12 @@ instance (Arbitrary1 m, Arbitrary a) => Arbitrary (NodeT m a) where
     liftA2 NodeT arbitrary (vector n)
 
 -- GenT
+
+instance Arbitrary TestCount where
+  arbitrary = TestCount <$> arbitrary
+
+instance CoArbitrary TestCount where
+  coarbitrary = coarbitraryIntegral
 
 instance Arbitrary Size where
   arbitrary = Size <$> arbitrary

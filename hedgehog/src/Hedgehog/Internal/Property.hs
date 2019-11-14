@@ -169,6 +169,7 @@ import           Hedgehog.Internal.Gen (Gen, GenT)
 import qualified Hedgehog.Internal.Gen as Gen
 import           Hedgehog.Internal.Show
 import           Hedgehog.Internal.Source
+import           Hedgehog.Internal.TestCount (TestCount(..))
 
 import           Language.Haskell.TH.Syntax (Lift)
 
@@ -279,12 +280,6 @@ data PropertyConfig =
 newtype TestLimit =
   TestLimit Int
   deriving (Eq, Ord, Show, Num, Enum, Real, Integral, Lift)
-
--- | The number of tests a property ran successfully.
---
-newtype TestCount =
-  TestCount Int
-  deriving (Eq, Ord, Show, Num, Enum, Real, Integral)
 
 -- | The number of tests a property had to discard.
 --

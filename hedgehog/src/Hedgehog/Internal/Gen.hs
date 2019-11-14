@@ -221,6 +221,7 @@ import           Hedgehog.Internal.Distributive (MonadTransDistributive(..))
 import           Hedgehog.Internal.Seed (Seed)
 import qualified Hedgehog.Internal.Seed as Seed
 import qualified Hedgehog.Internal.Shrink as Shrink
+import           Hedgehog.Internal.TestCount (TestCount(..))
 import           Hedgehog.Internal.Tree (Tree, TreeT(..), NodeT(..))
 import qualified Hedgehog.Internal.Tree as Tree
 import           Hedgehog.Range (Size, Range)
@@ -241,14 +242,14 @@ type Gen =
 --
 newtype GenT m a =
   GenT {
-      unGenT :: Size -> Seed -> TreeT (MaybeT m) a
+      unGenT :: TestCount -> Size -> Seed -> TreeT (MaybeT m) a
     }
 
 -- | Runs a generator, producing its shrink tree.
 --
-runGenT :: Size -> Seed -> GenT m a -> TreeT (MaybeT m) a
-runGenT size seed (GenT m) =
-  m size seed
+runGenT :: TestCount -> Size -> Seed -> GenT m a -> TreeT (MaybeT m) a
+runGenT tests size seed (GenT m) =
+  m tests size seed
 
 -- | Run a generator, producing its shrink tree.
 --
@@ -258,21 +259,21 @@ evalGen :: Size -> Seed -> Gen a -> Maybe (Tree a)
 evalGen size seed =
   fmap (fmap Maybe.fromJust) .
   Tree.filter Maybe.isJust .
-  evalGenT size seed
+  evalGenT 0 size seed
 
 -- | Runs a generator, producing its shrink tree.
 --
-evalGenT :: Monad m => Size -> Seed -> GenT m a -> TreeT m (Maybe a)
-evalGenT size seed =
+evalGenT :: Monad m => TestCount -> Size -> Seed -> GenT m a -> TreeT m (Maybe a)
+evalGenT tests size seed =
   runDiscardEffectT .
-  runGenT size seed
+  runGenT tests size seed
 
 -- | Map over a generator's shrink tree.
 --
 mapGenT :: (TreeT (MaybeT m) a -> TreeT (MaybeT n) b) -> GenT m a -> GenT n b
 mapGenT f gen =
-  GenT $ \size seed ->
-    f (runGenT size seed gen)
+  GenT $ \tests size seed ->
+    f (runGenT tests size seed gen)
 
 -- | Lift a predefined shrink tree in to a generator, ignoring the seed and the
 --   size.
@@ -295,7 +296,7 @@ fromTreeT x =
 --
 fromTreeMaybeT :: MonadGen m => TreeT (MaybeT (GenBase m)) a -> m a
 fromTreeMaybeT x =
-  fromGenT . GenT $ \_ _ ->
+  fromGenT . GenT $ \_ _ _->
     x
 
 -- | Observe a generator's shrink tree.
@@ -474,8 +475,8 @@ instance (Monad m, Monoid a) => Monoid (GenT m a) where
 
 instance Functor m => Functor (GenT m) where
   fmap f gen =
-    GenT $ \seed size ->
-      fmap f (runGenT seed size gen)
+    GenT $ \tests size seed ->
+      fmap f (runGenT tests size seed gen)
 
 --
 -- implementation: parallel shrinking
@@ -485,12 +486,12 @@ instance Monad m => Applicative (GenT m) where
     fromTreeMaybeT . pure
 
   (<*>) f m =
-    GenT $ \ size seed ->
+    GenT $ \ tests size seed ->
       case Seed.split seed of
         (sf, sm) ->
           uncurry ($) <$>
-            runGenT size sf f `mzip`
-            runGenT size sm m
+            runGenT tests size sf f `mzip`
+            runGenT tests size sm m
 
 --
 -- implementation: satisfies law (ap = <*>)
@@ -499,22 +500,22 @@ instance Monad m => Applicative (GenT m) where
 --  pure =
 --    fromTreeMaybeT . pure
 --  (<*>) f m =
---    GenT $ \ size seed ->
+--    GenT $ \ tests size seed ->
 --      case Seed.split seed of
 --        (sf, sm) ->
---          runGenT size sf f <*>
---          runGenT size sm m
+--          runGenT tests size sf f <*>
+--          runGenT tests size sm m
 
 instance Monad m => Monad (GenT m) where
   return =
     pure
 
   (>>=) m k =
-    GenT $ \size seed ->
+    GenT $ \tests size seed ->
       case Seed.split seed of
         (sk, sm) ->
-          runGenT size sk . k =<<
-          runGenT size sm m
+          runGenT tests size sk . k =<<
+          runGenT tests size sm m
 
 #if MIN_VERSION_base(4,13,0)
 #else
@@ -538,11 +539,11 @@ instance Monad m => MonadPlus (GenT m) where
     fromTreeMaybeT mzero
 
   mplus x y =
-    GenT $ \size seed ->
+    GenT $ \tests size seed ->
       case Seed.split seed of
         (sx, sy) ->
-          runGenT size sx x `mplus`
-          runGenT size sy y
+          runGenT tests size sx x `mplus`
+          runGenT tests size sy y
 
 instance MonadTrans GenT where
   lift =
@@ -576,11 +577,11 @@ embedGenT ::
   -> GenT m b
   -> GenT n b
 embedGenT f gen =
-  GenT $ \size seed ->
+  GenT $ \tests size seed ->
     case Seed.split seed of
       (sf, sg) ->
-        (runGenT size sf . f) `embedTreeMaybeT`
-        (runGenT size sg gen)
+        (runGenT tests size sf . f) `embedTreeMaybeT`
+        (runGenT tests size sg gen)
 
 instance MMonad GenT where
   embed =
@@ -588,8 +589,8 @@ instance MMonad GenT where
 
 distributeGenT :: Transformer t GenT m => GenT (t m) a -> t (GenT m) a
 distributeGenT x =
-  join . lift . GenT $ \size seed ->
-    pure . hoist fromTreeMaybeT . distributeT . hoist distributeT $ runGenT size seed x
+  join . lift . GenT $ \tests size seed ->
+    pure . hoist fromTreeMaybeT . distributeT . hoist distributeT $ runGenT tests size seed x
 
 instance MonadTransDistributive GenT where
   type Transformer t GenT m = (
@@ -640,11 +641,11 @@ instance MonadThrow m => MonadThrow (GenT m) where
 
 instance MonadCatch m => MonadCatch (GenT m) where
   catch m onErr =
-    GenT $ \size seed ->
+    GenT $ \tests size seed ->
       case Seed.split seed of
         (sm, se) ->
-          (runGenT size sm m) `catch`
-          (runGenT size se . onErr)
+          (runGenT tests size sm m) `catch`
+          (runGenT tests size se . onErr)
 
 instance MonadReader r m => MonadReader r (GenT m) where
   ask =
@@ -676,11 +677,11 @@ instance MonadError e m => MonadError e (GenT m) where
   throwError =
     lift . throwError
   catchError m onErr =
-    GenT $ \size seed ->
+    GenT $ \tests size seed ->
       case Seed.split seed of
         (sm, se) ->
-          (runGenT size sm m) `catchError`
-          (runGenT size se . onErr)
+          (runGenT tests size sm m) `catchError`
+          (runGenT tests size se . onErr)
 
 instance MonadResource m => MonadResource (GenT m) where
   liftResourceT =
@@ -693,7 +694,7 @@ instance MonadResource m => MonadResource (GenT m) where
 --
 generate :: MonadGen m => (Size -> Seed -> a) -> m a
 generate f =
-  fromGenT . GenT $ \size seed ->
+  fromGenT . GenT $ \_ size seed ->
     pure (f size seed)
 
 ------------------------------------------------------------------------
@@ -735,7 +736,7 @@ resize size gen =
 scale :: MonadGen m => (Size -> Size) -> m a -> m a
 scale f =
   withGenT $ \gen ->
-    GenT $ \size0 seed ->
+    GenT $ \tests size0 seed ->
       let
         size =
           f size0
@@ -743,7 +744,7 @@ scale f =
         if size < 0 then
           error "Hedgehog.Gen.scale: negative size"
         else
-          runGenT size seed gen
+          runGenT tests size seed gen
 
 -- | Make a generator smaller by scaling its size parameter.
 --
@@ -1470,8 +1471,8 @@ deriving instance Traversable (Vec n)
 freeze :: MonadGen m => m a -> m (a, m a)
 freeze =
   withGenT $ \gen ->
-    GenT $ \size seed -> do
-      mx <- lift . lift . runMaybeT . runTreeT $ runGenT size seed gen
+    GenT $ \tests size seed -> do
+      mx <- lift . lift . runMaybeT . runTreeT $ runGenT tests size seed gen
       case mx of
         Nothing ->
           empty

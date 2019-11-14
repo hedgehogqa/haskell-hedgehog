@@ -265,7 +265,7 @@ checkReport cfg size0 seed0 test0 updateUI =
         case Seed.split seed of
           (s0, s1) -> do
             node@(NodeT x _) <-
-              runTreeT . evalGenT size s0 . runTestT $ unPropertyT test
+              runTreeT . evalGenT tests size s0 . runTestT $ unPropertyT test
             case x of
               Nothing ->
                 loop tests (discards + 1) (size + 1) s1 coverage0
