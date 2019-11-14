@@ -66,8 +66,8 @@ import           Data.Dynamic (Dynamic, toDyn, fromDynamic, dynTypeRep)
 import           Data.Foldable (traverse_)
 import           Data.Functor.Classes (Eq1(..), Ord1(..), Show1(..))
 import           Data.Functor.Classes (eq1, compare1, showsPrec1)
-import           Data.Map (Map)
-import qualified Data.Map as Map
+import           Hedgehog.Internal.State.Name.Map (NMap)
+import qualified Hedgehog.Internal.State.Name.Map as NMap
 import qualified Data.Maybe as Maybe
 import           Data.Typeable (Typeable, TypeRep, Proxy(..), typeRep)
 
@@ -80,17 +80,8 @@ import           Hedgehog.Internal.Property (MonadTest(..), Test, evalEither, ev
 import           Hedgehog.Internal.Range (Range)
 import           Hedgehog.Internal.Show (showPretty)
 import           Hedgehog.Internal.Source (HasCallStack, withFrozenCallStack)
+import           Hedgehog.Internal.State.Name (Name (..))
 
-
--- | Symbolic variable names.
---
-newtype Name =
-  Name Int
-  deriving (Eq, Ord, Num)
-
-instance Show Name where
-  showsPrec p (Name x) =
-    showsPrec p x
 
 -- | Symbolic values: Because hedgehog generates actions in a separate phase
 --   before execution, you will sometimes need to refer to the result of a
@@ -105,7 +96,7 @@ instance Show Name where
 --   See also: 'Command', 'Var'
 --
 data Symbolic a where
-  Symbolic :: Typeable a => Name -> Symbolic a
+  Symbolic :: Typeable a => !Name -> Symbolic a
 
 deriving instance Eq (Symbolic a)
 deriving instance Ord (Symbolic a)
@@ -213,7 +204,7 @@ instance HTraversable (Var a) where
 --
 newtype Environment =
   Environment {
-      unEnvironment :: Map Name Dynamic
+      unEnvironment :: NMap Dynamic
     } deriving (Show)
 
 -- | Environment errors.
@@ -227,17 +218,17 @@ data EnvironmentError =
 --
 emptyEnvironment :: Environment
 emptyEnvironment =
-  Environment Map.empty
+  Environment NMap.empty
 
 unionsEnvironment :: [Environment] -> Environment
 unionsEnvironment =
-  Environment . Map.unions . fmap unEnvironment
+  Environment . NMap.unions . fmap unEnvironment
 
 -- | Insert a symbolic / concrete pairing in to the environment.
 --
 insertConcrete :: Symbolic a -> Concrete a -> Environment -> Environment
 insertConcrete (Symbolic k) (Concrete v) =
-  Environment . Map.insert k (toDyn v) . unEnvironment
+  Environment . NMap.insert k (toDyn v) . unEnvironment
 
 -- | Cast a 'Dynamic' in to a concrete value.
 --
@@ -254,7 +245,7 @@ reifyDynamic dyn =
 --
 reifyEnvironment :: Environment -> (forall a. Symbolic a -> Either EnvironmentError (Concrete a))
 reifyEnvironment (Environment vars) (Symbolic n) =
-  case Map.lookup n vars of
+  case NMap.lookup n vars of
     Nothing ->
       Left $ EnvironmentValueNotFound n
     Just dyn ->
@@ -415,7 +406,7 @@ data Action m (state :: (* -> *) -> *) =
         input Symbolic
 
     , actionOutput ::
-        Symbolic output
+        {-# UNPACK #-} !(Symbolic output)
 
     , actionExecute ::
         input Concrete -> m output
@@ -446,47 +437,46 @@ takeSymbolic (Symbolic name) =
 
 -- | Insert a symbolic variable in to a map of variables to types.
 --
-insertSymbolic :: Symbolic a -> Map Name TypeRep -> Map Name TypeRep
+insertSymbolic :: Symbolic a -> NMap TypeRep -> NMap TypeRep
 insertSymbolic s =
   let
     (name, typ) =
       takeSymbolic s
   in
-    Map.insert name typ
+    NMap.insert name typ
 
 -- | Collects all the symbolic values in a data structure and produces a set of
 --   all the variables they refer to.
 --
-takeVariables :: forall t. HTraversable t => t Symbolic -> Map Name TypeRep
+takeVariables :: forall t. HTraversable t => t Symbolic -> NMap TypeRep
 takeVariables xs =
   let
     go x = do
       modify (insertSymbolic x)
       pure x
   in
-    flip execState Map.empty $ htraverse go xs
+    flip execState NMap.empty $ htraverse go xs
 
 -- | Checks that the symbolic values in the data structure refer only to the
 --   variables in the provided set, and that they are of the correct type.
 --
-variablesOK :: HTraversable t => t Symbolic -> Map Name TypeRep -> Bool
+variablesOK :: HTraversable t => t Symbolic -> NMap TypeRep -> Bool
 variablesOK xs allowed =
   let
     vars =
       takeVariables xs
   in
-    Map.null (vars `Map.difference` allowed) &&
-    and (Map.intersectionWith (==) vars allowed)
+    vars `NMap.isSubmapOf` allowed
 
 data Context state =
   Context {
       contextState :: state Symbolic
-    , _contextVars :: Map Name TypeRep
+    , _contextVars :: !(NMap TypeRep)
     }
 
 mkContext :: state Symbolic -> Context state
 mkContext initial =
-  Context initial Map.empty
+  Context initial NMap.empty
 
 contextUpdate :: MonadState (Context state) m => state Symbolic -> m ()
 contextUpdate state = do
@@ -499,13 +489,13 @@ contextNewVar = do
 
   let
     var =
-      case Map.maxViewWithKey vars of
+      case NMap.maxViewWithKey vars of
         Nothing ->
           Symbolic 0
         Just ((name, _), _) ->
           Symbolic (name + 1)
 
-  put $ Context state (insertSymbolic var vars)
+  put $! Context state (insertSymbolic var vars)
   pure var
 
 -- | Drops invalid actions from the sequence.
@@ -521,7 +511,7 @@ dropInvalid =
           state =
             update state0 input (Var output)
 
-          vars =
+          !vars =
             insertSymbolic output vars0
 
         put $ Context state vars
