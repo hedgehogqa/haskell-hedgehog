@@ -46,7 +46,7 @@ module Hedgehog.Internal.Tree (
   ) where
 
 import           Control.Applicative (Alternative(..), liftA2)
-import           Control.Monad (MonadPlus(..), join)
+import           Control.Monad (MonadPlus(..), guard, join)
 import           Control.Monad.Base (MonadBase(..))
 import           Control.Monad.Trans.Control ()
 import           Control.Monad.Catch (MonadThrow(..), MonadCatch(..), Exception)
@@ -69,7 +69,6 @@ import           Data.Functor.Classes (showsUnaryWith, showsBinaryWith)
 import qualified Data.Maybe as Maybe
 
 import           Hedgehog.Internal.Distributive
-import           Hedgehog.Internal.Predicate
 import           Control.Monad.Trans.Control (MonadBaseControl (..))
 
 import           Prelude hiding (filter)
@@ -229,6 +228,9 @@ catMaybes m =
       Just x ->
         Just . Tree $
           Node x (Maybe.mapMaybe catMaybes mxs)
+
+fromPred :: (a -> Bool) -> a -> Maybe a
+fromPred p a = a <$ guard (p a)
 
 -- | Returns a tree containing only elements that match the predicate.
 --

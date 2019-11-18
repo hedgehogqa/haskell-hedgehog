@@ -168,7 +168,7 @@ module Hedgehog.Internal.Gen (
   ) where
 
 import           Control.Applicative (Alternative(..),liftA2)
-import           Control.Monad (MonadPlus(..), filterM, replicateM, join)
+import           Control.Monad (MonadPlus(..), filterM, guard, replicateM, join)
 import           Control.Monad.Base (MonadBase(..))
 import           Control.Monad.Trans.Control (MonadBaseControl(..))
 import           Control.Monad.Catch (MonadThrow(..), MonadCatch(..))
@@ -220,7 +220,6 @@ import qualified Data.Text.Encoding as Text
 import           Data.Word (Word8, Word16, Word32, Word64)
 
 import           Hedgehog.Internal.Distributive (MonadTransDistributive(..))
-import           Hedgehog.Internal.Predicate (fromPred)
 import           Hedgehog.Internal.Seed (Seed)
 import qualified Hedgehog.Internal.Seed as Seed
 import qualified Hedgehog.Internal.Shrink as Shrink
@@ -1258,6 +1257,9 @@ ensure p gen = do
     pure x
   else
     discard
+
+fromPred :: (a -> Bool) -> a -> Maybe a
+fromPred p a = a <$ guard (p a)
 
 -- | Generates a value that satisfies a predicate.
 --
