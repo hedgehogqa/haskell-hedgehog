@@ -281,8 +281,10 @@ flattenTree p (Tree (Node mx mxs0)) =
       Nothing -> mxs
       Just x ->
         case p x of
-          Just x' -> [Tree (Node x' mxs)]
-          Nothing -> mxs
+          Just x' ->
+            [Tree (Node x' mxs)]
+          Nothing ->
+            mxs
 
 -- | Returns a tree containing only elements that match the predicate.
 --
@@ -290,7 +292,8 @@ flattenTree p (Tree (Node mx mxs0)) =
 --   'empty'.
 --
 filterT :: (Monad m, Alternative m) => (a -> Bool) -> TreeT m a -> TreeT m a
-filterT p = mapMaybeT (fromPred p)
+filterT p =
+  mapMaybeT (fromPred p)
 
 mapMaybeT :: (Monad m, Alternative m) => (a -> Maybe b) -> TreeT m a -> TreeT m b
 mapMaybeT p m =

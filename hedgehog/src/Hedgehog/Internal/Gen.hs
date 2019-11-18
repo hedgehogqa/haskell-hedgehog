@@ -1271,7 +1271,8 @@ ensure p gen = do
 --   forever. If we trigger these limits then the whole generator is discarded.
 --
 filter :: (MonadGen m, GenBase m ~ Identity) => (a -> Bool) -> m a -> m a
-filter p = mapMaybe (fromPred p)
+filter p =
+  mapMaybe (fromPred p)
 
 mapMaybe :: (MonadGen m, GenBase m ~ Identity) => (a -> Maybe b) -> m a -> m b
 mapMaybe p gen0 =
@@ -1283,13 +1284,16 @@ mapMaybe p gen0 =
         (x, gen) <- freeze $ scale (2 * k +) gen0
 
         case p x of
-          Just _ -> withGenT (mapGenT (Tree.mapMaybeMaybeT p)) gen
-          Nothing -> try (k + 1)
+          Just _ ->
+            withGenT (mapGenT (Tree.mapMaybeMaybeT p)) gen
+          Nothing ->
+            try (k + 1)
   in
     try 0
 
 filterT :: MonadGen m => (a -> Bool) -> m a -> m a
-filterT p = mapMaybeT (fromPred p)
+filterT p =
+  mapMaybeT (fromPred p)
 
 mapMaybeT :: MonadGen m => (a -> Maybe b) -> m a -> m b
 mapMaybeT p gen0 =
@@ -1301,8 +1305,10 @@ mapMaybeT p gen0 =
         (x, gen) <- freeze $ scale (2 * k +) gen0
 
         case p x of
-          Just _ -> withGenT (mapGenT (Tree.mapMaybeT p)) gen
-          Nothing -> try (k + 1)
+          Just _ ->
+            withGenT (mapGenT (Tree.mapMaybeT p)) gen
+          Nothing ->
+            try (k + 1)
   in
     try 0
 
