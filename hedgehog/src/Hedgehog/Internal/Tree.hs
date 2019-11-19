@@ -33,8 +33,11 @@ module Hedgehog.Internal.Tree (
 
   , catMaybes
   , filter
+  , mapMaybe
   , filterMaybeT
+  , mapMaybeMaybeT
   , filterT
+  , mapMaybeT
   , depth
   , interleave
 
@@ -43,7 +46,7 @@ module Hedgehog.Internal.Tree (
   ) where
 
 import           Control.Applicative (Alternative(..), liftA2)
-import           Control.Monad (MonadPlus(..), join)
+import           Control.Monad (MonadPlus(..), guard, join)
 import           Control.Monad.Base (MonadBase(..))
 import           Control.Monad.Trans.Control ()
 import           Control.Monad.Catch (MonadThrow(..), MonadCatch(..), Exception)
@@ -226,16 +229,22 @@ catMaybes m =
         Just . Tree $
           Node x (Maybe.mapMaybe catMaybes mxs)
 
+fromPred :: (a -> Bool) -> a -> Maybe a
+fromPred p a = a <$ guard (p a)
+
 -- | Returns a tree containing only elements that match the predicate.
 --
 --   If the root of the tree does not match the predicate then 'Nothing' is
 --   returned.
 --
 filter :: (a -> Bool) -> Tree a -> Maybe (Tree a)
-filter p =
+filter p = mapMaybe (fromPred p)
+
+mapMaybe :: (a -> Maybe b) -> Tree a -> Maybe (Tree b)
+mapMaybe p =
   catMaybes .
   runTreeMaybeT .
-  filterMaybeT p .
+  mapMaybeMaybeT p .
   hoist lift
 
 runTreeMaybeT :: Monad m => TreeT (MaybeT m) a -> TreeT m (Maybe a)
@@ -249,29 +258,35 @@ runTreeMaybeT =
 --   returned.
 --
 filterMaybeT :: (a -> Bool) -> TreeT (MaybeT Identity) a -> TreeT (MaybeT Identity) a
-filterMaybeT p t =
+filterMaybeT p = mapMaybeMaybeT (fromPred p)
+
+mapMaybeMaybeT :: (a -> Maybe b) -> TreeT (MaybeT Identity) a -> TreeT (MaybeT Identity) b
+mapMaybeMaybeT p t =
   case runTreeMaybeT t of
     Tree (Node Nothing _) ->
       TreeT . MaybeT . Identity $ Nothing
     Tree (Node (Just x) xs) ->
-      hoist generalize $
-        Tree . Node x $
-          concatMap (flattenTree (maybe False p)) xs
+      case p x of
+        Nothing -> TreeT . MaybeT . Identity $ Nothing
+        Just x' ->
+          hoist generalize $
+            Tree . Node x' $
+              concatMap (flattenTree p) xs
 
-flattenTree :: (Maybe a -> Bool) -> Tree (Maybe a) -> [Tree a]
+flattenTree :: (a -> Maybe b) -> Tree (Maybe a) -> [Tree b]
 flattenTree p (Tree (Node mx mxs0)) =
   let
     mxs =
       concatMap (flattenTree p) mxs0
   in
-    if p mx then
-      case mx of
-        Nothing ->
-          []
-        Just x ->
-          [Tree (Node x mxs)]
-    else
-      mxs
+    case mx of
+      Nothing -> mxs
+      Just x ->
+        case p x of
+          Just x' ->
+            [Tree (Node x' mxs)]
+          Nothing ->
+            mxs
 
 -- | Returns a tree containing only elements that match the predicate.
 --
@@ -279,14 +294,19 @@ flattenTree p (Tree (Node mx mxs0)) =
 --   'empty'.
 --
 filterT :: (Monad m, Alternative m) => (a -> Bool) -> TreeT m a -> TreeT m a
-filterT p m =
+filterT p =
+  mapMaybeT (fromPred p)
+
+mapMaybeT :: (Monad m, Alternative m) => (a -> Maybe b) -> TreeT m a -> TreeT m b
+mapMaybeT p m =
   TreeT $ do
     NodeT x xs <- runTreeT m
-    if p x then
-      pure $
-        NodeT x (fmap (filterT p) xs)
-    else
-      empty
+    case p x of
+      Just x' ->
+        pure $
+          NodeT x' (fmap (mapMaybeT p) xs)
+      Nothing ->
+        empty
 
 ------------------------------------------------------------------------
 

@@ -12,7 +12,6 @@ import qualified Control.Monad.Writer.Lazy as Lazy
 import qualified Control.Monad.Writer.Class as Writer
 import           Control.Monad.Morph (MFunctor(..))
 
-import           Data.Maybe (fromJust)
 import           Data.Foldable (toList)
 import           Data.Monoid (Sum(..))
 import qualified Data.List as List

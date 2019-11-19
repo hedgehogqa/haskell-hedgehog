@@ -67,6 +67,7 @@ module Hedgehog.Gen (
   -- ** Conditional
   , discard
   , filter
+  , mapMaybe
   , just
 
   -- ** Collections
