@@ -665,12 +665,12 @@ instance MonadWriter w m => MonadWriter w (GenT m) where
     lift . writer
   tell =
     lift . tell
-  listen =
-    undefined
-    --mapGenT listen
-  pass =
-    undefined
-    --mapGenT pass
+  listen m =
+    GenT $ \size seed ->
+      listen $ runGenT size seed m
+  pass m =
+    GenT $ \size seed ->
+      pass $ runGenT size seed m
 
 instance MonadError e m => MonadError e (GenT m) where
   throwError =
