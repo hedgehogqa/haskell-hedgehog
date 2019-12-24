@@ -53,7 +53,7 @@ library
     , async                           >= 2.0        && < 2.3
     , bytestring                      >= 0.10       && < 0.11
     , concurrent-output               >= 1.7        && < 1.11
-    , containers                      >= 0.4        && < 0.7
+    , containers                      >= 0.5.8        && < 0.7
     , directory                       >= 1.2        && < 1.4
     , erf                             >= 2.0        && < 2.1
     , exceptions                      >= 0.7        && < 0.11
@@ -137,7 +137,7 @@ test-suite test
   build-depends:
       hedgehog
     , base                            >= 3          && < 5
-    , containers                      >= 0.4        && < 0.7
+    , containers                      >= 0.5.8        && < 0.7
     , mmorph                          >= 1.0        && < 1.2
     , mtl                             >= 2.1        && < 2.3
     , pretty-show                     >= 1.6        && < 1.10
