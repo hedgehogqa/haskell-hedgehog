@@ -66,6 +66,7 @@ import           Data.Functor.Identity (Identity(..))
 import           Data.Functor.Classes (Eq1(..))
 import           Data.Functor.Classes (Show1(..), showsPrec1)
 import           Data.Functor.Classes (showsUnaryWith, showsBinaryWith)
+import qualified Data.List as List
 import qualified Data.Maybe as Maybe
 
 import           Hedgehog.Internal.Distributive
@@ -320,12 +321,12 @@ mapMaybeT p m =
 --   ]
 --
 splits :: [a] -> [([a], a, [a])]
-splits = \case
-  [] ->
-    []
-  x : xs ->
-    ([], x, xs) :
-    fmap (\(as, b, cs) -> (x : as, b, cs)) (splits xs)
+-- This implementation is significantly more efficient than the others I've
+-- tried when the lists are long.
+splits xs0 = go (List.inits xs0) xs0
+  where
+    go (front : fronts) (x : xs) = (front, x, xs) : go fronts xs
+    go _ _ = []
 
 dropOne :: Monad m => [NodeT m a] -> [TreeT m [a]]
 dropOne ts = do

@@ -18,6 +18,7 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-} -- MonadBase
+{-# LANGUAGE ViewPatterns #-}
 #if __GLASGOW_HASKELL__ >= 806
 {-# LANGUAGE DerivingVia #-}
 #endif
@@ -209,6 +210,7 @@ import qualified Data.List.NonEmpty as NonEmpty
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Maybe as Maybe
+import qualified Data.Primitive.SmallArray as PSArr
 import           Data.Semigroup (Semigroup)
 import qualified Data.Semigroup as Semigroup
 import           Data.Sequence (Seq)
@@ -1144,12 +1146,16 @@ constant =
 --   /The input list must be non-empty./
 --
 element :: MonadGen m => [a] -> m a
-element = \case
-  [] ->
-    error "Hedgehog.Gen.element: used with empty list"
-  xs -> do
-    n <- integral $ Range.constant 0 (length xs - 1)
-    pure $ xs !! n
+-- We convert the list to an array so we only have to walk it once,
+-- rather than once for every item generated.
+element (PSArr.smallArrayFromList -> xs)
+  | sz == 0
+  = error "Hedgehog.Gen.element: used with empty list"
+  | otherwise
+  = do
+      n <- integral $ Range.constant 0 (sz - 1)
+      PSArr.indexSmallArrayM xs n
+  where sz = PSArr.sizeofSmallArray xs
 
 -- | Randomly selects one of the generators in the list.
 --
@@ -1158,12 +1164,14 @@ element = \case
 --   /The input list must be non-empty./
 --
 choice :: MonadGen m => [m a] -> m a
-choice = \case
-  [] ->
-    error "Hedgehog.Gen.choice: used with empty list"
-  xs -> do
-    n <- integral $ Range.constant 0 (length xs - 1)
-    xs !! n
+choice (PSArr.smallArrayFromList -> xs)
+  | sz == 0
+  = error "Hedgehog.Gen.choice: used with empty list"
+  | otherwise
+  = do
+      n <- integral $ Range.constant 0 (sz - 1)
+      PSArr.indexSmallArray xs n
+  where sz = PSArr.sizeofSmallArray xs
 
 -- | Uses a weighted distribution to randomly select one of the generators in
 --   the list.
