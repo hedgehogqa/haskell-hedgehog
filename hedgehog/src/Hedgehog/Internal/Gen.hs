@@ -125,6 +125,7 @@ module Hedgehog.Internal.Gen (
   -- ** Combinations & Permutations
   , subsequence
   , shuffle
+  , shuffleSeq
 
   -- * Sampling Generators
   , sample
@@ -1589,16 +1590,40 @@ subsequence xs =
 --   /list./
 --
 shuffle :: MonadGen m => [a] -> m [a]
-shuffle = \case
-  [] ->
-    pure []
-  xs0 -> do
-    n <- integral $ Range.constant 0 (length xs0 - 1)
-    case splitAt n xs0 of
-      (xs, y : ys) ->
-        (y :) <$> shuffle (xs ++ ys)
-      (_, []) ->
-        error "Hedgehog.Gen.shuffle: internal error, split generated empty list"
+-- We shuffle sequences instead of lists to make extracting an arbitrary
+-- element logarithmic instead of linear, and to make length calculation
+-- constant-time instead of linear. We could probably do better, but
+-- this is at least reasonably quick.
+shuffle = fmap toList . shuffleSeq . Seq.fromList
+
+-- | Generates a random permutation of a sequence.
+--
+--   /This shrinks towards the order of the sequence being identical to the input/
+--   /sequence./
+--
+shuffleSeq :: MonadGen m => Seq a -> m (Seq a)
+shuffleSeq xs
+  | null xs = pure Seq.empty
+  | otherwise = do
+    n <- integral $ Range.constant 0 (length xs - 1)
+#if MIN_VERSION_containers(0,5,8)
+    -- Data.Sequence should offer a version of deleteAt that returns the
+    -- deleted element, but it does not currently do so. Lookup followed
+    -- by deletion seems likely faster than splitting and then appending,
+    -- but I haven't actually tested that. It's certainly easier to see
+    -- what's going on.
+    case Seq.lookup n xs of
+      Just y -> (y Seq.<|) <$> shuffleSeq (Seq.deleteAt n xs)
+      Nothing -> error $
+        "Hedgehog.Gen.shuffleSeq: internal error, lookup in empty sequence"
+#else
+    case Seq.splitAt n xs of
+      (beginning, end) ->
+        case Seq.viewl end of
+          y Seq.:< end' -> (y Seq.<|) <$> shuffleSeq (beginning Seq.>< end')
+          Seq.EmptyL -> error $
+            "Hedgehog.Gen.shuffleSeq: internal error, lookup in empty sequence"
+#endif
 
 ------------------------------------------------------------------------
 -- Sampling
