@@ -126,6 +126,7 @@ module Hedgehog.Internal.Gen (
   -- ** Combinations & Permutations
   , subsequence
   , shuffle
+  , shuffleSeq
 
   -- * Sampling Generators
   , sample
@@ -1599,20 +1600,26 @@ subsequence xs =
 shuffle :: MonadGen m => [a] -> m [a]
 -- We shuffle sequences instead of lists to make extracting an arbitrary
 -- element logarithmic instead of linear, and to make length calculation
--- constant-time instead of linear. We could probably do better, but at
--- least this should be less intolerably slow.
-shuffle = fmap toList . go . Seq.fromList
-  where
-    go Empty = pure Empty
-    go xs0 = do
-      n <- integral $ Range.constant 0 (length xs0 - 1)
-      -- Data.Sequence should offer a version of deleteAt that returns the
-      -- deleted element, but it does not currently do so. Lookup followed
-      -- by deletion seems likely faster than splitting and then appending.
-      case Seq.lookup n xs0 of
-        Just y -> (y :<|) <$> go (Seq.deleteAt n xs0)
-        Nothing ->
-          error "Hedgehog.Gen.shuffle: internal error--lookup in empty sequence"
+-- constant-time instead of linear. We could probably do better, but
+-- this is at least reasonably quick.
+shuffle = fmap toList . shuffleSeq . Seq.fromList
+
+-- | Generates a random permutation of a sequence.
+--
+--   /This shrinks towards the order of the sequence being identical to the input/
+--   /sequence./
+--
+shuffleSeq :: MonadGen m => Seq a -> m (Seq a)
+shuffleSeq Empty = pure Empty
+shuffleSeq xs0 = do
+  n <- integral $ Range.constant 0 (length xs0 - 1)
+  -- Data.Sequence should offer a version of deleteAt that returns the
+  -- deleted element, but it does not currently do so. Lookup followed
+  -- by deletion seems likely faster than splitting and then appending.
+  case Seq.lookup n xs0 of
+    Just y -> (y :<|) <$> shuffleSeq (Seq.deleteAt n xs0)
+    Nothing ->
+      error "Hedgehog.Gen.shuffleSeq: internal error--lookup in empty sequence"
 
 ------------------------------------------------------------------------
 -- Sampling
