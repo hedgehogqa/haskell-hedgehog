@@ -48,8 +48,9 @@ import           Prelude hiding (minimum, maximum)
 -- >>> import Data.Int (Int8)
 -- >>> let x = 3
 
--- | Tests are parameterized by the size of the randomly-generated data, the
---   meaning of which depends on the particular generator used.
+-- | Tests are parameterized by the size of the randomly-generated data. The
+--   meaning of a 'Size' value depends on the particular generator used, but
+--   it must always be a number between 0 and 99 inclusive.
 --
 newtype Size =
   Size {
