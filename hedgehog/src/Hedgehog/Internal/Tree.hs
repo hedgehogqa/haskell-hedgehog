@@ -321,13 +321,14 @@ mapMaybeT p m =
 --   ]
 --
 splits :: [a] -> [([a], a, [a])]
--- This implementation is significantly more efficient than the others I've
--- tried when the lists are long, thanks to the carefully optimized
--- implementation of Data.List.inits.
-splits = \xs -> go (List.inits xs) xs
-  where
-    go (front : fronts) (x : xs) = (front, x, xs) : go fronts xs
-    go _ _ = []
+splits xs0 =
+  let
+    go (front : fronts) (x : xs) =
+      (front, x, xs) : go fronts xs
+    go _ _ =
+      []
+  in
+    go (List.inits xs0) xs0
 
 dropOne :: Monad m => [NodeT m a] -> [TreeT m [a]]
 dropOne ts = do
