@@ -1602,9 +1602,10 @@ shuffle = fmap toList . shuffleSeq . Seq.fromList
 --   /sequence./
 --
 shuffleSeq :: MonadGen m => Seq a -> m (Seq a)
-shuffleSeq xs
-  | null xs = pure Seq.empty
-  | otherwise = do
+shuffleSeq xs =
+  if null xs then
+    pure Seq.empty
+  else do
     n <- integral $ Range.constant 0 (length xs - 1)
 #if MIN_VERSION_containers(0,5,8)
     -- Data.Sequence should offer a version of deleteAt that returns the
@@ -1613,16 +1614,18 @@ shuffleSeq xs
     -- but I haven't actually tested that. It's certainly easier to see
     -- what's going on.
     case Seq.lookup n xs of
-      Just y -> (y Seq.<|) <$> shuffleSeq (Seq.deleteAt n xs)
-      Nothing -> error $
-        "Hedgehog.Gen.shuffleSeq: internal error, lookup in empty sequence"
+      Just y ->
+        (y Seq.<|) <$> shuffleSeq (Seq.deleteAt n xs)
+      Nothing ->
+        error "Hedgehog.Gen.shuffleSeq: internal error, lookup in empty sequence"
 #else
     case Seq.splitAt n xs of
       (beginning, end) ->
         case Seq.viewl end of
-          y Seq.:< end' -> (y Seq.<|) <$> shuffleSeq (beginning Seq.>< end')
-          Seq.EmptyL -> error $
-            "Hedgehog.Gen.shuffleSeq: internal error, lookup in empty sequence"
+          y Seq.:< end' ->
+            (y Seq.<|) <$> shuffleSeq (beginning Seq.>< end')
+          Seq.EmptyL ->
+            error "Hedgehog.Gen.shuffleSeq: internal error, lookup in empty sequence"
 #endif
 
 ------------------------------------------------------------------------
