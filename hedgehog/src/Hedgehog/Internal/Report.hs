@@ -1069,8 +1069,8 @@ ppSummary summary =
             Nothing
         ]
 
-renderDoc :: MonadIO m => Maybe UseColor -> Doc Markup -> m String
-renderDoc mcolor doc = do
+renderDoc :: MonadIO m => UseColor -> Doc Markup -> m String
+renderDoc color doc = do
   let
     dull =
       SetColor Foreground Dull
@@ -1170,8 +1170,6 @@ renderDoc mcolor doc = do
     end _ =
       setSGRCode [Reset]
 
-  color <- resolveColor mcolor
-
   let
     display =
       case color of
@@ -1191,14 +1189,14 @@ renderDoc mcolor doc = do
     WL.renderSmart 100 $
     WL.indent 2 doc
 
-renderProgress :: MonadIO m => Maybe UseColor -> Maybe PropertyName -> Report Progress -> m String
-renderProgress mcolor name x =
-  renderDoc mcolor =<< ppProgress name x
+renderProgress :: MonadIO m => UseColor -> Maybe PropertyName -> Report Progress -> m String
+renderProgress color name x =
+  renderDoc color =<< ppProgress name x
 
-renderResult :: MonadIO m => Maybe UseColor -> Maybe PropertyName -> Report Result -> m String
-renderResult mcolor name x =
-  renderDoc mcolor =<< ppResult name x
+renderResult :: MonadIO m => UseColor -> Maybe PropertyName -> Report Result -> m String
+renderResult color name x =
+  renderDoc color =<< ppResult name x
 
-renderSummary :: MonadIO m => Maybe UseColor -> Summary -> m String
-renderSummary mcolor x =
-  renderDoc mcolor =<< ppSummary x
+renderSummary :: MonadIO m => UseColor -> Summary -> m String
+renderSummary color x =
+  renderDoc color =<< ppSummary x
