@@ -1,3 +1,13 @@
+## Version 1.0.2 (2020-01-10)
+- Speed up `Tree.splits` ([#349][349], [@treeowl][treeowl])
+- Speed up `Gen.shuffle` ([#348][348], [@treeowl][treeowl])
+- Add docs on the bounds of `Size` ([#346][346], [@chris-martin][chris-martin])
+- Fix performance issues with color handling ([#345][345], [@stolyaroleh][stolyaroleh])
+- Add `mapMaybe`, `mapMaybeT`, in `Tree` and `Gen` ([#339][339], [@treeowl][treeowl])
+- Fix some formatting bugs in Haddock ([#332][332], [@sshine][sshine])
+- Add `MonadGen` instances for `StateT` ([#330][330], [@symbiont-sam-halliday][symbiont-sam-halliday])
+- Add `MonadBaseControl` instance for `PropertyT` ([#328][328], [@treeowl][treeowl])
+
 ## Version 1.0.1 (2019-09-16)
 - Add compatibility with GHC 8.8 ([#319][319], [@erikd][erikd])
 - Include location of failed assertion in report. This enables editors to more easily parse the location of failed test assertions, and provide links/jump functionality ([#308][308], [@owickstrom][owickstrom])
@@ -155,7 +165,31 @@
   https://github.com/ajmcmiddlin
 [owickstrom]:
   https://github.com/owickstrom
+[treeowl]:
+  https://github.com/treeowl
+[symbiont-sam-halliday]:
+  https://github.com/symbiont-sam-halliday
+[sshine]:
+  https://github.com/sshine
+[stolyaroleh]:
+  https://github.com/stolyaroleh
 
+[349]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/349
+[348]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/348
+[346]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/346
+[345]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/345
+[339]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/339
+[332]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/332
+[330]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/330
+[328]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/328
 [319]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/319
 [308]:
