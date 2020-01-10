@@ -5,7 +5,7 @@
 - Fix performance issues with color handling ([#345][345], [@stolyaroleh][stolyaroleh])
 - Add `mapMaybe`, `mapMaybeT`, in `Tree` and `Gen` ([#339][339], [@treeowl][treeowl])
 - Fix some formatting bugs in Haddock ([#332][332], [@sshine][sshine])
-- Add `MonadGen` instances for `StateT` ([#330][330], [@symbiont-sam-halliday][symbiont-sam-halliday])
+- Add `MonadGen` instances for `StateT` ([#321][321] [#330][330], [@HuwCampbell][HuwCampbell] [@symbiont-sam-halliday][symbiont-sam-halliday])
 - Add `MonadBaseControl` instance for `PropertyT` ([#328][328], [@treeowl][treeowl])
 
 ## Version 1.0.1 (2019-09-16)
@@ -190,6 +190,8 @@
   https://github.com/hedgehogqa/haskell-hedgehog/pull/330
 [328]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/328
+[321]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/321
 [319]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/319
 [308]:
