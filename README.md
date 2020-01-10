@@ -92,7 +92,7 @@ You can then load the module in GHCi, and run it:
 <img width="307" src="https://github.com/hedgehogqa/haskell-hedgehog/raw/master/img/hedgehog-logo-grey.png" />
 
  [hackage]: http://hackage.haskell.org/package/hedgehog
- [hackage-shield]: https://img.shields.io/badge/hackage-v1.0.1-blue.svg
+ [hackage-shield]: https://img.shields.io/hackage/v/hedgehog.svg?style=flat
 
  [travis]: https://travis-ci.org/hedgehogqa/haskell-hedgehog
  [travis-shield]: https://travis-ci.org/hedgehogqa/haskell-hedgehog.svg?branch=master
