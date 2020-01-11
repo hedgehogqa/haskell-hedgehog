@@ -1,4 +1,3 @@
-{-# LANGUAGE CPP #-}
 module Hedgehog.Main (
   -- * Running tests
     defaultMain
