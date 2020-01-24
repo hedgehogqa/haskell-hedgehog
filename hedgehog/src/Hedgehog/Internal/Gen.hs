@@ -1607,26 +1607,11 @@ shuffleSeq xs =
     pure Seq.empty
   else do
     n <- integral $ Range.constant 0 (length xs - 1)
-#if MIN_VERSION_containers(0,5,8)
-    -- Data.Sequence should offer a version of deleteAt that returns the
-    -- deleted element, but it does not currently do so. Lookup followed
-    -- by deletion seems likely faster than splitting and then appending,
-    -- but I haven't actually tested that. It's certainly easier to see
-    -- what's going on.
     case Seq.lookup n xs of
       Just y ->
         (y Seq.<|) <$> shuffleSeq (Seq.deleteAt n xs)
       Nothing ->
         error "Hedgehog.Gen.shuffleSeq: internal error, lookup in empty sequence"
-#else
-    case Seq.splitAt n xs of
-      (beginning, end) ->
-        case Seq.viewl end of
-          y Seq.:< end' ->
-            (y Seq.<|) <$> shuffleSeq (beginning Seq.>< end')
-          Seq.EmptyL ->
-            error "Hedgehog.Gen.shuffleSeq: internal error, lookup in empty sequence"
-#endif
 
 ------------------------------------------------------------------------
 -- Sampling
