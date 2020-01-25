@@ -5,23 +5,16 @@
 {-# LANGUAGE TemplateHaskell #-}
 module Test.Example.List where
 
-import           Control.Monad.Zip (mzip)
 import qualified Control.Monad.State.Lazy as Lazy
 import qualified Control.Monad.State.Class as State
 import qualified Control.Monad.Writer.Lazy as Lazy
 import qualified Control.Monad.Writer.Class as Writer
 import           Control.Monad.Morph (MFunctor(..))
 
-import           Data.Foldable (toList)
-import           Data.Monoid (Sum(..))
-import qualified Data.List as List
-
 import           Hedgehog
 import qualified Hedgehog.Range as Range
 
 import qualified Hedgehog.Internal.Gen as Gen
-import qualified Hedgehog.Internal.Shrink as Shrink
-import           Hedgehog.Internal.Source (HasCallStack, withFrozenCallStack)
 import           Hedgehog.Internal.Tree (Tree)
 import qualified Hedgehog.Internal.Tree as Tree
 
