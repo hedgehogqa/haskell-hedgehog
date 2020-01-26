@@ -8,12 +8,21 @@ Usage
 When you need some sensible human readable strings for property testing.
 
 ``` haskell
+import           Data.Text (Text)
 
-import qualified Test.QuickCheck as Q
+import           Hedgehog
 import qualified Hedgehog.Corpus as Corpus
+import qualified Hedgehog.Gen as Gen
 
-prop_test =
-  Q.forAll (Q.elements Corpus.agile) $ \name ->
-    ...
+genName :: Gen Text
+genName =
+  Gen.element Corpus.agile
 
+genBetterName :: Gen Text
+genBetterName =
+  mconcat [
+      Gen.element Corpus.agile
+    , pure " "
+    , Gen.element Corpus.animals
+    ]
 ```
