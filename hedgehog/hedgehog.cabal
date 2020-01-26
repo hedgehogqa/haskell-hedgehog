@@ -98,6 +98,7 @@ library
     Hedgehog.Internal.Gen
     Hedgehog.Internal.HTraversable
     Hedgehog.Internal.Opaque
+    Hedgehog.Internal.Prelude
     Hedgehog.Internal.Property
     Hedgehog.Internal.Queue
     Hedgehog.Internal.Range

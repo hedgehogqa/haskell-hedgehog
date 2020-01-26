@@ -12,6 +12,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
@@ -21,6 +22,7 @@
 #if __GLASGOW_HASKELL__ >= 806
 {-# LANGUAGE DerivingVia #-}
 #endif
+
 module Hedgehog.Internal.Gen (
   -- * Transformer
     Gen
@@ -174,10 +176,6 @@ import           Control.Monad.Base (MonadBase(..))
 import           Control.Monad.Trans.Control (MonadBaseControl(..))
 import           Control.Monad.Catch (MonadThrow(..), MonadCatch(..))
 import           Control.Monad.Error.Class (MonadError(..))
-#if __GLASGOW_HASKELL__ < 808
-import           Control.Monad.Fail (MonadFail(..))
-import qualified Control.Monad.Fail as Fail
-#endif
 import           Control.Monad.IO.Class (MonadIO(..))
 import           Control.Monad.Morph (MFunctor(..), MMonad(..))
 import qualified Control.Monad.Morph as Morph
@@ -201,9 +199,6 @@ import           Data.Bifunctor (first)
 import           Data.ByteString (ByteString)
 import qualified Data.ByteString as ByteString
 import qualified Data.Char as Char
-#if __GLASGOW_HASKELL__ < 806
-import           Data.Coerce (coerce)
-#endif
 import           Data.Foldable (for_, toList)
 import           Data.Functor.Identity (Identity(..))
 import           Data.Int (Int8, Int16, Int32, Int64)
@@ -212,7 +207,6 @@ import qualified Data.List.NonEmpty as NonEmpty
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Maybe as Maybe
-import           Data.Semigroup (Semigroup)
 import qualified Data.Semigroup as Semigroup
 import           Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
@@ -223,6 +217,7 @@ import qualified Data.Text.Encoding as Text
 import           Data.Word (Word8, Word16, Word32, Word64)
 
 import           Hedgehog.Internal.Distributive (MonadTransDistributive(..))
+import           Hedgehog.Internal.Prelude hiding (maybe, seq)
 import           Hedgehog.Internal.Seed (Seed)
 import qualified Hedgehog.Internal.Seed as Seed
 import qualified Hedgehog.Internal.Shrink as Shrink
@@ -231,8 +226,12 @@ import qualified Hedgehog.Internal.Tree as Tree
 import           Hedgehog.Range (Size, Range)
 import qualified Hedgehog.Range as Range
 
-import           Prelude hiding (filter, print, maybe, map, seq)
-
+#if __GLASGOW_HASKELL__ < 808
+import qualified Control.Monad.Fail as Fail
+#endif
+#if __GLASGOW_HASKELL__ < 806
+import           Data.Coerce (coerce)
+#endif
 
 ------------------------------------------------------------------------
 -- Generator transformer
@@ -519,8 +518,7 @@ instance Monad m => Monad (GenT m) where
           runGenT size sk . k =<<
           runGenT size sm m
 
-#if MIN_VERSION_base(4,13,0)
-#else
+#if __GLASGOW_HASKELL__ < 808
   fail =
     Fail.fail
 #endif

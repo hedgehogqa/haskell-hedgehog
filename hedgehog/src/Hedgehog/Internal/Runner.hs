@@ -5,8 +5,10 @@
 {-# LANGUAGE DoAndIfThenElse #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
+
 module Hedgehog.Internal.Runner (
   -- * Running Individual Properties
     check
@@ -29,20 +31,19 @@ import qualified Control.Concurrent.STM.TVar as TVar
 import           Control.Monad.Catch (MonadCatch(..), catchAll)
 import           Control.Monad.IO.Class (MonadIO(..))
 
-import           Data.Semigroup ((<>))
-
 import           Hedgehog.Internal.Config
 import           Hedgehog.Internal.Gen (evalGenT)
+import           Hedgehog.Internal.Prelude
 import           Hedgehog.Internal.Property (DiscardCount(..), ShrinkCount(..))
 import           Hedgehog.Internal.Property (Group(..), GroupName(..))
 import           Hedgehog.Internal.Property (Journal(..), Coverage(..), CoverCount(..))
 import           Hedgehog.Internal.Property (Property(..), PropertyConfig(..), PropertyName(..))
 import           Hedgehog.Internal.Property (PropertyT(..), Failure(..), runTestT)
 import           Hedgehog.Internal.Property (ShrinkLimit, ShrinkRetries, withTests)
-import           Hedgehog.Internal.Property (TestCount(..), PropertyCount(..))
 import           Hedgehog.Internal.Property (TerminationCriteria(..))
-import           Hedgehog.Internal.Property (coverageSuccess, journalCoverage)
+import           Hedgehog.Internal.Property (TestCount(..), PropertyCount(..))
 import           Hedgehog.Internal.Property (confidenceSuccess, confidenceFailure)
+import           Hedgehog.Internal.Property (coverageSuccess, journalCoverage)
 import           Hedgehog.Internal.Property (defaultMinTests)
 import           Hedgehog.Internal.Queue
 import           Hedgehog.Internal.Region

@@ -12,6 +12,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -20,6 +21,7 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-} -- Distributive
+
 module Hedgehog.Internal.Property (
   -- * Property
     Property(..)
@@ -127,7 +129,6 @@ import           Control.Monad.Base (MonadBase(..))
 import           Control.Monad.Catch (MonadThrow(..), MonadCatch(..))
 import           Control.Monad.Catch (SomeException(..), displayException)
 import           Control.Monad.Error.Class (MonadError(..))
-import           Control.Monad.Fail (MonadFail (..))
 import qualified Control.Monad.Fail as Fail
 import           Control.Monad.IO.Class (MonadIO(..))
 import           Control.Monad.Morph (MFunctor(..))
@@ -158,7 +159,6 @@ import           Data.Map (Map)
 import qualified Data.Map.Strict as Map
 import           Data.Number.Erf (invnormcdf)
 import qualified Data.List as List
-import           Data.Semigroup (Semigroup(..))
 import           Data.String (IsString)
 import           Data.Ratio ((%))
 import           Data.Typeable (typeOf)
@@ -167,10 +167,12 @@ import           Hedgehog.Internal.Distributive
 import           Hedgehog.Internal.Exception
 import           Hedgehog.Internal.Gen (Gen, GenT)
 import qualified Hedgehog.Internal.Gen as Gen
+import           Hedgehog.Internal.Prelude
 import           Hedgehog.Internal.Show
 import           Hedgehog.Internal.Source
 
 import           Language.Haskell.TH.Syntax (Lift)
+
 
 ------------------------------------------------------------------------
 
@@ -1107,7 +1109,7 @@ coverageSuccess tests =
 
 coverageFailures :: TestCount -> Coverage CoverCount -> [Label CoverCount]
 coverageFailures tests (Coverage kvs) =
-  filter (not . labelCovered tests) (Map.elems kvs)
+  List.filter (not . labelCovered tests) (Map.elems kvs)
 
 -- | Is true when the test coverage satisfies the specified 'Confidence'
 --   contstraint for all 'Coverage CoverCount's

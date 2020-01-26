@@ -6,6 +6,7 @@
 {-# LANGUAGE DoAndIfThenElse #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE NoImplicitPrelude #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TupleSections #-}
 
@@ -45,14 +46,14 @@ import qualified Data.List as List
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Maybe (mapMaybe, catMaybes)
-import           Data.Semigroup (Semigroup(..))
 import           Data.Traversable (for)
 
 import           Hedgehog.Internal.Config
 import           Hedgehog.Internal.Discovery (Pos(..), Position(..))
 import qualified Hedgehog.Internal.Discovery as Discovery
-import           Hedgehog.Internal.Property (Coverage(..), Label(..), LabelName(..))
+import           Hedgehog.Internal.Prelude
 import           Hedgehog.Internal.Property (CoverCount(..), CoverPercentage(..))
+import           Hedgehog.Internal.Property (Coverage(..), Label(..), LabelName(..))
 import           Hedgehog.Internal.Property (PropertyName(..), Log(..), Diff(..))
 import           Hedgehog.Internal.Property (ShrinkCount(..), PropertyCount(..))
 import           Hedgehog.Internal.Property (TestCount(..), DiscardCount(..))
@@ -678,7 +679,7 @@ ppFailureReport name tests (FailureReport size seed _ mcoverage inputs0 mlocatio
     WL.punctuate WL.line .
     fmap (WL.vsep . fmap (WL.indent 2)) .
     fmap (id :: [Doc Markup] -> [Doc Markup]) .
-    filter (not . null) $
+    List.filter (not . null) $
     concat [
       with args $
         WL.punctuate WL.line

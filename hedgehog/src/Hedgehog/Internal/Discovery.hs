@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE CPP #-}
 module Hedgehog.Internal.Discovery (
     PropertySource(..)
   , readProperties
@@ -20,10 +21,13 @@ import qualified Data.List as List
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Ord as Ord
-import           Data.Semigroup (Semigroup(..))
 
 import           Hedgehog.Internal.Property (PropertyName(..))
 import           Hedgehog.Internal.Source (LineNo(..), ColumnNo(..))
+
+#if __GLASGOW_HASKELL__ < 808
+import           Data.Semigroup (Semigroup(..))
+#endif
 
 ------------------------------------------------------------------------
 -- Property Extraction
