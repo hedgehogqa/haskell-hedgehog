@@ -174,8 +174,10 @@ import           Control.Monad.Base (MonadBase(..))
 import           Control.Monad.Trans.Control (MonadBaseControl(..))
 import           Control.Monad.Catch (MonadThrow(..), MonadCatch(..))
 import           Control.Monad.Error.Class (MonadError(..))
-import           Control.Monad.Fail (MonadFail (..))
+#if __GLASGOW_HASKELL__ < 808
+import           Control.Monad.Fail (MonadFail(..))
 import qualified Control.Monad.Fail as Fail
+#endif
 import           Control.Monad.IO.Class (MonadIO(..))
 import           Control.Monad.Morph (MFunctor(..), MMonad(..))
 import qualified Control.Monad.Morph as Morph
