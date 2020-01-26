@@ -36,7 +36,8 @@ tested-with:
     GHC == 8.0.2
   , GHC == 8.2.2
   , GHC == 8.4.4
-  , GHC == 8.6.4
+  , GHC == 8.6.5
+  , GHC == 8.8.1
 extra-source-files:
   README.md
   CHANGELOG.md
@@ -97,6 +98,7 @@ library
     Hedgehog.Internal.Gen
     Hedgehog.Internal.HTraversable
     Hedgehog.Internal.Opaque
+    Hedgehog.Internal.Prelude
     Hedgehog.Internal.Property
     Hedgehog.Internal.Queue
     Hedgehog.Internal.Range

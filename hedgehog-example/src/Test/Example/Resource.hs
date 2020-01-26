@@ -1,8 +1,9 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE PackageImports #-}
 module Test.Example.Resource where
 
-import           Control.Monad (replicateM)
+import           Control.Exception.Lifted (bracket, bracket_)
 import           Control.Monad.IO.Class (MonadIO(..))
 import           Control.Monad.Morph (hoist)
 import           Control.Monad.Trans.Except (ExceptT, throwE)
@@ -16,10 +17,13 @@ import           Hedgehog
 import qualified Hedgehog.Gen as Gen
 import qualified Hedgehog.Range as Range
 
+import           System.Directory
 import           System.Exit
 import           System.FilePath ((</>))
-import qualified System.IO.Temp as Temp
 import           System.Process
+
+import qualified "temporary"           System.IO.Temp as Temp
+import qualified "temporary-resourcet" System.IO.Temp as TempResourceT
 
 newtype ProcessFailed =
   ProcessFailed Int
@@ -49,7 +53,7 @@ prop_unix_sort =
       Gen.list (Range.linear 0 100) $
       Gen.string (Range.constant 1 5) Gen.alpha
 
-    (_, dir) <- Temp.createTempDirectory Nothing "prop_dir"
+    (_, dir) <- TempResourceT.createTempDirectory Nothing "prop_dir"
 
     let input = dir </> "input"
         output = dir </> "output"
@@ -107,7 +111,7 @@ prop_logged_unix_sort ref =
     hoist (bracketLog ref 2 "inner:hoist") $ do
       normalLog ref 4 "inner:action"
 
-      (_, dir) <- Temp.createTempDirectory Nothing "prop_dir"
+      (_, dir) <- TempResourceT.createTempDirectory Nothing "prop_dir"
 
       let input = dir </> "input"
           output = dir </> "output"
@@ -117,6 +121,38 @@ prop_logged_unix_sort ref =
       values <- liftIO . fmap lines $ readFile output
 
       values0 === values
+
+prop_logged_unix_sort_bracket :: IORef [String] -> Property
+prop_logged_unix_sort_bracket ref =
+  property .
+  hoist (bracketLog ref 0 "b:property") .
+  bracket_
+    (normalLog ref 0 "b:property:acquire")
+    (normalLog ref 0 "b:property:release") $ do
+    normalLog ref 2 "b:forAll:before"
+
+    values0 <- forAll $
+      Gen.list (Range.constant 1 2) $
+      Gen.string (Range.constant 1 2) Gen.alpha
+
+    normalLog ref 2 "b:forAll:after"
+
+    hoist (bracketLog ref 2 "b:inner:hoist") $ do
+      normalLog ref 4 "b:inner:action"
+
+      tmpdir <- liftIO getTemporaryDirectory
+      bracket
+        (liftIO $ Temp.createTempDirectory tmpdir "prop_foo")
+        (liftIO . removeDirectoryRecursive) $ \dir -> do
+
+        let input = dir </> "input"
+            output = dir </> "output"
+
+        liftIO $ writeFile input (unlines values0)
+        evalExceptT $ unixSort input output
+        values <- liftIO . fmap lines $ readFile output
+
+        values0 === values
 
 bracketLog :: MonadIO m => IORef [String] -> Int -> String -> m a -> m a
 bracketLog ref indent x io = do
@@ -148,6 +184,7 @@ tests = do
     checkSequential $ Group "Test.Example.Resource" [
         ("prop_unix_sort", prop_logged_unix_sort ref)
       , ("prop_logged_unix_sort", prop_logged_unix_sort ref)
+      , ("prop_logged_unix_sort_bracket", prop_logged_unix_sort_bracket ref)
       ]
 
   -- Print only unique blocks, remove 'List.nub' to see the complete log.
