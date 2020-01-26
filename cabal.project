@@ -1,5 +1,6 @@
 packages:
   hedgehog
+  hedgehog-corpus
   hedgehog-dieharder
   hedgehog-example
   hedgehog-quickcheck
@@ -12,6 +13,8 @@ packages:
 --   ghc-options: -Wall -Werror
 
 package hedgehog
+  ghc-options: -Wall -Werror
+package hedgehog-corpus
   ghc-options: -Wall -Werror
 package hedgehog-dieharder
   ghc-options: -Wall -Werror

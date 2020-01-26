@@ -1,0 +1,31 @@
+name:                  hedgehog-corpus
+version:               0.2.0
+license:               BSD3
+license-file:          LICENSE
+author:                Tim McGilchrist <timmcgil@gmail.com>
+maintainer:            Jacob Stanley <jacob@stanley.io>
+copyright:             (c) 2017-2020 Tim McGilchrist
+synopsis:              hedgehog-corpus
+category:              Testing
+cabal-version:         >= 1.8
+build-type:            Simple
+homepage:              https://github.com/tmcgilchrist/hedgehog-corpus
+description:
+            Collection of strings for testing things.
+
+source-repository head
+  type: git
+  location: git://github.com/tmcgilchrist/hedgehog-corpus.git
+
+library
+  build-depends:
+                      base                            >= 3          && < 5
+
+  ghc-options:
+                    -Wall
+
+  hs-source-dirs:
+                    src
+
+  exposed-modules:
+                    Hedgehog.Corpus
