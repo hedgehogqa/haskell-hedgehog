@@ -1,9 +1,8 @@
-hedgehog-corpus
-===============
+# hedgehog-corpus
+
 Collections of strings for testing things.
 
-Usage
----------------
+## Usage
 
 When you need some sensible human readable strings for property testing.
 
