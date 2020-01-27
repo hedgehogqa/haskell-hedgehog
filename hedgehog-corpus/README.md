@@ -7,6 +7,7 @@ Collections of strings for testing things.
 When you need some sensible human readable strings for property testing.
 
 ``` haskell
+{-# LANGUAGE OverloadedStrings #-}
 import           Data.Text (Text)
 
 import           Hedgehog
@@ -24,4 +25,24 @@ genBetterName =
     , pure " "
     , Gen.element Corpus.animals
     ]
+
+main :: IO ()
+main =
+  Gen.print genBetterName
+```
+
+```
+=== Outcome ===
+"test driven elephant"
+=== Shrinks ===
+"agile elephant"
+"pair programming elephant"
+"scrum master elephant"
+"standup elephant"
+"story points elephant"
+"test driven alligator"
+"test driven chimpanzee"
+"test driven dog"
+"test driven duck"
+"test driven eagle"
 ```
