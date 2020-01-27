@@ -1,31 +1,54 @@
-name:                  hedgehog-corpus
-version:               0.2.0
-license:               BSD3
-license-file:          LICENSE
-author:                Tim McGilchrist <timmcgil@gmail.com>
-maintainer:            Jacob Stanley <jacob@stanley.io>
-copyright:             (c) 2017-2020 Tim McGilchrist
-synopsis:              hedgehog-corpus
-category:              Testing
-cabal-version:         >= 1.8
-build-type:            Simple
-homepage:              https://github.com/tmcgilchrist/hedgehog-corpus
+version: 0.2.0
+
+name:
+  hedgehog-corpus
+author:
+  Tim McGilchrist <timmcgil@gmail.com>
+maintainer:
+  Jacob Stanley <jacob@stanley.io>
+homepage:
+  https://github.com/hedgehogqa/haskell-hedgehog/tree/master/hedgehog-corpus
+bug-reports:
+  https://github.com/hedgehogqa/haskell-hedgehog/issues
+synopsis:
+  hedgehog-corpus
 description:
-            Collection of strings for testing things.
+  Collections of strings for testing things, when you need some sensible human
+  readable strings for property testing.
+  .
+  To get started quickly, see the <https://github.com/hedgehogqa/haskell-hedgehog/blob/master/hedgehog-corpus/README.md>.
+category:
+  Testing
+license:
+  BSD3
+license-file:
+  LICENSE
+cabal-version:
+  >= 1.8
+build-type:
+  Simple
+tested-with:
+    GHC == 8.0.2
+  , GHC == 8.2.2
+  , GHC == 8.4.4
+  , GHC == 8.6.5
+  , GHC == 8.8.1
+extra-source-files:
+  README.md
 
 source-repository head
   type: git
-  location: git://github.com/tmcgilchrist/hedgehog-corpus.git
+  location: git://github.com/hedgehogqa/haskell-hedgehog.git
 
 library
   build-depends:
-                      base                            >= 3          && < 5
+      base                            >= 3          && < 5
 
   ghc-options:
-                    -Wall
+    -Wall
 
   hs-source-dirs:
-                    src
+    src
 
   exposed-modules:
-                    Hedgehog.Corpus
+    Hedgehog.Corpus
