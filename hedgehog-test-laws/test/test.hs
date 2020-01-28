@@ -16,7 +16,7 @@ import           Test.QuickCheck (choose, vector, coarbitraryIntegral, property)
 
 import           Test.QuickCheck (arbitrary1)
 import           Test.QuickCheck.Checkers (EqProp(..), eq)
-import           Test.QuickCheck.Classes (applicative, monad, monadApplicative)
+import           Test.QuickCheck.Classes (applicative, monad)
 import           Test.Tasty (TestTree, defaultMain, testGroup)
 import           Test.Tasty.ExpectedFailure (ignoreTest)
 import           Test.Tasty.QuickCheck (testProperties)
@@ -36,19 +36,16 @@ instances =
         testBatch <$> [
             applicative (undefined :: TreeT Maybe (Bool, Char, Int))
           , monad (undefined :: TreeT Maybe (Bool, Char, Int))
-          , monadApplicative (undefined :: TreeT (Either Bool) (Char, Int))
           ]
     , testGroup "NodeT" $
         testBatch <$> [
             applicative (undefined :: NodeT Maybe (Bool, Char, Int))
           , monad (undefined :: NodeT Maybe (Bool, Char, Int))
-          , monadApplicative (undefined :: NodeT (Either Bool) (Char, Int))
           ]
     , testGroup "GenT" $
         ignoreTest . testBatch <$> [
             applicative (undefined :: GenT Maybe (Bool, Char, Int))
           , monad (undefined :: GenT Maybe (Bool, Char, Int))
-          , monadApplicative (undefined :: GenT (Either Bool) (Char, Int))
           ]
     ]
 
