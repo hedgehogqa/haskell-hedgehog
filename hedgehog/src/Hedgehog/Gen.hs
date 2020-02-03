@@ -67,8 +67,11 @@ module Hedgehog.Gen (
   -- ** Conditional
   , discard
   , filter
+  , filterT
   , mapMaybe
+  , mapMaybeT
   , just
+  , justT
 
   -- ** Collections
   , maybe
