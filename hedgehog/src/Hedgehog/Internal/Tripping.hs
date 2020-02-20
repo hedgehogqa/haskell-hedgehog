@@ -1,6 +1,7 @@
 {-# OPTIONS_HADDOCK not-home #-}
 module Hedgehog.Internal.Tripping (
     tripping
+  , trippingM
   ) where
 
 import           Hedgehog.Internal.Property (MonadTest, Diff(..), success, failWith)
@@ -28,18 +29,24 @@ tripping ::
   -> (b -> f a)
   -> m ()
 tripping x encode decode =
+  trippingM x (pure . encode) (pure . decode)
+
+
+trippingM ::
+     (MonadTest m, Applicative f, Show b, Show (f a), Eq (f a), HasCallStack)
+  => a
+  -> (a -> m b)
+  -> (b -> m (f a))
+  -> m ()
+trippingM x encode decode = do
   let
     mx =
       pure x
 
-    i =
-      encode x
-
-    my =
-      decode i
-  in
-    if mx == my then
-      success
+  i <- encode x
+  my <- decode i
+  if mx == my
+    then success
     else
       case valueDiff <$> mkValue mx <*> mkValue my of
         Nothing ->
