@@ -32,6 +32,7 @@ tripping x encode decode =
   trippingM x (pure . encode) (pure . decode)
 
 
+-- | Similar to tripping, but with a monadic action.
 trippingM ::
      (MonadTest m, Applicative f, Show b, Show (f a), Eq (f a), HasCallStack)
   => a
