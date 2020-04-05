@@ -4,7 +4,7 @@
 #
 # For more information, see https://github.com/haskell-CI/haskell-ci
 #
-# version: 0.9.20200402
+# version: 0.9.20200405
 #
 version: ~> 1.0
 language: c
@@ -100,6 +100,18 @@ install:
     echo "packages: hedgehog-example" >> cabal.project
     echo "packages: hedgehog-quickcheck" >> cabal.project
     echo "packages: hedgehog-test-laws" >> cabal.project
+  - if [ $HCNUMVER -ge 80200 ] ; then echo 'package hedgehog' >> cabal.project ; fi
+  - "if [ $HCNUMVER -ge 80200 ] ; then echo '  ghc-options: -Werror=missing-methods' >> cabal.project ; fi"
+  - if [ $HCNUMVER -ge 80200 ] ; then echo 'package hedgehog-corpus' >> cabal.project ; fi
+  - "if [ $HCNUMVER -ge 80200 ] ; then echo '  ghc-options: -Werror=missing-methods' >> cabal.project ; fi"
+  - if [ $HCNUMVER -ge 80200 ] ; then echo 'package hedgehog-dieharder' >> cabal.project ; fi
+  - "if [ $HCNUMVER -ge 80200 ] ; then echo '  ghc-options: -Werror=missing-methods' >> cabal.project ; fi"
+  - if [ $HCNUMVER -ge 80200 ] ; then echo 'package hedgehog-example' >> cabal.project ; fi
+  - "if [ $HCNUMVER -ge 80200 ] ; then echo '  ghc-options: -Werror=missing-methods' >> cabal.project ; fi"
+  - if [ $HCNUMVER -ge 80200 ] ; then echo 'package hedgehog-quickcheck' >> cabal.project ; fi
+  - "if [ $HCNUMVER -ge 80200 ] ; then echo '  ghc-options: -Werror=missing-methods' >> cabal.project ; fi"
+  - if [ $HCNUMVER -ge 80200 ] ; then echo 'package hedgehog-test-laws' >> cabal.project ; fi
+  - "if [ $HCNUMVER -ge 80200 ] ; then echo '  ghc-options: -Werror=missing-methods' >> cabal.project ; fi"
   - |
     echo "package hedgehog"             >> cabal.project
     echo "  ghc-options: -Wall -Werror" >> cabal.project
@@ -157,18 +169,18 @@ script:
     echo "packages: ${PKGDIR_hedgehog_example}" >> cabal.project
     echo "packages: ${PKGDIR_hedgehog_quickcheck}" >> cabal.project
     echo "packages: ${PKGDIR_hedgehog_test_laws}" >> cabal.project
-  - echo 'package hedgehog' >> cabal.project
-  - "echo '  ghc-options: -Werror=missing-methods' >> cabal.project"
-  - echo 'package hedgehog-corpus' >> cabal.project
-  - "echo '  ghc-options: -Werror=missing-methods' >> cabal.project"
-  - echo 'package hedgehog-dieharder' >> cabal.project
-  - "echo '  ghc-options: -Werror=missing-methods' >> cabal.project"
-  - echo 'package hedgehog-example' >> cabal.project
-  - "echo '  ghc-options: -Werror=missing-methods' >> cabal.project"
-  - echo 'package hedgehog-quickcheck' >> cabal.project
-  - "echo '  ghc-options: -Werror=missing-methods' >> cabal.project"
-  - echo 'package hedgehog-test-laws' >> cabal.project
-  - "echo '  ghc-options: -Werror=missing-methods' >> cabal.project"
+  - if [ $HCNUMVER -ge 80200 ] ; then echo 'package hedgehog' >> cabal.project ; fi
+  - "if [ $HCNUMVER -ge 80200 ] ; then echo '  ghc-options: -Werror=missing-methods' >> cabal.project ; fi"
+  - if [ $HCNUMVER -ge 80200 ] ; then echo 'package hedgehog-corpus' >> cabal.project ; fi
+  - "if [ $HCNUMVER -ge 80200 ] ; then echo '  ghc-options: -Werror=missing-methods' >> cabal.project ; fi"
+  - if [ $HCNUMVER -ge 80200 ] ; then echo 'package hedgehog-dieharder' >> cabal.project ; fi
+  - "if [ $HCNUMVER -ge 80200 ] ; then echo '  ghc-options: -Werror=missing-methods' >> cabal.project ; fi"
+  - if [ $HCNUMVER -ge 80200 ] ; then echo 'package hedgehog-example' >> cabal.project ; fi
+  - "if [ $HCNUMVER -ge 80200 ] ; then echo '  ghc-options: -Werror=missing-methods' >> cabal.project ; fi"
+  - if [ $HCNUMVER -ge 80200 ] ; then echo 'package hedgehog-quickcheck' >> cabal.project ; fi
+  - "if [ $HCNUMVER -ge 80200 ] ; then echo '  ghc-options: -Werror=missing-methods' >> cabal.project ; fi"
+  - if [ $HCNUMVER -ge 80200 ] ; then echo 'package hedgehog-test-laws' >> cabal.project ; fi
+  - "if [ $HCNUMVER -ge 80200 ] ; then echo '  ghc-options: -Werror=missing-methods' >> cabal.project ; fi"
   - |
     echo "package hedgehog"             >> cabal.project
     echo "  ghc-options: -Wall -Werror" >> cabal.project
@@ -211,5 +223,5 @@ script:
   - rm -f cabal.project.local
   - ${CABAL} v2-build $WITHCOMPILER --disable-tests --disable-benchmarks all
 
-# REGENDATA ("0.9.20200402",["cabal.project"])
+# REGENDATA ("0.9.20200405",["cabal.project"])
 # EOF
