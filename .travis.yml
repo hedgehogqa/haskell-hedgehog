@@ -100,18 +100,6 @@ install:
     echo "packages: hedgehog-example" >> cabal.project
     echo "packages: hedgehog-quickcheck" >> cabal.project
     echo "packages: hedgehog-test-laws" >> cabal.project
-  - echo 'package hedgehog' >> cabal.project
-  - "echo '  ghc-options: -Werror=missing-methods' >> cabal.project"
-  - echo 'package hedgehog-corpus' >> cabal.project
-  - "echo '  ghc-options: -Werror=missing-methods' >> cabal.project"
-  - echo 'package hedgehog-dieharder' >> cabal.project
-  - "echo '  ghc-options: -Werror=missing-methods' >> cabal.project"
-  - echo 'package hedgehog-example' >> cabal.project
-  - "echo '  ghc-options: -Werror=missing-methods' >> cabal.project"
-  - echo 'package hedgehog-quickcheck' >> cabal.project
-  - "echo '  ghc-options: -Werror=missing-methods' >> cabal.project"
-  - echo 'package hedgehog-test-laws' >> cabal.project
-  - "echo '  ghc-options: -Werror=missing-methods' >> cabal.project"
   - |
     echo "package hedgehog"             >> cabal.project
     echo "  ghc-options: -Wall -Werror" >> cabal.project
