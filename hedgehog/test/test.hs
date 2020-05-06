@@ -5,6 +5,7 @@ import qualified Test.Hedgehog.Confidence
 import qualified Test.Hedgehog.Filter
 import qualified Test.Hedgehog.Maybe
 import qualified Test.Hedgehog.Seed
+import qualified Test.Hedgehog.State
 import qualified Test.Hedgehog.Text
 import qualified Test.Hedgehog.Zip
 
@@ -17,6 +18,7 @@ main =
     , Test.Hedgehog.Filter.tests
     , Test.Hedgehog.Maybe.tests
     , Test.Hedgehog.Seed.tests
+    , Test.Hedgehog.State.tests
     , Test.Hedgehog.Text.tests
     , Test.Hedgehog.Zip.tests
     ]
