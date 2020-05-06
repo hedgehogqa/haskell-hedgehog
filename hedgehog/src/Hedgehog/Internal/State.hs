@@ -46,7 +46,9 @@ module Hedgehog.Internal.State (
   , dropInvalid
   , action
   , sequential
+  , sequential'
   , parallel
+  , parallel'
   , executeSequential
   , executeParallel
   ) where
@@ -55,7 +57,7 @@ import qualified Control.Concurrent.Async.Lifted as Async
 import           Control.Monad (foldM, foldM_)
 import           Control.Monad.Catch (MonadCatch)
 import           Control.Monad.State.Class (MonadState, get, put, modify)
-import           Control.Monad.Morph (MFunctor(..))
+import           Control.Monad.Morph (MFunctor(hoist))
 import           Control.Monad.Trans.Class (lift)
 import           Control.Monad.Trans.Control (MonadBaseControl)
 import           Control.Monad.Trans.State (State, runState, execState)
@@ -530,18 +532,18 @@ dropInvalid =
   in
     fmap Maybe.catMaybes . traverse loop
 
--- | Generates a single action from a set of possible commands.
+-- | Generates a single action from a generator of commands.
 --
 action ::
      (MonadGen gen, MonadTest m)
-  => [Command gen m state]
+  => gen (Command gen m state)
   -> GenT (StateT (Context state) (GenBase gen)) (Action m state)
-action commands =
+action commandsGen =
   Gen.justT $ do
     Context state0 _ <- get
 
     Command mgenInput exec callbacks <-
-      Gen.element $ filter (\c -> commandGenOK c state0) commands
+      hoist lift $ Gen.toGenT $ Gen.filterT (\c -> commandGenOK c state0) commandsGen
 
     input <-
       case mgenInput state0 of
@@ -568,11 +570,11 @@ action commands =
 genActions ::
      (MonadGen gen, MonadTest m)
   => Range Int
-  -> [Command gen m state]
+  -> gen (Command gen m state)
   -> Context state
   -> gen ([Action m state], Context state)
-genActions range commands ctx = do
-  xs <- Gen.fromGenT . (`evalStateT` ctx) . distributeT $ Gen.list range (action commands)
+genActions range commandsGen ctx = do
+  xs <- Gen.fromGenT . (`evalStateT` ctx) . distributeT $ Gen.list range (action commandsGen)
   pure $
     dropInvalid xs `runState` ctx
 
@@ -640,9 +642,19 @@ sequential ::
   -> (forall v. state v)
   -> [Command gen m state]
   -> gen (Sequential m state)
-sequential range initial commands =
+sequential range initial commands = sequential' range initial (Gen.element commands)
+
+-- | Generates a sequence of actions from an initial model state and a generator of commands.
+--
+sequential' ::
+     (MonadGen gen, MonadTest m)
+  => Range Int
+  -> (forall v. state v)
+  -> gen (Command gen m state)
+  -> gen (Sequential m state)
+sequential' range initial commandsGen =
   fmap (Sequential . fst) $
-    genActions range commands (mkContext initial)
+    genActions range commandsGen (mkContext initial)
 
 -- | A sequential prefix of actions to execute, with two branches to execute in parallel.
 --
@@ -686,10 +698,23 @@ parallel ::
   -> (forall v. state v)
   -> [Command gen m state]
   -> gen (Parallel m state)
-parallel prefixN parallelN initial commands = do
-  (prefix, ctx0) <- genActions prefixN commands (mkContext initial)
-  (branch1, ctx1) <- genActions parallelN commands ctx0
-  (branch2, _ctx2) <- genActions parallelN commands ctx1 { contextState = contextState ctx0 }
+parallel prefixN parallelN initial commands = parallel' prefixN parallelN initial (Gen.element commands)
+
+-- | Given the initial model state and a generator of commands, generates prefix
+--   actions to be run sequentially, followed by two branches to be run in
+--   parallel.
+--
+parallel' ::
+     (MonadGen gen, MonadTest m)
+  => Range Int
+  -> Range Int
+  -> (forall v. state v)
+  -> gen (Command gen m state)
+  -> gen (Parallel m state)
+parallel' prefixN parallelN initial commandsGen = do
+  (prefix, ctx0) <- genActions prefixN commandsGen (mkContext initial)
+  (branch1, ctx1) <- genActions parallelN commandsGen ctx0
+  (branch2, _ctx2) <- genActions parallelN commandsGen ctx1 { contextState = contextState ctx0 }
 
   pure $ Parallel prefix branch1 branch2
 
