@@ -109,6 +109,8 @@ module Hedgehog.Internal.Gen (
 
   -- ** Collections
   , maybe
+  , either
+  , either_
   , list
   , seq
   , nonEmpty
@@ -217,7 +219,7 @@ import qualified Data.Text.Encoding as Text
 import           Data.Word (Word8, Word16, Word32, Word64)
 
 import           Hedgehog.Internal.Distributive (MonadTransDistributive(..))
-import           Hedgehog.Internal.Prelude hiding (maybe, seq)
+import           Hedgehog.Internal.Prelude hiding (either, maybe, seq)
 import           Hedgehog.Internal.Seed (Seed)
 import qualified Hedgehog.Internal.Seed as Seed
 import qualified Hedgehog.Internal.Shrink as Shrink
@@ -1353,6 +1355,29 @@ maybe gen =
         (2, pure Nothing)
       , (1 + fromIntegral n, Just <$> gen)
       ]
+
+-- | Generates either an 'a' or a 'b'.
+--
+--   As the size grows, this generator generates @Right@s more often than @Left@s.
+--
+either :: MonadGen m => m a -> m b -> m (Either a b)
+either genA genB =
+  sized $ \n ->
+    frequency [
+        (2, Left <$> genA)
+      , (1 + fromIntegral n, Right <$> genB)
+      ]
+
+-- | Generates either an 'a' or a 'b', without bias.
+--
+--   This generator generates as many @Right@s as it does @Left@s.
+--
+either_ :: MonadGen m => m a -> m b -> m (Either a b)
+either_ genA genB =
+    choice [
+      Left <$> genA
+    , Right <$> genB
+    ]
 
 -- | Generates a list using a 'Range' to determine the length.
 --
