@@ -609,25 +609,34 @@ ppTextLines =
 
 ppFailureReport :: MonadIO m => Maybe PropertyName -> TestCount -> FailureReport -> m [Doc Markup]
 ppFailureReport name tests (FailureReport size seed _ mcoverage inputs0 mlocation0 msg mdiff msgs0) = do
+  let
+    basic =
+      -- Move the failure message to the end section if we have
+      -- no source location or can't find the source file.
+      let
+        msgs1 =
+          msgs0 ++
+          (if null msg then [] else [msg])
+
+        docs =
+          concatMap ppTextLines msgs1 ++
+          maybe [] ppDiff mdiff
+      in
+        (docs, Nothing)
+
   (msgs1, mlocation) <-
     case mlocation0 of
       Nothing ->
-        -- Move the failure message to the end section if we have
-        -- no source location.
-        let
-          msgs1 =
-            msgs0 ++
-            (if null msg then [] else [msg])
+        return basic
 
-          docs =
-            concatMap ppTextLines msgs1 ++
-            maybe [] ppDiff mdiff
-        in
-          pure (docs, Nothing)
-
-      Just location0 ->
-        fmap (concatMap ppTextLines msgs0,) $
+      Just location0 -> do
+        mAdvanced <-
           ppFailureLocation (fmap WL.text $ List.lines msg) mdiff location0
+        case mAdvanced of
+          Just advanced ->
+            return (concatMap ppTextLines msgs0, Just advanced)
+          Nothing ->
+            return basic
 
   coverageLocations <-
     case mcoverage of
