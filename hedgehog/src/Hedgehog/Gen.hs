@@ -75,6 +75,8 @@ module Hedgehog.Gen (
 
   -- ** Collections
   , maybe
+  , either
+  , either_
   , list
   , seq
   , nonEmpty
@@ -109,4 +111,4 @@ module Hedgehog.Gen (
 import           Hedgehog.Internal.Gen
 import           Hedgehog.Internal.State (sequential, parallel)
 
-import           Prelude hiding (filter, print, maybe, map, seq)
+import           Prelude hiding (either, filter, print, maybe, map, seq)

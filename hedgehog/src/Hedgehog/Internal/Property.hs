@@ -73,6 +73,7 @@ module Hedgehog.Internal.Property (
   , (/==)
 
   , eval
+  , evalNF
   , evalM
   , evalIO
   , evalEither
@@ -124,6 +125,7 @@ module Hedgehog.Internal.Property (
   ) where
 
 import           Control.Applicative (Alternative(..))
+import           Control.DeepSeq (NFData, rnf)
 import           Control.Monad (MonadPlus(..))
 import           Control.Monad.Base (MonadBase(..))
 import           Control.Monad.Catch (MonadThrow(..), MonadCatch(..))
@@ -153,6 +155,7 @@ import qualified Control.Monad.Trans.Writer.Lazy as Lazy
 import qualified Control.Monad.Trans.Writer.Strict as Strict
 
 import qualified Data.Char as Char
+import           Data.Functor (($>))
 import           Data.Functor.Identity (Identity(..))
 import           Data.Int (Int64)
 import           Data.Map (Map)
@@ -702,11 +705,19 @@ failDiff x y =
 --   message.
 --
 failException :: (MonadTest m, HasCallStack) => SomeException -> m a
-failException (SomeException x) =
+failException ex =
   withFrozenCallStack $
-    failWith Nothing $ unlines [
-        "━━━ Exception (" ++ show (typeOf x) ++ ") ━━━"
-      , List.dropWhileEnd Char.isSpace (displayException x)
+    failExceptionWith [] ex
+
+-- | Fails with an error which renders the given messages, the type of an exception,
+--   and its error message.
+--
+failExceptionWith :: (MonadTest m, HasCallStack) => [String] -> SomeException -> m a
+failExceptionWith messages (SomeException ex) =
+  withFrozenCallStack
+    failWith Nothing $ unlines $ messages <> [
+        "━━━ Exception (" ++ show (typeOf ex) ++ ") ━━━"
+      , List.dropWhileEnd Char.isSpace (displayException ex)
       ]
 
 -- | Causes a test to fail.
@@ -780,6 +791,15 @@ infix 4 /==
 eval :: (MonadTest m, HasCallStack) => a -> m a
 eval x =
   either (withFrozenCallStack failException) pure (tryEvaluate x)
+
+-- | Fails the test if the value throws an exception when evaluated to
+--   normal form (NF).
+--
+evalNF :: (MonadTest m, NFData a, HasCallStack) => a -> m a
+evalNF x =
+  either (withFrozenCallStack (failExceptionWith messages)) pure (tryEvaluate (rnf x)) $> x
+  where
+    messages = ["━━━ Value could not be evaluated to normal form ━━━"]
 
 -- | Fails the test if the action throws an exception.
 --

@@ -3,6 +3,7 @@ import           System.IO (BufferMode(..), hSetBuffering, stdout, stderr)
 import qualified Test.Example.Basic
 import qualified Test.Example.Confidence
 import qualified Test.Example.Coverage
+import qualified Test.Example.EvalNF
 import qualified Test.Example.Exception
 import qualified Test.Example.QuickCheck
 import qualified Test.Example.References
@@ -20,6 +21,7 @@ main = do
       Test.Example.Basic.tests
     , Test.Example.Confidence.tests
     , Test.Example.Coverage.tests
+    , Test.Example.EvalNF.tests
     , Test.Example.Exception.tests
     , Test.Example.QuickCheck.tests
     , Test.Example.References.tests
