@@ -108,6 +108,7 @@ module Hedgehog (
   , tripping
 
   , eval
+  , evalNF
   , evalM
   , evalIO
   , evalEither
@@ -164,7 +165,7 @@ import           Hedgehog.Internal.Property (assert, diff, (===), (/==))
 import           Hedgehog.Internal.Property (classify, cover)
 import           Hedgehog.Internal.Property (discard, failure, success)
 import           Hedgehog.Internal.Property (DiscardLimit, withDiscards)
-import           Hedgehog.Internal.Property (eval, evalM, evalIO)
+import           Hedgehog.Internal.Property (eval, evalNF, evalM, evalIO)
 import           Hedgehog.Internal.Property (evalEither, evalExceptT)
 import           Hedgehog.Internal.Property (footnote, footnoteShow)
 import           Hedgehog.Internal.Property (forAll, forAllWith)

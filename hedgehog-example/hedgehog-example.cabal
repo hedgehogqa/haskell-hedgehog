@@ -38,6 +38,7 @@ library
       Test.Example.Basic
     , Test.Example.Confidence
     , Test.Example.Coverage
+    , Test.Example.EvalNF
     , Test.Example.Exception
     , Test.Example.List
     , Test.Example.QuasiShow

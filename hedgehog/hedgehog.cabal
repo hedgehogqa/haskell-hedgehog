@@ -56,6 +56,7 @@ library
     , bytestring                      >= 0.10       && < 0.11
     , concurrent-output               >= 1.7        && < 1.11
     , containers                      >= 0.4        && < 0.7
+    , deepseq                         >= 1.1.0.0    && < 1.5
     , directory                       >= 1.2        && < 1.4
     , erf                             >= 2.0        && < 2.1
     , exceptions                      >= 0.7        && < 0.11
