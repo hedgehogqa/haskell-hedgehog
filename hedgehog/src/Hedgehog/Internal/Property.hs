@@ -705,19 +705,19 @@ failDiff x y =
 --   message.
 --
 failException :: (MonadTest m, HasCallStack) => SomeException -> m a
-failException ex =
+failException x =
   withFrozenCallStack $
-    failExceptionWith [] ex
+    failExceptionWith [] x
 
 -- | Fails with an error which renders the given messages, the type of an exception,
 --   and its error message.
 --
 failExceptionWith :: (MonadTest m, HasCallStack) => [String] -> SomeException -> m a
-failExceptionWith messages (SomeException ex) =
+failExceptionWith messages (SomeException x) =
   withFrozenCallStack
     failWith Nothing $ unlines $ messages <> [
-        "━━━ Exception (" ++ show (typeOf ex) ++ ") ━━━"
-      , List.dropWhileEnd Char.isSpace (displayException ex)
+        "━━━ Exception (" ++ show (typeOf x) ++ ") ━━━"
+      , List.dropWhileEnd Char.isSpace (displayException x)
       ]
 
 -- | Causes a test to fail.
