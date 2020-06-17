@@ -797,9 +797,11 @@ eval x =
 --
 evalNF :: (MonadTest m, NFData a, HasCallStack) => a -> m a
 evalNF x =
-  either (withFrozenCallStack (failExceptionWith messages)) pure (tryEvaluate (rnf x)) $> x
-  where
-    messages = ["━━━ Value could not be evaluated to normal form ━━━"]
+  let
+    messages =
+      ["━━━ Value could not be evaluated to normal form ━━━"]
+  in
+    either (withFrozenCallStack (failExceptionWith messages)) pure (tryEvaluate (rnf x)) $> x
 
 -- | Fails the test if the action throws an exception.
 --
