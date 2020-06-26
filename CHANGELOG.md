@@ -1,4 +1,16 @@
+## Version 1.0.3 (2020-06-26)
+
+- Bump cabal-version to 1.10 ([#390][390], [@moodmosaic][moodmosaic])
+- Don't swallow errors if we can't find the source file ([#387][387], [@HuwCampbell][HuwCampbell])
+- Add `Property.evalNF` ([#384][384], [@dcastro][dcastro])
+- Add `Gen.either` and `Gen.either_` ([#382][382], [@dcastro][dcastro])
+- Add `filterT`, `justT`, and `mapMaybeT` to `Gen` exports ([#366][366], [@kquick][kquick])
+- Bump pretty-show to 1.10 which supports quasi-quotes ([#365][365], [@jacobstanley][jacobstanley])
+- Remove `undefined` in `GenT`'s `MonadWriter` instance ([#344][344], [@HuwCampbell][HuwCampbell])
+- Make `Tree.interleave` logarithmtic rather than linear ([#313][313], [@edsko][edsko])
+
 ## Version 1.0.2 (2020-01-10)
+- Support GHC 8.10  ([#376][376], [@sjakobi][sjakobi])
 - Speed up `Tree.splits` ([#349][349], [@treeowl][treeowl])
 - Speed up `Gen.shuffle` ([#348][348], [@treeowl][treeowl])
 - Add docs on the bounds of `Size` ([#346][346], [@chris-martin][chris-martin])
@@ -168,14 +180,32 @@
 [treeowl]:
   https://github.com/treeowl
 [tomjaguarpaw]:
-  https://github.com/tomjaguarpaw 
+  https://github.com/tomjaguarpaw
 [symbiont-sam-halliday]:
   https://github.com/symbiont-sam-halliday
 [sshine]:
   https://github.com/sshine
 [stolyaroleh]:
   https://github.com/stolyaroleh
+[kquick]:
+  https://github.com/kquick
+[dcastro]:
+  https://github.com/dcastro
 
+[390]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/390
+[387]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/387
+[384]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/384
+[382]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/382
+[376]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/376
+[366]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/366
+[365]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/365
 [349]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/349
 [348]:
@@ -184,6 +214,8 @@
   https://github.com/hedgehogqa/haskell-hedgehog/pull/346
 [345]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/345
+[344]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/344
 [339]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/339
 [332]:
@@ -196,6 +228,8 @@
   https://github.com/hedgehogqa/haskell-hedgehog/pull/321
 [319]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/319
+[313]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/313
 [308]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/308
 [303]:
