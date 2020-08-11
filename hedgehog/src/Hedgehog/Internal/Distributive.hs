@@ -22,6 +22,7 @@ import qualified Control.Monad.Trans.State.Strict as Strict
 import qualified Control.Monad.Trans.Writer.Lazy as Lazy
 import qualified Control.Monad.Trans.Writer.Strict as Strict
 
+import           Data.Kind (Type)
 import           GHC.Exts (Constraint)
 
 ------------------------------------------------------------------------
@@ -29,9 +30,9 @@ import           GHC.Exts (Constraint)
 
 class MonadTransDistributive g where
   type Transformer
-    (f :: (* -> *) -> * -> *)
-    (g :: (* -> *) -> * -> *)
-    (m :: * -> *) :: Constraint
+    (f :: (Type -> Type) -> Type -> Type)
+    (g :: (Type -> Type) -> Type -> Type)
+    (m :: Type -> Type) :: Constraint
 
   type Transformer f g m = (
       Monad m

@@ -65,6 +65,7 @@ import           Data.Dynamic (Dynamic, toDyn, fromDynamic, dynTypeRep)
 import           Data.Foldable (traverse_)
 import           Data.Functor.Classes (Eq1(..), Ord1(..), Show1(..))
 import           Data.Functor.Classes (eq1, compare1, showsPrec1)
+import           Data.Kind (Type)
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import qualified Data.Maybe as Maybe
@@ -374,7 +375,7 @@ callbackEnsure callbacks s0 s i o =
 -- an instance of 'MonadTest'. These constraints appear when you pass
 -- your 'Command' list to 'sequential' or 'parallel'.
 --
-data Command gen m (state :: (* -> *) -> *) =
+data Command gen m (state :: (Type -> Type) -> Type) =
   forall input output.
   (HTraversable input, Show (input Symbolic), Show output, Typeable output) =>
   Command {
@@ -406,7 +407,7 @@ commandGenOK (Command inputGen _ _) state =
 -- | An instantiation of a 'Command' which can be executed, and its effect
 --   evaluated.
 --
-data Action m (state :: (* -> *) -> *) =
+data Action m (state :: (Type -> Type) -> Type) =
   forall input output.
   (HTraversable input, Show (input Symbolic), Show output) =>
   Action {
