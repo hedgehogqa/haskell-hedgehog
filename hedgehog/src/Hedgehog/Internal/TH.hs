@@ -1,4 +1,5 @@
 {-# OPTIONS_HADDOCK not-home #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TemplateHaskell #-}
 module Hedgehog.Internal.TH (
@@ -14,11 +15,30 @@ import qualified Data.Ord as Ord
 import           Hedgehog.Internal.Discovery
 import           Hedgehog.Internal.Property
 
-import           Language.Haskell.TH (Exp(..), Q, TExp, location, runIO)
-import           Language.Haskell.TH.Syntax (Loc(..), mkName, unTypeQ, unsafeTExpCoerce)
+import           Language.Haskell.TH (Exp(..), Q, location, runIO
+#if MIN_VERSION_template_haskell(2,17,0)
+  , CodeQ, joinCode, unTypeCode, unsafeCodeCoerce
+#endif
+  )
+import           Language.Haskell.TH.Syntax (Loc(..), mkName
+#if !MIN_VERSION_template_haskell(2,17,0)
+  , TExp, unsafeTExpCoerce, unTypeQ
+#endif
+  )
 
-type TExpQ a =
-  Q (TExp a)
+#if MIN_VERSION_template_haskell(2,17,0)
+type TExpQ a = CodeQ a
+#else
+-- Originally `Code` is a more polymorphic newtype wrapper, but for this module
+-- we can get away with just making it a type alias.
+type TExpQ a = Q (TExp a)
+joinCode :: Q (TExpQ a) -> TExpQ a
+joinCode = (>>= id)
+unsafeCodeCoerce :: Q Exp -> TExpQ a
+unsafeCodeCoerce = unsafeTExpCoerce
+unTypeCode ::  TExpQ a -> Q Exp
+unTypeCode = unTypeQ
+#endif
 
 -- | Discover all the properties in a module.
 --
@@ -28,7 +48,7 @@ discover :: TExpQ Group
 discover = discoverPrefix "prop_"
 
 discoverPrefix :: String -> TExpQ Group
-discoverPrefix prefix = do
+discoverPrefix prefix = joinCode $ do
   file <- getCurrentFile
   properties <- Map.toList <$> runIO (readProperties prefix file)
 
@@ -44,24 +64,24 @@ discoverPrefix prefix = do
       fmap (mkNamedProperty . fst) $
       List.sortBy startLine properties
 
-  [|| Group $$(moduleName) $$(listTE names) ||]
+  return [|| Group $$(moduleName) $$(listTE names) ||]
 
 mkNamedProperty :: PropertyName -> TExpQ (PropertyName, Property)
-mkNamedProperty name = do
+mkNamedProperty name =
   [|| (name, $$(unsafeProperty name)) ||]
 
 unsafeProperty :: PropertyName -> TExpQ Property
 unsafeProperty =
-  unsafeTExpCoerce . pure . VarE . mkName . unPropertyName
+  unsafeCodeCoerce . pure . VarE . mkName . unPropertyName
 
 listTE :: [TExpQ a] -> TExpQ [a]
-listTE xs = do
-  unsafeTExpCoerce . pure . ListE =<< traverse unTypeQ xs
+listTE xs =
+  unsafeCodeCoerce $ pure . ListE =<< traverse unTypeCode xs
 
 moduleName :: TExpQ GroupName
-moduleName = do
+moduleName = joinCode $ do
   loc <- GroupName . loc_module <$> location
-  [|| loc ||]
+  return [|| loc ||]
 
 getCurrentFile :: Q FilePath
 getCurrentFile =
