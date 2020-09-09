@@ -31,10 +31,9 @@ towards destination x =
     let
       -- Halve the operands before subtracting them so they don't overflow.
       -- Consider 'minBound' and 'maxBound' for a fixed sized type like 'Int64'.
-      diff =
-        (x `quot` 2) - (destination `quot` 2)
+      diff = (toInteger x `quot` 2) - (toInteger destination `quot` 2)
     in
-      destination `consNub` fmap (x -) (halves diff)
+      destination `consNub` fmap ((x -) . fromInteger) (halves diff)
 
 -- | Shrink a floating-point number by edging towards a destination.
 --
