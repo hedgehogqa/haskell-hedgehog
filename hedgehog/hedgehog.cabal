@@ -107,6 +107,8 @@ library
     Hedgehog.Internal.Shrink
     Hedgehog.Internal.Source
     Hedgehog.Internal.State
+    Hedgehog.Internal.State.Name
+    Hedgehog.Internal.State.Name.Map
     Hedgehog.Internal.TH
     Hedgehog.Internal.Tree
     Hedgehog.Internal.Tripping
