@@ -67,7 +67,7 @@ instance HTraversable ReadRef where
   htraverse f (ReadRef ref) =
     ReadRef <$> htraverse f ref
 
-readRef :: (MonadGen n, MonadIO m, MonadTest m) => Command n m State
+readRef :: (MonadGen n, MonadIO m) => Command n m State
 readRef =
   let
     gen s =
@@ -177,7 +177,8 @@ prop_references_sequential =
         , incRef 2
         ]
 
-    executeSequential initialState actions
+    test $
+      executeSequential initialState actions
 
 prop_references_parallel :: Property
 prop_references_parallel =

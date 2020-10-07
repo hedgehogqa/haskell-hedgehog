@@ -262,7 +262,7 @@ prop_registry_sequential =
         [spawn, register, unregister]
 
     evalIO ioReset
-    Gen.executeSequential initialState actions
+    test $ Gen.executeSequential initialState actions
 
 prop_registry_parallel :: Property
 prop_registry_parallel =
