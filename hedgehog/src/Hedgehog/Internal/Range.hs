@@ -307,8 +307,9 @@ scaleLinear sz0 z0 n0 =
 
     -- @rng@ has magnitude 1 bigger than the biggest diff
     -- i.e. it specifies the range the diff can be in [0,rng)
-    -- with the upper bound being exclusive
-    rng = n - z + signum (n - z)
+    -- with the upper bound being exclusive.
+    rng =
+      n - z + signum (n - z)
 
     diff =
       (rng * fromIntegral sz) `quot` 100
