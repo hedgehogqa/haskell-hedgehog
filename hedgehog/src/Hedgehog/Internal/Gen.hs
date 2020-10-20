@@ -1190,10 +1190,13 @@ frequency = \case
           else
             pick (n - k) xs
 
+      iis =
+        scanl1 (+) (fmap fst xs0)
+
       total =
         sum (fmap fst xs0)
 
-    n <- integral $ Range.constant 1 total
+    n <- shrink (\n -> takeWhile (< n) iis) $ integral_ $ Range.constant 1 total
     pick n xs0
 
 -- | Modifies combinators which choose from a list of generators, like 'choice'
