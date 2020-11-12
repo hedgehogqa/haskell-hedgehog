@@ -106,6 +106,7 @@ module Hedgehog (
   , (===)
   , (/==)
   , tripping
+  , trippingM
 
   , eval
   , evalNF
@@ -187,4 +188,4 @@ import           Hedgehog.Internal.State (Action, Sequential(..), Parallel(..))
 import           Hedgehog.Internal.State (executeSequential, executeParallel)
 import           Hedgehog.Internal.State (Var(..), Symbolic, Concrete(..), concrete, opaque)
 import           Hedgehog.Internal.TH (discover, discoverPrefix)
-import           Hedgehog.Internal.Tripping (tripping)
+import           Hedgehog.Internal.Tripping (tripping, trippingM)
