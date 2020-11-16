@@ -76,11 +76,11 @@ module Hedgehog.Internal.Property (
   , evalNF
   , evalM
   , evalIO
-  , evalMaybe
-  , evalMaybeM
   , evalEither
   , evalEitherM
   , evalExceptT
+  , evalMaybe
+  , evalMaybeM
 
   -- * Coverage
   , Coverage(..)
@@ -824,22 +824,6 @@ evalIO :: (MonadTest m, MonadIO m, HasCallStack) => IO a -> m a
 evalIO m =
   either (withFrozenCallStack failException) pure =<< liftIO (tryAll m)
 
--- | Fails the test if the 'Maybe' is 'Nothing', otherwise returns the value in
---   the 'Just'.
---
-evalMaybe :: (MonadTest m, Show a, HasCallStack) => Maybe a -> m a
-evalMaybe = \case
-  Nothing ->
-    withFrozenCallStack $ failWith Nothing "the value was 'Nothing'"
-  Just x ->
-    pure x
-
--- | Fails the test if the 'Maybe' is 'Nothing', otherwise returns the value in
---   the 'Just'.
---
-evalMaybeM :: (MonadTest m, Show a, MonadCatch m, HasCallStack) => m (Maybe a) -> m a
-evalMaybeM = evalMaybe <=< evalM
-
 -- | Fails the test if the 'Either' is 'Left', otherwise returns the value in
 --   the 'Right'.
 --
@@ -854,7 +838,8 @@ evalEither = \case
 --   'Either' is 'Left'.  Otherwise returns the value in the 'Right'.
 --
 evalEitherM :: (MonadTest m, Show x, MonadCatch m, HasCallStack) => m (Either x a) -> m a
-evalEitherM = evalEither <=< evalM
+evalEitherM =
+  evalEither <=< evalM
 
 -- | Fails the test if the 'ExceptT' is 'Left', otherwise returns the value in
 --   the 'Right'.
@@ -862,6 +847,23 @@ evalEitherM = evalEither <=< evalM
 evalExceptT :: (MonadTest m, Show x, HasCallStack) => ExceptT x m a -> m a
 evalExceptT m =
   withFrozenCallStack evalEither =<< runExceptT m
+
+-- | Fails the test if the 'Maybe' is 'Nothing', otherwise returns the value in
+--   the 'Just'.
+--
+evalMaybe :: (MonadTest m, Show a, HasCallStack) => Maybe a -> m a
+evalMaybe = \case
+  Nothing ->
+    withFrozenCallStack $ failWith Nothing "the value was 'Nothing'"
+  Just x ->
+    pure x
+
+-- | Fails the test if the 'Maybe' is 'Nothing', otherwise returns the value in
+--   the 'Just'.
+--
+evalMaybeM :: (MonadTest m, Show a, MonadCatch m, HasCallStack) => m (Maybe a) -> m a
+evalMaybeM =
+  evalMaybe <=< evalM
 
 ------------------------------------------------------------------------
 -- PropertyT
