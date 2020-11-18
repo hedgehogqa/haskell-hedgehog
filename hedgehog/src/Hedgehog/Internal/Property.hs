@@ -854,7 +854,7 @@ evalExceptT m =
 evalMaybe :: (MonadTest m, Show a, HasCallStack) => Maybe a -> m a
 evalMaybe = \case
   Nothing ->
-    withFrozenCallStack $ failWith Nothing "the value was 'Nothing'"
+    withFrozenCallStack $ failWith Nothing "the value was Nothing"
   Just x ->
     pure x
 
