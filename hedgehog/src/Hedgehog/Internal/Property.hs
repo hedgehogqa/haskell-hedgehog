@@ -835,7 +835,7 @@ evalEither = \case
     pure x
 
 -- | Fails the test if the action throws an exception, or if the
---   'Either' is 'Left'.  Otherwise returns the value in the 'Right'.
+--   'Either' is 'Left', otherwise returns the value in the 'Right'.
 --
 evalEitherM :: (MonadTest m, Show x, MonadCatch m, HasCallStack) => m (Either x a) -> m a
 evalEitherM =
