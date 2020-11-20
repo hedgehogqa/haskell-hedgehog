@@ -859,7 +859,7 @@ evalMaybe = \case
     pure x
 
 -- | Fails the test if the action throws an exception, or if the
---   the 'Just'.
+--   'Maybe' is 'Nothing', otherwise returns the value in the 'Just'.
 --
 evalMaybeM :: (MonadTest m, Show a, MonadCatch m, HasCallStack) => m (Maybe a) -> m a
 evalMaybeM =
