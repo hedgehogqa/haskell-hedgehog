@@ -77,7 +77,10 @@ module Hedgehog.Internal.Property (
   , evalM
   , evalIO
   , evalEither
+  , evalEitherM
   , evalExceptT
+  , evalMaybe
+  , evalMaybeM
 
   -- * Coverage
   , Coverage(..)
@@ -126,7 +129,7 @@ module Hedgehog.Internal.Property (
 
 import           Control.Applicative (Alternative(..))
 import           Control.DeepSeq (NFData, rnf)
-import           Control.Monad (MonadPlus(..))
+import           Control.Monad (MonadPlus(..), (<=<))
 import           Control.Monad.Base (MonadBase(..))
 import           Control.Monad.Catch (MonadThrow(..), MonadCatch(..))
 import           Control.Monad.Catch (SomeException(..), displayException)
@@ -831,12 +834,36 @@ evalEither = \case
   Right x ->
     pure x
 
+-- | Fails the test if the action throws an exception, or if the
+--   'Either' is 'Left', otherwise returns the value in the 'Right'.
+--
+evalEitherM :: (MonadTest m, Show x, MonadCatch m, HasCallStack) => m (Either x a) -> m a
+evalEitherM =
+  evalEither <=< evalM
+
 -- | Fails the test if the 'ExceptT' is 'Left', otherwise returns the value in
 --   the 'Right'.
 --
 evalExceptT :: (MonadTest m, Show x, HasCallStack) => ExceptT x m a -> m a
 evalExceptT m =
   withFrozenCallStack evalEither =<< runExceptT m
+
+-- | Fails the test if the 'Maybe' is 'Nothing', otherwise returns the value in
+--   the 'Just'.
+--
+evalMaybe :: (MonadTest m, Show a, HasCallStack) => Maybe a -> m a
+evalMaybe = \case
+  Nothing ->
+    withFrozenCallStack $ failWith Nothing "the value was Nothing"
+  Just x ->
+    pure x
+
+-- | Fails the test if the action throws an exception, or if the
+--   'Maybe' is 'Nothing', otherwise returns the value in the 'Just'.
+--
+evalMaybeM :: (MonadTest m, Show a, MonadCatch m, HasCallStack) => m (Maybe a) -> m a
+evalMaybeM =
+  evalMaybe <=< evalM
 
 ------------------------------------------------------------------------
 -- PropertyT
