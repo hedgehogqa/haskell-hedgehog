@@ -45,4 +45,4 @@ executable dieharder-input
   build-depends:
       hedgehog
     , base                            >= 3          && < 5
-    , bytestring                      >= 0.10.4.0   && < 0.11
+    , bytestring                      >= 0.10.4.0   && < 0.12
