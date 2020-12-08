@@ -757,7 +757,7 @@ assert b = do
 --   This function behaves like the unix @diff@ tool, which gives a 0 exit
 --   code if the compared files are identical, or a 1 exit code code
 --   otherwise. Like unix @diff@, if the arguments fail the comparison, a
---   /diff/ is shown.
+--   /diff is shown.
 --
 diff :: (MonadTest m, Show a, Show b, HasCallStack) => a -> (a -> b -> Bool) -> b -> m ()
 diff x op y = do
