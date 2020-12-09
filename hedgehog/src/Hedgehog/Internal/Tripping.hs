@@ -10,12 +10,12 @@ import           Hedgehog.Internal.Source (HasCallStack, withFrozenCallStack)
 
 -- | Test that a pair of encode / decode functions are compatible.
 --
--- Given a printer from some type 'a -> b', and a parser with a
--- potential failure case 'b -> f a'. Ensure that a valid 'a' round
--- trips through the "print" and "parse" to yield the same 'a'.
+-- Given a printer from some type @a -> b@, and a parser with a
+-- potential failure case @b -> f a@. Ensure that a valid @a@ round
+-- trips through the "print" and "parse" to yield the same @a@.
 --
--- For example, types __should__ have tripping 'Read' and 'Show'
--- instances.
+-- For example, types /should/ have tripping 'Read' and 'Show'
+-- instances:
 --
 -- @
 -- trippingShowRead :: (Show a, Read a, Eq a, MonadTest m) => a -> m ()
