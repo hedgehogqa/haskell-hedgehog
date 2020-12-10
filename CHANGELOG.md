@@ -1,3 +1,15 @@
+## Version 1.0.4 (2020-12-11)
+
+- Bump ansi-terminal to 0.11 ([#394][394], [@mpilgrem][mpilgrem])
+- Clean up hedgehog.cabal for GHC 8.0+ ([#391][391], [@felixonmars][felixonmars])
+- Bump random to 1.2 ([#396][396], [@felixonmars][felixonmars])
+- Improve the distribution of `Range.scaleLinear` ([#405][405], [@jonfowler][jonfowler] / [@moodmosaic][moodmosaic])
+- Change `Gen.frequency` generator immediately shrink ([#406][406], [@ocharles][ocharles] / [@HuwCampbell][HuwCampbell])
+- Add `Property.evalMaybe`, `Property.evalMaybeM` and `Property.evalEitherM` ([#381][381], [@markus1189][markus1189] / [@moodmosaic][moodmosaic])
+- Bump QuickCheck to 2.14 ([#409][409], [@lehins][lehins])
+- Bump bytestring to 0.11 ([#408][408], [@Bodigrim][Bodigrim])
+- Minor Haddock formatting improvments ([#398][398], [@sshine][sshine] / [@moodmosaic][moodmosaic])
+
 ## Version 1.0.3 (2020-06-26)
 
 - Bump cabal-version to 1.10 ([#390][390], [@moodmosaic][moodmosaic])
@@ -191,7 +203,38 @@
   https://github.com/kquick
 [dcastro]:
   https://github.com/dcastro
+[Bodigrim]:
+  https://github.com/Bodigrim
+[lehins]:
+  https://github.com/lehins
+[markus1189]:
+  https://github.com/markus1189
+[ocharles]:
+  https://github.com/ocharles
+[jonfowler]:
+  https://github.com/jonfowler
+[felixonmars]:
+  https://github.com/felixonmars
+[mpilgrem]:
+  https://github.com/mpilgrem
 
+
+[409]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/409
+[408]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/408
+[406]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/406
+[405]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/405
+[398]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/398
+[396]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/396
+[394]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/394
+[391]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/391
 [390]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/390
 [387]:
@@ -200,6 +243,8 @@
   https://github.com/hedgehogqa/haskell-hedgehog/pull/384
 [382]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/382
+[381]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/381
 [376]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/376
 [366]:
