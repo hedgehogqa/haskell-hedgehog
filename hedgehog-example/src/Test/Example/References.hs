@@ -1,13 +1,17 @@
 --
 -- Translated from https://github.com/advancedtelematic/quickcheck-state-machine/blob/7e3056d493ad430cfacd62da7878955e80fd296f/example/src/MutableReference.hs
 --
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE TemplateHaskell #-}
 module Test.Example.References where
 
 import           Control.Monad.IO.Class (MonadIO(..))
+import           GHC.Generics (Generic)
 
 import           Data.Bifunctor (second)
+import           Data.Functor.Barbie (FunctorB, Rec(..), TraversableB)
 import           Data.IORef (IORef)
 import qualified Data.IORef as IORef
 import qualified Data.List as List
@@ -34,11 +38,7 @@ initialState =
 
 data NewRef (v :: * -> *) =
   NewRef
-  deriving (Eq, Show)
-
-instance HTraversable NewRef where
-  htraverse _ NewRef =
-    pure NewRef
+  deriving (Eq, Generic, Show, FunctorB, TraversableB)
 
 newRef :: (Monad n, MonadIO m) => Command n m State
 newRef =
@@ -61,11 +61,7 @@ newRef =
 
 data ReadRef v =
   ReadRef (Var (Opaque (IORef Int)) v)
-  deriving (Eq, Show)
-
-instance HTraversable ReadRef where
-  htraverse f (ReadRef ref) =
-    ReadRef <$> htraverse f ref
+  deriving (Eq, Generic, Show, FunctorB, TraversableB)
 
 readRef :: (MonadGen n, MonadIO m, MonadTest m) => Command n m State
 readRef =
@@ -94,11 +90,7 @@ readRef =
 
 data WriteRef v =
   WriteRef (Var (Opaque (IORef Int)) v) Int
-  deriving (Eq, Show)
-
-instance HTraversable WriteRef where
-  htraverse f (WriteRef ref x) =
-    WriteRef <$> htraverse f ref <*> pure x
+  deriving (Eq, Generic, Show, FunctorB, TraversableB)
 
 writeRef :: (MonadGen n, MonadIO m) => Command n m State
 writeRef =
@@ -130,11 +122,7 @@ writeRef =
 
 data IncRef v =
   IncRef (Var (Opaque (IORef Int)) v)
-  deriving (Eq, Show)
-
-instance HTraversable IncRef where
-  htraverse f (IncRef ref) =
-    IncRef <$> htraverse f ref
+  deriving (Eq, Generic, Show, FunctorB, TraversableB)
 
 incRef :: (MonadGen n, MonadIO m) => Int -> Command n m State
 incRef n =

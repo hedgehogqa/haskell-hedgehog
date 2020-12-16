@@ -145,8 +145,6 @@ module Hedgehog (
   , distributeT
 
   -- * Functors
-  , HTraversable(..)
-
   , Eq1
   , eq1
 
@@ -161,7 +159,6 @@ import           Data.Functor.Classes (Eq1, eq1, Ord1, compare1, Show1, showsPre
 
 import           Hedgehog.Internal.Distributive (distributeT)
 import           Hedgehog.Internal.Gen (Gen, GenT, MonadGen(..))
-import           Hedgehog.Internal.HTraversable (HTraversable(..))
 import           Hedgehog.Internal.Opaque (Opaque(..))
 import           Hedgehog.Internal.Property (annotate, annotateShow)
 import           Hedgehog.Internal.Property (assert, diff, (===), (/==))

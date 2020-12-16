@@ -1,6 +1,9 @@
 --
 -- Translated from https://github.com/rjmh/registry/blob/master/registry_eqc.erl
 --
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -8,8 +11,10 @@ module Test.Example.Registry where
 
 import           Control.Monad (when)
 import           Control.Monad.IO.Class (MonadIO(..))
+import           GHC.Generics (Generic)
 
 import           Data.Foldable (traverse_)
+import           Data.Functor.Barbie (FunctorB, Rec(..), TraversableB)
 import qualified Data.HashTable.IO as HashTable
 import           Data.IORef (IORef)
 import qualified Data.IORef as IORef
@@ -37,11 +42,11 @@ import           System.IO.Unsafe (unsafePerformIO)
 
 newtype Pid =
   Pid Int
-  deriving (Eq, Ord, Show, Num)
+  deriving newtype (Eq, Ord, Show, Num)
 
 newtype Name =
   Name String
-  deriving (Eq, Ord, Show)
+  deriving newtype (Eq, Ord, Show)
 
 data State v =
   State {
@@ -68,11 +73,7 @@ initialState =
 
 data Spawn (v :: * -> *) =
   Spawn
-  deriving (Eq, Show)
-
-instance HTraversable Spawn where
-  htraverse _ Spawn =
-    pure Spawn
+  deriving (Eq, Generic, Show, FunctorB, TraversableB)
 
 spawn :: (Monad n, MonadIO m) => Command n m State
 spawn =
@@ -115,13 +116,7 @@ spawn =
 
 data Register v =
   Register Name (Var Pid v)
-  deriving (Eq, Show)
-
-instance HTraversable Register where
-  htraverse f (Register name pid) =
-    Register
-      <$> pure name
-      <*> htraverse f pid
+  deriving (Eq, Generic, Show, FunctorB, TraversableB)
 
 genName :: MonadGen m => m Name
 genName =
@@ -175,11 +170,7 @@ register =
 
 data Unregister (v :: * -> *) =
   Unregister Name
-  deriving (Eq, Show)
-
-instance HTraversable Unregister where
-  htraverse _ (Unregister name) =
-    Unregister <$> pure name
+  deriving (Eq, Generic, Show, FunctorB, TraversableB)
 
 unregister :: (MonadGen n, MonadIO m) => Command n m State
 unregister =
