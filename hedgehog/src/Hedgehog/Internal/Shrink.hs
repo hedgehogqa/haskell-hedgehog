@@ -27,13 +27,17 @@ towards :: Integral a => a -> a -> [a]
 towards destination x =
   if destination == x then
     []
+  -- special case for 1-bit numbers
+  else if destination == 0 && x == 1 then
+    [0]
   else
     let
       -- Halve the operands before subtracting them so they don't overflow.
       -- Consider 'minBound' and 'maxBound' for a fixed sized type like 'Int64'.
-      diff = (toInteger x `quot` 2) - (toInteger destination `quot` 2)
+      diff =
+        (x `quot` 2) - (destination `quot` 2)
     in
-      destination `consNub` fmap ((x -) . fromInteger) (halves diff)
+      destination `consNub` fmap (x -) (halves diff)
 
 -- | Shrink a floating-point number by edging towards a destination.
 --
