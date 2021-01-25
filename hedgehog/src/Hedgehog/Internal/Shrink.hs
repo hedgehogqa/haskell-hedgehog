@@ -27,6 +27,9 @@ towards :: Integral a => a -> a -> [a]
 towards destination x =
   if destination == x then
     []
+  -- special case for 1-bit numbers
+  else if destination == 0 && x == 1 then
+    [0]
   else
     let
       -- Halve the operands before subtracting them so they don't overflow.
