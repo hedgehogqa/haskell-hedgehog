@@ -799,9 +799,36 @@ golden x =
 --   > 2058
 --   > 2060
 --
-integral :: (MonadGen m, Integral a) => Range a -> m a
+integral :: forall m a. (MonadGen m, Integral a) => Range a -> m a
 integral range =
-  shrink (Shrink.towards $ Range.origin range) (integral_ range)
+  let
+    appendOrigin :: Tree.TreeT (MaybeT (GenBase m)) a -> Tree.TreeT (MaybeT (GenBase m)) a
+    appendOrigin tree =
+      Tree.TreeT $ do
+        Tree.NodeT x xs <- Tree.runTreeT tree
+        pure $
+          Tree.NodeT x $
+            xs <> [pure (Range.origin range)]
+
+    binarySearchTree :: a -> Tree.TreeT (MaybeT (GenBase m)) a -> Tree.TreeT (MaybeT (GenBase m)) a
+    binarySearchTree bottom tree =
+      Tree.TreeT $ do
+        Tree.NodeT x xs <- Tree.runTreeT tree
+        let
+          level =
+            Shrink.towards bottom x
+          zipped =
+            zipWith (\b -> binarySearchTree b . pure) level (drop 1 level)
+
+        pure $
+          Tree.NodeT x $
+            xs <> zipped
+
+    withGenT' :: (GenT (GenBase m) a -> GenT (GenBase m) b) -> m a -> m b
+    withGenT' = withGenT
+
+  in
+    withGenT' (mapGenT (binarySearchTree (Range.origin range) . appendOrigin)) (integral_ range)
 
 -- | Generates a random integral number in the [inclusive,inclusive] range.
 --
