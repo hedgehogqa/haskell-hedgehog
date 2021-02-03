@@ -805,10 +805,13 @@ integral range =
     appendOrigin :: Tree.TreeT (MaybeT (GenBase m)) a -> Tree.TreeT (MaybeT (GenBase m)) a
     appendOrigin tree =
       Tree.TreeT $ do
+        let origin_ = Range.origin range
         Tree.NodeT x xs <- Tree.runTreeT tree
         pure $
-          Tree.NodeT x $
-            xs <> [pure (Range.origin range)]
+          if x == origin_ then
+            Tree.NodeT x xs
+          else
+            Tree.NodeT x (pure origin_ : xs)
 
     binarySearchTree :: a -> Tree.TreeT (MaybeT (GenBase m)) a -> Tree.TreeT (MaybeT (GenBase m)) a
     binarySearchTree bottom tree =
