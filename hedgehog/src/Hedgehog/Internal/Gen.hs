@@ -801,6 +801,7 @@ golden x =
 --
 integral :: forall m a. (MonadGen m, Integral a) => Range a -> m a
 integral range =
+  -- https://github.com/hedgehogqa/haskell-hedgehog/pull/413/files
   let
     tryOriginFirst :: Tree.TreeT (MaybeT (GenBase m)) a -> Tree.TreeT (MaybeT (GenBase m)) a
     tryOriginFirst tree =
