@@ -802,8 +802,8 @@ golden x =
 integral :: forall m a. (MonadGen m, Integral a) => Range a -> m a
 integral range =
   let
-    appendOrigin :: Tree.TreeT (MaybeT (GenBase m)) a -> Tree.TreeT (MaybeT (GenBase m)) a
-    appendOrigin tree =
+    tryOriginFirst :: Tree.TreeT (MaybeT (GenBase m)) a -> Tree.TreeT (MaybeT (GenBase m)) a
+    tryOriginFirst tree =
       Tree.TreeT $ do
         let origin_ = Range.origin range
         Tree.NodeT x xs <- Tree.runTreeT tree
@@ -831,7 +831,7 @@ integral range =
     withGenT' = withGenT
 
   in
-    withGenT' (mapGenT (binarySearchTree (Range.origin range) . appendOrigin)) (integral_ range)
+    withGenT' (mapGenT (tryOriginFirst . binarySearchTree (Range.origin range))) (integral_ range)
 
 -- | Generates a random integral number in the [inclusive,inclusive] range.
 --
