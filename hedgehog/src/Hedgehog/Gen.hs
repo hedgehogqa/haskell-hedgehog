@@ -98,7 +98,9 @@ module Hedgehog.Gen (
 
   -- ** Abstract State Machine
   , sequential
+  , sequential'
   , parallel
+  , parallel'
 
   -- * Sampling Generators
   , sample
@@ -109,6 +111,6 @@ module Hedgehog.Gen (
   ) where
 
 import           Hedgehog.Internal.Gen
-import           Hedgehog.Internal.State (sequential, parallel)
+import           Hedgehog.Internal.State (sequential, sequential', parallel, parallel')
 
 import           Prelude hiding (either, filter, print, maybe, map, seq)
