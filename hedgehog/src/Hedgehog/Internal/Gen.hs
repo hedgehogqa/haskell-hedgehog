@@ -204,6 +204,7 @@ import qualified Data.Char as Char
 import           Data.Foldable (for_, toList)
 import           Data.Functor.Identity (Identity(..))
 import           Data.Int (Int8, Int16, Int32, Int64)
+import           Data.Kind (Type)
 import           Data.List.NonEmpty (NonEmpty)
 import qualified Data.List.NonEmpty as NonEmpty
 import           Data.Map (Map)
@@ -350,7 +351,7 @@ generalize =
 -- | Class of monads which can generate input data for tests.
 --
 class (Monad m, Monad (GenBase m)) => MonadGen m where
-  type GenBase m :: (* -> *)
+  type GenBase m :: (Type -> Type)
 
   -- | Extract a 'GenT' from a  'MonadGen'.
   --
