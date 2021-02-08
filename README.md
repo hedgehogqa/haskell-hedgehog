@@ -94,8 +94,8 @@ You can then load the module in GHCi, and run it:
  [hackage]: http://hackage.haskell.org/package/hedgehog
  [hackage-shield]: https://img.shields.io/hackage/v/hedgehog.svg?style=flat
 
- [travis]: https://travis-ci.org/hedgehogqa/haskell-hedgehog
- [travis-shield]: https://travis-ci.org/hedgehogqa/haskell-hedgehog.svg?branch=master
+ [travis]: https://travis-ci.com/hedgehogqa/haskell-hedgehog
+ [travis-shield]: https://travis-ci.com/hedgehogqa/haskell-hedgehog.svg?branch=master
 
  [appveyor]: https://ci.appveyor.com/project/hedgehogqa/haskell-hedgehog
  [appveyor-shield]: https://ci.appveyor.com/api/projects/status/o4rlstbc80sum3on/branch/master?svg=true
