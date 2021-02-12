@@ -542,7 +542,7 @@ action commands =
     Context state0 _ <- get
 
     Command mgenInput exec callbacks <-
-      Gen.element $ filter (\c -> commandGenOK c state0) commands
+      Gen.element_ $ filter (\c -> commandGenOK c state0) commands
 
     input <-
       case mgenInput state0 of
@@ -579,7 +579,7 @@ genActions range commands ctx = do
 
 -- | A sequence of actions to execute.
 --
-data Sequential m state =
+newtype Sequential m state =
   Sequential {
       -- | The sequence of actions.
       sequentialActions :: [Action m state]
