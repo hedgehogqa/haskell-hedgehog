@@ -804,50 +804,50 @@ integral :: forall m a. (MonadGen m, Integral a) => Range a -> m a
 integral range =
   -- https://github.com/hedgehogqa/haskell-hedgehog/pull/413/files
   let
-    tryOriginFirst :: Tree.TreeT (MaybeT (GenBase m)) a -> Tree.TreeT (MaybeT (GenBase m)) a
-    tryOriginFirst tree =
-      Tree.TreeT $ do
-        let origin_ = Range.origin range
-        Tree.NodeT x xs <- Tree.runTreeT tree
-        pure $
-          if x == origin_ then
-            Tree.NodeT x xs
-          else
-            Tree.NodeT x (pure origin_ : xs)
+    origin_ =
+      Range.origin range
 
-    binarySearchTree :: a -> Tree.TreeT (MaybeT (GenBase m)) a -> Tree.TreeT (MaybeT (GenBase m)) a
-    binarySearchTree bottom tree =
-      Tree.TreeT $ do
-        Tree.NodeT x xs <- Tree.runTreeT tree
+    binarySearchTree bottom top =
+      Tree.Tree $
         let
-          level =
-            Shrink.towards bottom x
-          zipped =
-            zipWith (\b -> binarySearchTree b . pure) level (drop 1 level)
+          shrinks =
+            Shrink.towards bottom top
+          children =
+            zipWith binarySearchTree shrinks (drop 1 shrinks)
+        in
+          Tree.NodeT top children
 
-        pure $
-          Tree.NodeT x $
-            xs <> zipped
-
-    withGenT' :: (GenT (GenBase m) a -> GenT (GenBase m) b) -> m a -> m b
-    withGenT' = withGenT
+    createTree root =
+      if root == origin_ then
+        pure root
+      else
+        hoist Morph.generalize $
+          Tree.consChild origin_ $
+            binarySearchTree origin_ root
 
   in
-    withGenT' (mapGenT (tryOriginFirst . binarySearchTree (Range.origin range))) (integral_ range)
+    fromGenT . GenT $ \size seed ->
+      createTree $ integralHelper range size seed
 
 -- | Generates a random integral number in the [inclusive,inclusive] range.
 --
 --   /This generator does not shrink./
 --
 integral_ :: (MonadGen m, Integral a) => Range a -> m a
-integral_ range =
-  generate $ \size seed ->
-    let
-      (x, y) =
-        Range.bounds size range
-    in
-      fromInteger . fst $
-        Seed.nextInteger (toInteger x) (toInteger y) seed
+integral_ =
+  generate . integralHelper
+
+
+-- | Generates a random integral value from a range.
+integralHelper :: (Integral a, Num c) => Range a -> Size -> Seed -> c
+integralHelper range size seed =
+  let
+    (x, y) =
+      Range.bounds size range
+  in
+    fromInteger . fst $
+      Seed.nextInteger (toInteger x) (toInteger y) seed
+
 
 -- | Generates a random machine integer in the given @[inclusive,inclusive]@ range.
 --

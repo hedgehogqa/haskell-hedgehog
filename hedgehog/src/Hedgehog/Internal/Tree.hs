@@ -40,6 +40,7 @@ module Hedgehog.Internal.Tree (
   , filterMaybeT
   , mapMaybeMaybeT
   , filterT
+  , consChild
   , mapMaybeT
   , depth
   , interleave
@@ -315,6 +316,14 @@ mapMaybeT p m =
           NodeT x' (fmap (mapMaybeT p) xs)
       Nothing ->
         empty
+
+consChild :: (Monad m) => a -> TreeT m a -> TreeT m a
+consChild a m =
+  TreeT $ do
+    NodeT x xs <- runTreeT m
+    pure $
+      NodeT x $
+        pure a : xs
 
 ------------------------------------------------------------------------
 
