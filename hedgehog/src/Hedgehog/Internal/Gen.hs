@@ -93,6 +93,7 @@ module Hedgehog.Internal.Gen (
   -- ** Choice
   , constant
   , element
+  , element_
   , choice
   , frequency
   , recursive
@@ -1184,6 +1185,20 @@ element = \case
     error "Hedgehog.Gen.element: used with empty list"
   xs -> do
     n <- integral $ Range.constant 0 (length xs - 1)
+    pure $ xs !! n
+
+-- | Randomly selects one of the elements in the list.
+--
+--   This generator does not shrink the choice of element.
+--
+--   /The input list must be non-empty./
+--
+element_ :: MonadGen m => [a] -> m a
+element_ = \case
+  [] ->
+    error "Hedgehog.Gen.element: used with empty list"
+  xs -> do
+    n <- integral_ $ Range.constant 0 (length xs - 1)
     pure $ xs !! n
 
 -- | Randomly selects one of the generators in the list.
