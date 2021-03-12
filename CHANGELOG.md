@@ -1,3 +1,11 @@
+## Version 1.0.5 (2021-03-12)
+
+- GHC 9 Support ([#392][392], [@utdemir][utdemir])
+- Use binary shrinking for integral ([#413][413], [@HuwCampbell][HuwCampbell])
+- Build tree from values instead of wrapping and unwrapping ([#414][414], [@HuwCampbell][HuwCampbell])
+- Don't shrink the action chosen in state machine testing ([#415][415], [@HuwCampbell][HuwCampbell])
+- Support shrinking 1-bit numbers for CLaSH ([#397][397], [@jonfowler][jonfowler] / [@jacobstanley][jacobstanley])
+
 ## Version 1.0.4 (2020-12-11)
 
 - Bump ansi-terminal to 0.11 ([#394][394], [@mpilgrem][mpilgrem])
@@ -217,8 +225,16 @@
   https://github.com/felixonmars
 [mpilgrem]:
   https://github.com/mpilgrem
+[utdemir]:
+  https://github.com/utdemir
 
 
+[415]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/415
+[414]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/414
+[413]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/413
 [409]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/409
 [408]:
@@ -229,10 +245,14 @@
   https://github.com/hedgehogqa/haskell-hedgehog/pull/405
 [398]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/398
+[397]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/397
 [396]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/396
 [394]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/394
+[392]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/392
 [391]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/391
 [390]:
