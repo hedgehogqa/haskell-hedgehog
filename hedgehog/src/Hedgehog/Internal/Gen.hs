@@ -529,7 +529,7 @@ instance Monad m => Monad (GenT m) where
 
 instance Monad m => MonadFail (GenT m) where
   fail =
-    error
+    discard
 
 instance Monad m => Alternative (GenT m) where
   empty =
