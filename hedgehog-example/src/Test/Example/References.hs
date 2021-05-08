@@ -36,7 +36,7 @@ initialState =
 
 data NewRef (v :: * -> *) =
   NewRef
-  deriving (Eq, Generic, Show)
+  deriving (Eq, Show, Generic)
 
 -- This would be more nicely done with DerivingStrategies anyclass but
 -- it's not supported in GHC 8.0, in your own app you have more options.
@@ -64,7 +64,7 @@ newRef =
 
 data ReadRef v =
   ReadRef (Var (Opaque (IORef Int)) v)
-  deriving (Eq, Generic, Show)
+  deriving (Eq, Show, Generic)
 
 instance FunctorB ReadRef
 instance TraversableB ReadRef
@@ -96,7 +96,7 @@ readRef =
 
 data WriteRef v =
   WriteRef (Var (Opaque (IORef Int)) v) Int
-  deriving (Eq, Generic, Show)
+  deriving (Eq, Show, Generic)
 
 instance FunctorB WriteRef
 instance TraversableB WriteRef
@@ -131,7 +131,7 @@ writeRef =
 
 data IncRef v =
   IncRef (Var (Opaque (IORef Int)) v)
-  deriving (Eq, Generic, Show)
+  deriving (Eq, Show, Generic)
 
 instance FunctorB IncRef
 instance TraversableB IncRef

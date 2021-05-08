@@ -70,7 +70,7 @@ initialState =
 
 data Spawn (v :: * -> *) =
   Spawn
-  deriving (Eq, Generic, Show)
+  deriving (Eq, Show, Generic)
 
 -- This would be more nicely done with DerivingStrategies anyclass but
 -- it's not supported in GHC 8.0, in your own app you have more options.
@@ -118,7 +118,7 @@ spawn =
 
 data Register v =
   Register Name (Var Pid v)
-  deriving (Eq, Generic, Show)
+  deriving (Eq, Show, Generic)
 
 instance FunctorB Register
 instance TraversableB Register
@@ -175,7 +175,7 @@ register =
 
 data Unregister (v :: * -> *) =
   Unregister Name
-  deriving (Eq, Generic, Show)
+  deriving (Eq, Show, Generic)
 
 instance FunctorB Unregister
 instance TraversableB Unregister
