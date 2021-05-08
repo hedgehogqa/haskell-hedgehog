@@ -11,7 +11,6 @@ import           Control.Monad.IO.Class (MonadIO(..))
 import           GHC.Generics (Generic)
 
 import           Data.Bifunctor (second)
-import           Data.Functor.Barbie (FunctorB, Rec(..), TraversableB)
 import           Data.IORef (IORef)
 import qualified Data.IORef as IORef
 import qualified Data.List as List

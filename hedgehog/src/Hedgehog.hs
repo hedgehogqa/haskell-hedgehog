@@ -145,6 +145,10 @@ module Hedgehog (
   , distributeT
 
   -- * Functors
+  , FunctorB(..)
+  , TraversableB(..)
+  , Rec(..)
+
   , Eq1
   , eq1
 
@@ -157,6 +161,7 @@ module Hedgehog (
 
 import           Data.Functor.Classes (Eq1, eq1, Ord1, compare1, Show1, showsPrec1)
 
+import           Hedgehog.Internal.Barbie (FunctorB(..), TraversableB(..), Rec(..))
 import           Hedgehog.Internal.Distributive (distributeT)
 import           Hedgehog.Internal.Gen (Gen, GenT, MonadGen(..))
 import           Hedgehog.Internal.Opaque (Opaque(..))
@@ -180,7 +185,6 @@ import           Hedgehog.Internal.Property (TestLimit, withTests)
 import           Hedgehog.Internal.Property (collect, label)
 import           Hedgehog.Internal.Range (Range, Size(..))
 import           Hedgehog.Internal.Runner (check, recheck, checkSequential, checkParallel)
-
 import           Hedgehog.Internal.Seed (Seed(..))
 import           Hedgehog.Internal.State (Command(..), Callback(..))
 import           Hedgehog.Internal.State (Action, Sequential(..), Parallel(..))

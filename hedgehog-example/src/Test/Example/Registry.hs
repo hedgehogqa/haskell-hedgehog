@@ -14,7 +14,6 @@ import           Control.Monad.IO.Class (MonadIO(..))
 import           GHC.Generics (Generic)
 
 import           Data.Foldable (traverse_)
-import           Data.Functor.Barbie (FunctorB, Rec(..), TraversableB)
 import qualified Data.HashTable.IO as HashTable
 import           Data.IORef (IORef)
 import qualified Data.IORef as IORef
