@@ -71,10 +71,10 @@ import qualified Data.Map as Map
 import qualified Data.Maybe as Maybe
 import           Data.Typeable (Typeable, TypeRep, Proxy(..), typeRep)
 
+import           Hedgehog.Internal.Barbie (FunctorB(..), TraversableB(..))
 import           Hedgehog.Internal.Distributive (distributeT)
 import           Hedgehog.Internal.Gen (MonadGen, GenT, GenBase)
 import qualified Hedgehog.Internal.Gen as Gen
-import           Data.Functor.Barbie (FunctorB(..), TraversableB(..))
 import           Hedgehog.Internal.Opaque (Opaque(..))
 import           Hedgehog.Internal.Property (MonadTest(..), Test, evalEither, evalM, success, runTest, failWith, annotate)
 import           Hedgehog.Internal.Range (Range)
