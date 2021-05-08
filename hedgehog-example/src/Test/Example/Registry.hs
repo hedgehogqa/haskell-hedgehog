@@ -1,6 +1,7 @@
 --
 -- Translated from https://github.com/rjmh/registry/blob/master/registry_eqc.erl
 --
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -8,6 +9,7 @@ module Test.Example.Registry where
 
 import           Control.Monad (when)
 import           Control.Monad.IO.Class (MonadIO(..))
+import           GHC.Generics (Generic)
 
 import           Data.Foldable (traverse_)
 import qualified Data.HashTable.IO as HashTable
@@ -68,11 +70,12 @@ initialState =
 
 data Spawn (v :: * -> *) =
   Spawn
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic)
 
-instance HTraversable Spawn where
-  htraverse _ Spawn =
-    pure Spawn
+-- This would be more nicely done with DerivingStrategies anyclass but
+-- it's not supported in GHC 8.0, in your own app you have more options.
+instance FunctorB Spawn
+instance TraversableB Spawn
 
 spawn :: (Monad n, MonadIO m) => Command n m State
 spawn =
@@ -115,13 +118,10 @@ spawn =
 
 data Register v =
   Register Name (Var Pid v)
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic)
 
-instance HTraversable Register where
-  htraverse f (Register name pid) =
-    Register
-      <$> pure name
-      <*> htraverse f pid
+instance FunctorB Register
+instance TraversableB Register
 
 genName :: MonadGen m => m Name
 genName =
@@ -175,11 +175,10 @@ register =
 
 data Unregister (v :: * -> *) =
   Unregister Name
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic)
 
-instance HTraversable Unregister where
-  htraverse _ (Unregister name) =
-    Unregister <$> pure name
+instance FunctorB Unregister
+instance TraversableB Unregister
 
 unregister :: (MonadGen n, MonadIO m) => Command n m State
 unregister =

@@ -53,6 +53,7 @@ library
       base                            >= 4.9        && < 5
     , ansi-terminal                   >= 0.6        && < 0.12
     , async                           >= 2.0        && < 2.3
+    , barbies                         >= 1.0        && < 2.1
     , bytestring                      >= 0.10       && < 0.12
     , concurrent-output               >= 1.7        && < 1.11
     , containers                      >= 0.4        && < 0.7
@@ -88,12 +89,12 @@ library
     Hedgehog.Main
     Hedgehog.Range
 
+    Hedgehog.Internal.Barbie
     Hedgehog.Internal.Config
     Hedgehog.Internal.Discovery
     Hedgehog.Internal.Distributive
     Hedgehog.Internal.Exception
     Hedgehog.Internal.Gen
-    Hedgehog.Internal.HTraversable
     Hedgehog.Internal.Opaque
     Hedgehog.Internal.Prelude
     Hedgehog.Internal.Property

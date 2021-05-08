@@ -53,6 +53,7 @@ library
       hedgehog
     , hedgehog-quickcheck
     , base                            >= 3          && < 5
+    , barbies
     , containers                      >= 0.4        && < 0.7
     , directory                       >= 1.0        && < 1.4
     , filepath                        >= 1.3        && < 1.5

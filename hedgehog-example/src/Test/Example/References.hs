@@ -1,11 +1,13 @@
 --
 -- Translated from https://github.com/advancedtelematic/quickcheck-state-machine/blob/7e3056d493ad430cfacd62da7878955e80fd296f/example/src/MutableReference.hs
 --
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE TemplateHaskell #-}
 module Test.Example.References where
 
 import           Control.Monad.IO.Class (MonadIO(..))
+import           GHC.Generics (Generic)
 
 import           Data.Bifunctor (second)
 import           Data.IORef (IORef)
@@ -34,11 +36,12 @@ initialState =
 
 data NewRef (v :: * -> *) =
   NewRef
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic)
 
-instance HTraversable NewRef where
-  htraverse _ NewRef =
-    pure NewRef
+-- This would be more nicely done with DerivingStrategies anyclass but
+-- it's not supported in GHC 8.0, in your own app you have more options.
+instance FunctorB NewRef
+instance TraversableB NewRef
 
 newRef :: (Monad n, MonadIO m) => Command n m State
 newRef =
@@ -61,11 +64,10 @@ newRef =
 
 data ReadRef v =
   ReadRef (Var (Opaque (IORef Int)) v)
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic)
 
-instance HTraversable ReadRef where
-  htraverse f (ReadRef ref) =
-    ReadRef <$> htraverse f ref
+instance FunctorB ReadRef
+instance TraversableB ReadRef
 
 readRef :: (MonadGen n, MonadIO m, MonadTest m) => Command n m State
 readRef =
@@ -94,11 +96,10 @@ readRef =
 
 data WriteRef v =
   WriteRef (Var (Opaque (IORef Int)) v) Int
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic)
 
-instance HTraversable WriteRef where
-  htraverse f (WriteRef ref x) =
-    WriteRef <$> htraverse f ref <*> pure x
+instance FunctorB WriteRef
+instance TraversableB WriteRef
 
 writeRef :: (MonadGen n, MonadIO m) => Command n m State
 writeRef =
@@ -130,11 +131,10 @@ writeRef =
 
 data IncRef v =
   IncRef (Var (Opaque (IORef Int)) v)
-  deriving (Eq, Show)
+  deriving (Eq, Show, Generic)
 
-instance HTraversable IncRef where
-  htraverse f (IncRef ref) =
-    IncRef <$> htraverse f ref
+instance FunctorB IncRef
+instance TraversableB IncRef
 
 incRef :: (MonadGen n, MonadIO m) => Int -> Command n m State
 incRef n =
