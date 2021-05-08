@@ -1,9 +1,7 @@
 --
 -- Translated from https://github.com/rjmh/registry/blob/master/registry_eqc.erl
 --
-{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -41,11 +39,11 @@ import           System.IO.Unsafe (unsafePerformIO)
 
 newtype Pid =
   Pid Int
-  deriving newtype (Eq, Ord, Show, Num)
+  deriving (Eq, Ord, Show, Num)
 
 newtype Name =
   Name String
-  deriving newtype (Eq, Ord, Show)
+  deriving (Eq, Ord, Show)
 
 data State v =
   State {
@@ -72,7 +70,12 @@ initialState =
 
 data Spawn (v :: * -> *) =
   Spawn
-  deriving (Eq, Generic, Show, FunctorB, TraversableB)
+  deriving (Eq, Generic, Show)
+
+-- This would be more nicely done with DerivingStrategies anyclass but
+-- it's not supported in GHC 8.0, in your own app you have more options.
+instance FunctorB Spawn
+instance TraversableB Spawn
 
 spawn :: (Monad n, MonadIO m) => Command n m State
 spawn =
@@ -115,7 +118,10 @@ spawn =
 
 data Register v =
   Register Name (Var Pid v)
-  deriving (Eq, Generic, Show, FunctorB, TraversableB)
+  deriving (Eq, Generic, Show)
+
+instance FunctorB Register
+instance TraversableB Register
 
 genName :: MonadGen m => m Name
 genName =
@@ -169,7 +175,10 @@ register =
 
 data Unregister (v :: * -> *) =
   Unregister Name
-  deriving (Eq, Generic, Show, FunctorB, TraversableB)
+  deriving (Eq, Generic, Show)
+
+instance FunctorB Unregister
+instance TraversableB Unregister
 
 unregister :: (MonadGen n, MonadIO m) => Command n m State
 unregister =
