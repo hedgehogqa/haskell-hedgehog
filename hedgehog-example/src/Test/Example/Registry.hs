@@ -23,7 +23,6 @@ import qualified Data.Set as Set
 
 import           Hedgehog
 import qualified Hedgehog.Gen as Gen
-import qualified Hedgehog.Internal.State as Gen
 import qualified Hedgehog.Range as Range
 
 import           System.IO.Unsafe (unsafePerformIO)
@@ -72,10 +71,15 @@ data Spawn (v :: * -> *) =
   Spawn
   deriving (Eq, Show, Generic)
 
--- This would be more nicely done with DerivingStrategies anyclass but
+-- This can also be done with DerivingStrategies/DeriveAnyClass but
 -- it's not supported in GHC 8.0, in your own app you have more options.
 instance FunctorB Spawn
 instance TraversableB Spawn
+
+-- Uncomment to check deprecation warning.
+--instance HTraversable Spawn where
+--  htraverse _ Spawn =
+--    pure Spawn
 
 spawn :: (Monad n, MonadIO m) => Command n m State
 spawn =
@@ -261,7 +265,7 @@ prop_registry_sequential =
         [spawn, register, unregister]
 
     evalIO ioReset
-    Gen.executeSequential initialState actions
+    executeSequential initialState actions
 
 prop_registry_parallel :: Property
 prop_registry_parallel =
@@ -275,7 +279,7 @@ prop_registry_parallel =
 
     test $ do
       evalIO ioReset
-      Gen.executeParallel initialState actions
+      executeParallel initialState actions
 
 ------------------------------------------------------------------------
 

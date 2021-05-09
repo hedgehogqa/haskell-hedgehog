@@ -145,6 +145,7 @@ module Hedgehog (
   , distributeT
 
   -- * Functors
+  -- $functors
   , FunctorB(..)
   , TraversableB(..)
   , Rec(..)
@@ -157,6 +158,9 @@ module Hedgehog (
 
   , Show1
   , showsPrec1
+
+  -- * Deprecated
+  , HTraversable(..)
   ) where
 
 import           Data.Functor.Classes (Eq1, eq1, Ord1, compare1, Show1, showsPrec1)
@@ -164,6 +168,7 @@ import           Data.Functor.Classes (Eq1, eq1, Ord1, compare1, Show1, showsPre
 import           Hedgehog.Internal.Barbie (FunctorB(..), TraversableB(..), Rec(..))
 import           Hedgehog.Internal.Distributive (distributeT)
 import           Hedgehog.Internal.Gen (Gen, GenT, MonadGen(..))
+import           Hedgehog.Internal.HTraversable (HTraversable(..))
 import           Hedgehog.Internal.Opaque (Opaque(..))
 import           Hedgehog.Internal.Property (annotate, annotateShow)
 import           Hedgehog.Internal.Property (assert, diff, (===), (/==))
@@ -192,3 +197,22 @@ import           Hedgehog.Internal.State (executeSequential, executeParallel)
 import           Hedgehog.Internal.State (Var(..), Symbolic, Concrete(..), concrete, opaque)
 import           Hedgehog.Internal.TH (discover, discoverPrefix)
 import           Hedgehog.Internal.Tripping (tripping)
+
+
+-- $functors
+--
+-- 'FunctorB' and 'TraversableB' must be implemented for all 'Command' @input@ types.
+--
+-- This is most easily achieved using "GHC.Generics".
+--
+-- @
+-- data Register v =
+--   Register Name (Var Pid v)
+--   deriving (Eq, Show, Generic)
+--
+-- instance FunctorB Register
+-- instance TraversableB Register
+-- @
+--
+-- /Ideally we could use @DerivingVia@ instead of @DefaultSignatures@, patches welcome./
+--
