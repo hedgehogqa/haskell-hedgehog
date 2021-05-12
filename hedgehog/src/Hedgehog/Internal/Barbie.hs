@@ -1,7 +1,7 @@
 {-# OPTIONS_HADDOCK not-home #-}
 {-# LANGUAGE CPP #-}
 
--- | For compatibility across different barbie versions.
+-- | For compatibility across different versions of the @barbie@ package.
 --
 module Hedgehog.Internal.Barbie (
     FunctorB(..)
