@@ -203,7 +203,7 @@ import           Hedgehog.Internal.Tripping (tripping)
 --
 -- 'FunctorB' and 'TraversableB' must be implemented for all 'Command' @input@ types.
 --
--- This is most easily achieved using "GHC.Generics".
+-- This is most easily achieved using `DeriveGeneric`:
 --
 -- @
 -- data Register v =
@@ -212,7 +212,25 @@ import           Hedgehog.Internal.Tripping (tripping)
 --
 -- instance FunctorB Register
 -- instance TraversableB Register
+--
+-- newtype Unregister (v :: * -> *) =
+--   Unregister Name
+--   deriving (Eq, Show, Generic)
+--
+-- instance FunctorB Unregister
+-- instance TraversableB Unregister
 -- @
 --
--- /Ideally we could use @DerivingVia@ instead of @DefaultSignatures@, patches welcome./
+-- `DeriveAnyClass` and `DerivingStrategies` allow a more compact syntax:
+--
+-- @
+-- data Register v =
+--   Register Name (Var Pid v)
+--   deriving (Eq, Show, Generic, FunctorB, TraversableB)
+--
+-- newtype Unregister (v :: * -> *) =
+--   Unregister Name
+--   deriving (Eq, Show, Generic)
+--   deriving anyclass (FunctorB, TraversableB)
+-- @
 --
