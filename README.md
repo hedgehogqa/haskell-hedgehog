@@ -91,6 +91,12 @@ You can then load the module in GHCi, and run it:
 <br />
 <img width="307" src="https://github.com/hedgehogqa/haskell-hedgehog/raw/master/img/hedgehog-logo-grey.png" />
 
+## Contributors
+
+<a href="https://github.com/hedgehogqa/haskell-hedgehog/graphs/contributors">
+  <img src="https://contrib.rocks/image?repo=hedgehogqa/haskell-hedgehog" />
+</a>
+
  [hackage]: http://hackage.haskell.org/package/hedgehog
  [hackage-shield]: https://img.shields.io/hackage/v/hedgehog.svg?style=flat
 
