@@ -25,9 +25,9 @@ genSeed =
 
 -- | Create a QuickCheck 'QuickCheck.Gen' from a Hedgehog 'Gen'.
 --
---   /Note that this conversion does not preserve shrinking. To preserve
---    shrinking use the exported 'forAll' and 'forAllShow' functions rather
---    than going via a 'QuickCheck.Gen'./
+--   /Note that this conversion does not preserve shrinking. To preserve/
+--   /shrinking use the exported 'forAll' and 'forAllShow' functions rather/
+--   /than going via a 'QuickCheck.Gen'./
 --
 hedgehog :: Gen a -> QuickCheck.Gen a
 hedgehog gen =
