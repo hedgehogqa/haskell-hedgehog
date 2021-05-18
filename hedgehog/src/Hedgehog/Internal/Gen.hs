@@ -235,6 +235,8 @@ import qualified Control.Monad.Fail as Fail
 #endif
 #if __GLASGOW_HASKELL__ < 806
 import           Data.Coerce (coerce)
+#else
+import           Data.Monoid (Ap (..))
 #endif
 
 ------------------------------------------------------------------------
@@ -477,6 +479,34 @@ instance (Monad m, Monoid a) => Monoid (GenT m a) where
 
   mempty =
     return mempty
+
+#if __GLASGOW_HASKELL__ >= 806
+deriving via (Ap (GenT m) x)
+  instance (Monad m, Num x) => Num (GenT m x)
+#else
+instance (Monad m, Num x) => Num (GenT m x) where
+  (+) =
+    liftA2 (+)
+
+  (*) =
+    liftA2 (*)
+
+  (-) =
+    liftA2 (-)
+
+  negate =
+    fmap negate
+
+  abs =
+    fmap abs
+
+  signum =
+    fmap signum
+
+  fromInteger =
+    pure . fromInteger
+#endif
+
 
 instance Functor m => Functor (GenT m) where
   fmap f gen =
