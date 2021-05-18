@@ -507,7 +507,6 @@ instance (Monad m, Num a) => Num (GenT m a) where
     pure . fromInteger
 #endif
 
-
 instance Functor m => Functor (GenT m) where
   fmap f gen =
     GenT $ \seed size ->
