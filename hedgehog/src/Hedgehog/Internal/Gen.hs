@@ -481,10 +481,10 @@ instance (Monad m, Monoid a) => Monoid (GenT m a) where
     return mempty
 
 #if __GLASGOW_HASKELL__ >= 806
-deriving via (Ap (GenT m) x)
-  instance (Monad m, Num x) => Num (GenT m x)
+deriving via (Ap (GenT m) a)
+  instance (Monad m, Num a) => Num (GenT m a)
 #else
-instance (Monad m, Num x) => Num (GenT m x) where
+instance (Monad m, Num a) => Num (GenT m a) where
   (+) =
     liftA2 (+)
 
