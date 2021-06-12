@@ -3,8 +3,8 @@
 module Test.QuickCheck.Hedgehog (
     hedgehog
 
-  , forAll
-  , forAllShow
+  , forAllH
+  , forAllHShow
   ) where
 
 import           Hedgehog (Gen, Seed)
@@ -26,7 +26,7 @@ genSeed =
 -- | Create a QuickCheck 'QuickCheck.Gen' from a Hedgehog 'Gen'.
 --
 --   /Note that this conversion does not preserve shrinking. To preserve/
---   /shrinking use the exported 'forAll' and 'forAllShow' functions rather/
+--   /shrinking use the exported 'forAllH' and 'forAllHShow' functions rather/
 --   /than going via a 'QuickCheck.Gen'./
 --
 hedgehog :: Gen a -> QuickCheck.Gen a
@@ -51,17 +51,17 @@ hedgehog gen =
 --   show typeclass for displaying errors.
 --
 --   This operation preserves Hedgehog's shrinking capabilities.
-forAll :: (Show a, Testable prop) => Gen a -> (a -> prop) -> QuickCheck.Property
-forAll =
-  forAllShow showPretty
+forAllH :: (Show a, Testable prop) => Gen a -> (a -> prop) -> QuickCheck.Property
+forAllH =
+  forAllHShow showPretty
 
 
 -- | Use a Hedgehog 'Gen' in a QuickCheck 'QuickCheck.Property', but provide a custom render function
 --   for displaying counterexamples.
 --
 --   This operation preserves Hedgehog's shrinking capabilities.
-forAllShow :: Testable prop => (a -> String) -> Gen a -> (a -> prop) -> QuickCheck.Property
-forAllShow render gen pf =
+forAllHShow :: Testable prop => (a -> String) -> Gen a -> (a -> prop) -> QuickCheck.Property
+forAllHShow render gen pf =
   QuickCheck.again $
     MkProperty $
       let
@@ -89,7 +89,7 @@ shrinking tree pf =
     props x =
       MkRose
         (unProperty . QuickCheck.property . pf $ treeValue x)
-        (fmap props $ treeChildren x)
+        (props <$> treeChildren x)
   in
-    fmap (MkProp . joinRose . fmap unProp) $
+    MkProp . joinRose . fmap unProp <$>
       promote (props tree)
