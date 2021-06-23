@@ -1248,8 +1248,8 @@ journalCoverage (Journal logs) =
 --    prop_with_coverage =
 --      property $ do
 --        match <- forAll Gen.bool
---        cover 30 "True" $ match
---        cover 30 "False" $ not match
+--        cover 30 \"True\" $ match
+--        cover 30 \"False\" $ not match
 -- @
 --
 --   The example above requires a minimum of 30% coverage for both
