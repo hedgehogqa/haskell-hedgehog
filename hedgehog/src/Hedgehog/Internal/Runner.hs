@@ -71,6 +71,9 @@ data RunnerConfig =
       --   the environment.
     , runnerColor :: !(Maybe UseColor)
 
+      -- | The seed to use. 'Nothing' means detect from the environment.
+    , runnerSeed :: !(Maybe Seed)
+
       -- | How verbose to be in the runner output. 'Nothing' means detect from
       --   the environment.
     , runnerVerbosity :: !(Maybe Verbosity)
@@ -331,10 +334,11 @@ checkNamed ::
   => Region
   -> UseColor
   -> Maybe PropertyName
+  -> Maybe Seed
   -> Property
   -> m (Report Result)
-checkNamed region color name prop = do
-  seed <- liftIO Seed.random
+checkNamed region color name mseed prop = do
+  seed <- resolveSeed mseed
   checkRegion region color name 0 seed prop
 
 -- | Check a property.
@@ -343,7 +347,7 @@ check :: MonadIO m => Property -> m Bool
 check prop = do
   color <- detectColor
   liftIO . displayRegion $ \region ->
-    (== OK) . reportStatus <$> checkNamed region color Nothing prop
+    (== OK) . reportStatus <$> checkNamed region color Nothing Nothing prop
 
 -- | Check a property using a specific size and seed.
 --
@@ -373,9 +377,10 @@ checkGroup config (Group group props) =
 
     putStrLn $ "━━━ " ++ unGroupName group ++ " ━━━"
 
+    seed <- resolveSeed (runnerSeed config)
     verbosity <- resolveVerbosity (runnerVerbosity config)
     color <- resolveColor (runnerColor config)
-    summary <- checkGroupWith n verbosity color props
+    summary <- checkGroupWith n verbosity color seed props
 
     pure $
       summaryFailed summary == 0 &&
@@ -390,9 +395,10 @@ checkGroupWith ::
      WorkerCount
   -> Verbosity
   -> UseColor
+  -> Seed
   -> [(PropertyName, Property)]
   -> IO Summary
-checkGroupWith n verbosity color props =
+checkGroupWith n verbosity color seed props =
   displayRegion $ \sregion -> do
     svar <- atomically . TVar.newTVar $ mempty { summaryWaiting = PropertyCount (length props) }
 
@@ -430,7 +436,7 @@ checkGroupWith n verbosity color props =
     summary <-
       fmap (mconcat . fmap (fromResult . reportStatus)) $
         runTasks n props start finish finalize $ \(name, prop, region) -> do
-          result <- checkNamed region color (Just name) prop
+          result <- checkNamed region color (Just name) (Just seed) prop
           updateSummary sregion svar color
             (<> fromResult (reportStatus result))
           pure result
@@ -462,6 +468,8 @@ checkSequential =
         runnerWorkers =
           Just 1
       , runnerColor =
+          Nothing
+      , runnerSeed =
           Nothing
       , runnerVerbosity =
           Nothing
@@ -496,6 +504,8 @@ checkParallel =
         runnerWorkers =
           Nothing
       , runnerColor =
+          Nothing
+      , runnerSeed =
           Nothing
       , runnerVerbosity =
           Nothing
