@@ -48,7 +48,6 @@ import           Hedgehog.Internal.Property (defaultMinTests)
 import           Hedgehog.Internal.Queue
 import           Hedgehog.Internal.Region
 import           Hedgehog.Internal.Report
-import           Hedgehog.Internal.Seed (Seed)
 import qualified Hedgehog.Internal.Seed as Seed
 import           Hedgehog.Internal.Tree (TreeT(..), NodeT(..))
 import           Hedgehog.Range (Size)
