@@ -60,7 +60,6 @@ import           Hedgehog.Internal.Property (TestCount(..), DiscardCount(..))
 import           Hedgehog.Internal.Property (coverPercentage, coverageFailures)
 import           Hedgehog.Internal.Property (labelCovered)
 
-import           Hedgehog.Internal.Seed (Seed)
 import           Hedgehog.Internal.Show
 import           Hedgehog.Internal.Source
 import           Hedgehog.Range (Size)
