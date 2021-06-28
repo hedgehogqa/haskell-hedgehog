@@ -9,6 +9,9 @@ module Hedgehog.Internal.Config (
     UseColor(..)
   , resolveColor
 
+  , Seed(..)
+  , resolveSeed
+
   , Verbosity(..)
   , resolveVerbosity
 
@@ -17,13 +20,19 @@ module Hedgehog.Internal.Config (
 
   , detectMark
   , detectColor
+  , detectSeed
   , detectVerbosity
   , detectWorkers
   ) where
 
 import           Control.Monad.IO.Class (MonadIO(..))
 
+import qualified Data.Text as Text
+
 import qualified GHC.Conc as Conc
+
+import           Hedgehog.Internal.Seed (Seed(..))
+import qualified Hedgehog.Internal.Seed as Seed
 
 import           Language.Haskell.TH.Syntax (Lift)
 
@@ -107,6 +116,20 @@ detectColor =
           else
             pure DisableColor
 
+detectSeed :: MonadIO m => m Seed
+detectSeed =
+  liftIO $ do
+    menv <- lookupEnv "HEDGEHOG_SEED"
+    case menv of
+      Nothing ->
+        Seed.random
+      Just env ->
+        let
+          [value, gamma] =
+            read . Text.unpack <$> Text.splitOn (Text.pack " ") (Text.pack env)
+        in
+          pure $ Seed value gamma
+
 detectVerbosity :: MonadIO m => m Verbosity
 detectVerbosity =
   liftIO $ do
@@ -139,6 +162,13 @@ resolveColor :: MonadIO m => Maybe UseColor -> m UseColor
 resolveColor = \case
   Nothing ->
     detectColor
+  Just x ->
+    pure x
+
+resolveSeed :: MonadIO m => Maybe Seed -> m Seed
+resolveSeed = \case
+  Nothing ->
+    detectSeed
   Just x ->
     pure x
 
