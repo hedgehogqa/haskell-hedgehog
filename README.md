@@ -11,7 +11,7 @@ https://github.com/hedgehogqa/haskell-hedgehog
 
 # Release with confidence.
 
-[![Hackage][hackage-shield]][hackage] [![Travis][travis-shield]][travis] [![AppVeyor][appveyor-shield]][appveyor]
+[![Hackage][hackage-shield]][hackage] [![GitHub CI][github-shield]][github-ci]
 
 <div align="left">
 
@@ -100,11 +100,8 @@ You can then load the module in GHCi, and run it:
  [hackage]: http://hackage.haskell.org/package/hedgehog
  [hackage-shield]: https://img.shields.io/hackage/v/hedgehog.svg?style=flat
 
- [travis]: https://travis-ci.com/hedgehogqa/haskell-hedgehog
- [travis-shield]: https://travis-ci.com/hedgehogqa/haskell-hedgehog.svg?branch=master
-
- [appveyor]: https://ci.appveyor.com/project/hedgehogqa/haskell-hedgehog
- [appveyor-shield]: https://ci.appveyor.com/api/projects/status/o4rlstbc80sum3on/branch/master?svg=true
+ [github-shield]: https://github.com/hedgehogqa/haskell-hedgehog/actions/workflows/ci.yaml/badge.svg
+ [github-ci]: https://github.com/hedgehogqa/haskell-hedgehog/actions/workflows/ci.yaml
 
  [haddock-hedgehog]: http://hackage.haskell.org/package/hedgehog/docs/Hedgehog.html
  [haddock-hedgehog-gen]: http://hackage.haskell.org/package/hedgehog/docs/Hedgehog-Gen.html
