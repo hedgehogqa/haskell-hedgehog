@@ -472,9 +472,6 @@ instance (Monad m, Semigroup a) => Semigroup (GenT m a) where
     liftA2 (Semigroup.<>)
 
 instance (Monad m, Monoid a) => Monoid (GenT m a) where
-  mappend =
-    liftA2 mappend
-
   mempty =
     return mempty
 
