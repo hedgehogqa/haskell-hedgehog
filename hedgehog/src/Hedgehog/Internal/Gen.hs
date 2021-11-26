@@ -472,9 +472,10 @@ instance (Monad m, Semigroup a) => Semigroup (GenT m a) where
     liftA2 (Semigroup.<>)
 
 instance (Monad m, Monoid a) => Monoid (GenT m a) where
+#if __GLASGOW_HASKELL__ < 902
   mappend =
     liftA2 mappend
-
+#endif
   mempty =
     return mempty
 

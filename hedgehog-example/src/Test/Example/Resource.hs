@@ -166,15 +166,11 @@ normalLog ref indent x = do
   liftIO $ IORef.modifyIORef ref (++ [replicate indent ' ' ++ x])
 
 joinBlocks :: [String] -> [String]
-joinBlocks = \case
-  [] ->
-    []
-  xs0 ->
-    let
-      (xs, x : ys) =
-        List.span (/= "}") xs0
-    in
-      concat (List.intersperse "\n" (xs ++ [x])) : joinBlocks ys
+joinBlocks xs0 =
+  case List.span (/= "}") xs0 of
+    (xs, []) -> xs
+    (xs, x : ys) ->  concat (List.intersperse "\n" (xs ++ [x])) : joinBlocks ys
+
 
 tests :: IO Bool
 tests = do

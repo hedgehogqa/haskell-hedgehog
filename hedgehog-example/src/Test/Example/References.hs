@@ -12,6 +12,7 @@ import           GHC.Generics (Generic)
 import           Data.Bifunctor (second)
 import           Data.IORef (IORef)
 import qualified Data.IORef as IORef
+import           Data.Kind (Type)
 import qualified Data.List as List
 
 import           Hedgehog
@@ -34,7 +35,7 @@ initialState =
 ------------------------------------------------------------------------
 -- NewRef
 
-data NewRef (v :: * -> *) =
+data NewRef (v :: Type -> Type) =
   NewRef
   deriving (Eq, Show, Generic)
 
