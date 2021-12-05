@@ -140,6 +140,9 @@ data Summary =
     } deriving (Show)
 
 instance Monoid Summary where
+#if !MIN_VERSION_base(4,11,0)
+  mappend = (Semigroup.<>)
+#endif
   mempty =
     Summary 0 0 0 0 0
 
