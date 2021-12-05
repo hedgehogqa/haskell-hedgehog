@@ -472,9 +472,8 @@ instance (Monad m, Semigroup a) => Semigroup (GenT m a) where
     liftA2 (Semigroup.<>)
 
 instance (Monad m, Monoid a) => Monoid (GenT m a) where
-#if !MIN_VERSION_GLASGOW_HASKELL(8,4,0,0)
-  mappend =
-    liftA2 mappend
+#if !MIN_VERSION_base(4,11,0)
+  mappend = (Semigroup.<>)
 #endif
 
   mempty =
