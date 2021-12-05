@@ -46,7 +46,9 @@ import qualified Data.List as List
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Maybe (mapMaybe, catMaybes)
+#if !MIN_VERSION_base(4,11,0)
 import qualified Data.Semigroup as Semigroup
+#endif
 import           Data.Traversable (for)
 
 import           Hedgehog.Internal.Config
