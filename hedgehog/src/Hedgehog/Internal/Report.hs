@@ -46,6 +46,7 @@ import qualified Data.List as List
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Maybe (mapMaybe, catMaybes)
+import qualified Data.Semigroup as Semigroup
 import           Data.Traversable (for)
 
 import           Hedgehog.Internal.Config
