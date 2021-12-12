@@ -13,6 +13,7 @@ import           GHC.Generics (Generic)
 
 import           Data.Foldable (traverse_)
 import qualified Data.HashTable.IO as HashTable
+import           Data.Kind (Type)
 import           Data.IORef (IORef)
 import qualified Data.IORef as IORef
 import           Data.Map (Map)
@@ -67,7 +68,7 @@ initialState =
 --   S#state{pids=S#state.pids++[Pid]}.
 --
 
-data Spawn (v :: * -> *) =
+data Spawn (v :: Type -> Type) =
   Spawn
   deriving (Eq, Show, Generic)
 
@@ -177,7 +178,7 @@ register =
 --   S#state{regs=lists:keydelete(Name,1,S#state.regs)}.
 --
 
-data Unregister (v :: * -> *) =
+data Unregister (v :: Type -> Type) =
   Unregister Name
   deriving (Eq, Show, Generic)
 
