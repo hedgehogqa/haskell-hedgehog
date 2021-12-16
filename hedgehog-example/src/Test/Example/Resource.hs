@@ -171,10 +171,10 @@ joinBlocks = \case
     []
   xs0 ->
     let
-      (xs, x : ys) =
+      (xs, ys) =
         List.span (/= "}") xs0
     in
-      concat (List.intersperse "\n" (xs ++ [x])) : joinBlocks ys
+      concat (List.intersperse "\n" (xs ++ [head ys])) : joinBlocks (tail ys)
 
 tests :: IO Bool
 tests = do
