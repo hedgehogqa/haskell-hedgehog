@@ -171,8 +171,11 @@ joinBlocks = \case
     []
   xs0 ->
     let
-      (xs, x : ys) =
-        List.span (/= "}") xs0
+      (xs, body) = List.span (/= "}") xs0
+      (x, ys) = case body of
+        (x' : y') -> (x', y')
+        _ -> error "joinBlocks: expected closing brace"
+
     in
       concat (List.intersperse "\n" (xs ++ [x])) : joinBlocks ys
 
