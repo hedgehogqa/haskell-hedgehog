@@ -471,9 +471,15 @@ instance (Monad m, Semigroup a) => Semigroup (GenT m a) where
   (<>) =
     liftA2 (Semigroup.<>)
 
-instance (Monad m, Monoid a) => Monoid (GenT m a) where
-  mappend =
-    liftA2 mappend
+instance (
+  Monad m, Monoid a
+#if !MIN_VERSION_base(4,11,0)
+  , Semigroup a
+#endif
+         ) => Monoid (GenT m a) where
+#if !MIN_VERSION_base(4,11,0)
+  mappend = (Semigroup.<>)
+#endif
 
   mempty =
     return mempty

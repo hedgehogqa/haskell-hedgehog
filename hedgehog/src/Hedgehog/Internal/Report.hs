@@ -46,6 +46,9 @@ import qualified Data.List as List
 import           Data.Map (Map)
 import qualified Data.Map as Map
 import           Data.Maybe (mapMaybe, catMaybes)
+#if !MIN_VERSION_base(4,11,0)
+import qualified Data.Semigroup as Semigroup
+#endif
 import           Data.Traversable (for)
 
 import           Hedgehog.Internal.Config
@@ -140,18 +143,20 @@ data Summary =
     } deriving (Show)
 
 instance Monoid Summary where
+#if !MIN_VERSION_base(4,11,0)
+  mappend = (Semigroup.<>)
+#endif
   mempty =
     Summary 0 0 0 0 0
-  mappend (Summary x1 x2 x3 x4 x5) (Summary y1 y2 y3 y4 y5) =
+
+instance Semigroup Summary where
+  Summary x1 x2 x3 x4 x5 <> Summary y1 y2 y3 y4 y5 =
     Summary
       (x1 + y1)
       (x2 + y2)
       (x3 + y3)
       (x4 + y4)
       (x5 + y5)
-
-instance Semigroup Summary where
-  (<>) = mappend
 
 -- | Construct a summary from a single result.
 --
