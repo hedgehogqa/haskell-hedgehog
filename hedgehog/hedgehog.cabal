@@ -63,7 +63,7 @@ library
     , erf                             >= 2.0        && < 2.1
     , exceptions                      >= 0.7        && < 0.11
     , lifted-async                    >= 0.7        && < 0.11
-    , mmorph                          >= 1.0        && < 1.2
+    , mmorph                          >= 1.0        && < 1.3
     , monad-control                   >= 1.0        && < 1.1
     , mtl                             >= 2.1        && < 2.3
     , pretty-show                     >= 1.6        && < 1.11
@@ -143,7 +143,7 @@ test-suite test
       hedgehog
     , base                            >= 3          && < 5
     , containers                      >= 0.4        && < 0.7
-    , mmorph                          >= 1.0        && < 1.2
+    , mmorph                          >= 1.0        && < 1.3
     , mtl                             >= 2.1        && < 2.3
     , pretty-show                     >= 1.6        && < 1.11
     , text                            >= 1.1        && < 1.3
