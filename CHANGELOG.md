@@ -1,3 +1,8 @@
+## Version 1.1 (2022-01-27)
+
+- Replace HTraversable with TraversableB (from barbies) ([#412][412], [@ocharles][ocharles])
+- Support GHC 9.2 ([#436][436], [@patrickt][patrickt])
+
 ## Version 1.0.5 (2021-03-12)
 
 - GHC 9 Support ([#392][392], [@utdemir][utdemir])
@@ -227,8 +232,14 @@
   https://github.com/mpilgrem
 [utdemir]:
   https://github.com/utdemir
+[patrickt]:
+  https://github.com/patrickt
 
 
+[436]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/436
+[421]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/421
 [415]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/415
 [414]:
