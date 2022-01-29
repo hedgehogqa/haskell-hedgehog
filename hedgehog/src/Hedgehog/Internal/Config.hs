@@ -116,19 +116,27 @@ detectColor =
           else
             pure DisableColor
 
+splitOn :: String -> String -> [String]
+splitOn needle haystack =
+  fmap Text.unpack $ Text.splitOn (Text.pack needle) (Text.pack haystack)
+
+parseSeed :: String -> Maybe Seed
+parseSeed env =
+  case splitOn " " env of
+    [value, gamma] ->
+      Seed <$> readMaybe value <*> readMaybe gamma
+    _ ->
+      Nothing
+
 detectSeed :: MonadIO m => m Seed
 detectSeed =
   liftIO $ do
     menv <- lookupEnv "HEDGEHOG_SEED"
-    case menv of
+    case parseSeed =<< menv of
       Nothing ->
         Seed.random
-      Just env ->
-        let
-          [value, gamma] =
-            read . Text.unpack <$> Text.splitOn (Text.pack " ") (Text.pack env)
-        in
-          pure $ Seed value gamma
+      Just seed ->
+        pure seed
 
 detectVerbosity :: MonadIO m => m Verbosity
 detectVerbosity =
