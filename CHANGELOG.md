@@ -1,3 +1,8 @@
+## Version 1.1.1 (2022-01-29)
+
+* Support using fixed seed via `HEDGEHOG_SEED` ([#446][446], [@simfleischman][simfleischman] / [@moodmosaic][moodmosaic])
+* Better 'cover' example code in haddocks ([#423][423], [@jhrcek][jhrcek])
+
 ## Version 1.1 (2022-01-27)
 
 - Replace HTraversable with TraversableB (from barbies) ([#412][412], [@ocharles][ocharles])
@@ -234,18 +239,26 @@
   https://github.com/utdemir
 [patrickt]:
   https://github.com/patrickt
+[simfleischman]:
+  https://github.com/simfleischman
+[jhrcek]:
+  https://github.com/jhrcek
 
 
+[446]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/446
 [436]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/436
-[421]:
-  https://github.com/hedgehogqa/haskell-hedgehog/pull/421
+[423]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/423
 [415]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/415
 [414]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/414
 [413]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/413
+[412]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/412
 [409]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/409
 [408]:
