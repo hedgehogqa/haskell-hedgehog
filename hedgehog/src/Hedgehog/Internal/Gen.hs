@@ -129,6 +129,7 @@ module Hedgehog.Internal.Gen (
 
   -- ** Combinations & Permutations
   , subsequence
+  , subset
   , shuffle
   , shuffleSeq
 
@@ -215,6 +216,7 @@ import qualified Data.Semigroup as Semigroup
 import           Data.Sequence (Seq)
 import qualified Data.Sequence as Seq
 import           Data.Set (Set)
+import qualified Data.Set as Set
 import           Data.Text (Text)
 import qualified Data.Text as Text
 import qualified Data.Text.Encoding as Text
@@ -1664,6 +1666,18 @@ subterm3 gx gy gz f =
 subsequence :: MonadGen m => [a] -> m [a]
 subsequence xs =
   shrink Shrink.list $ filterM (const bool_) xs
+
+-- | Generates a random subset of a set.
+--
+--  /This shrinks towards the empty set./
+--
+subset :: MonadGen m => Set a -> m (Set a)
+-- Set.fromDistinctAscList has an unchecked precondition that the list
+-- must be strictly ascending. This precondition is satisfied because
+-- Set.toAscList produces a strictly ascending list, and the 'subsequence'
+-- generator only removes elements from the list; it never adds or
+-- rearranges elements, so the strictly ascending property is undisturbed.
+subset = fmap Set.fromDistinctAscList . subsequence . Set.toAscList
 
 -- | Generates a random permutation of a list.
 --
