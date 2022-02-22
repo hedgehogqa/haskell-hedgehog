@@ -94,6 +94,7 @@ module Hedgehog.Gen (
 
   -- ** Combinations & Permutations
   , subsequence
+  , subset
   , shuffle
 
   -- ** Abstract State Machine
