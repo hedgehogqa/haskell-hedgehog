@@ -1661,6 +1661,20 @@ subterm3 gx gy gz f =
 
 -- | Generates a random subsequence of a list.
 --
+-- For example:
+--
+-- @
+-- Gen.print (Gen.subsequence [1..5])
+-- @
+--
+--   > === Outcome ===
+--   > [1,2,4]
+--   > === Shrinks ===
+--   > []
+--   > [2,4]
+--   > [1,4]
+--   > [1,2]
+--
 subsequence :: MonadGen m => [a] -> m [a]
 subsequence xs =
   shrink Shrink.list $ filterM (const bool_) xs
