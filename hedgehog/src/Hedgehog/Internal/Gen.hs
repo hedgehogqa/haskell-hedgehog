@@ -1677,7 +1677,8 @@ subset :: MonadGen m => Set a -> m (Set a)
 -- Set.toAscList produces a strictly ascending list, and the 'subsequence'
 -- generator only removes elements from the list; it never adds or
 -- rearranges elements, so the strictly ascending property is undisturbed.
-subset = fmap Set.fromDistinctAscList . subsequence . Set.toAscList
+subset =
+  fmap Set.fromDistinctAscList . subsequence . Set.toAscList
 
 -- | Generates a random permutation of a list.
 --
