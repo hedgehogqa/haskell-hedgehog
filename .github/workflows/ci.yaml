@@ -15,6 +15,12 @@ jobs:
         os:    [macos-latest, ubuntu-latest, windows-latest]
         cabal: ["3.4"]
         ghc:   ["8.0.2", "8.2.2", "8.4.4", "8.6.5", "8.8.4", "8.10.7", "9.2.1"]
+        exclude:
+          # https://github.com/haskell/text/pull/404
+          - os: windows-latest
+            ghc: "8.0.2"
+          - os: windows-latest
+            ghc: "8.2.2"
 
     runs-on: ${{ matrix.os }}
 
