@@ -30,6 +30,8 @@ import           Control.Concurrent.STM (TVar, atomically)
 import qualified Control.Concurrent.STM.TVar as TVar
 import           Control.Monad.Catch (MonadCatch(..), catchAll)
 import           Control.Monad.IO.Class (MonadIO(..))
+import           Data.Maybe (isJust)
+import           System.Environment (lookupEnv)
 
 import           Hedgehog.Internal.Config
 import           Hedgehog.Internal.Gen (evalGenT)
@@ -164,7 +166,11 @@ checkReport ::
   -> PropertyT m ()
   -> (Report Progress -> m ())
   -> m (Report Result)
-checkReport cfg size0 seed0 test0 updateUI =
+checkReport cfg size0 seed0 test0 updateUI = do
+  -- This should be a parameter, but that would need changes in hspec-hedgehog.
+  mSkipToTest <-
+    liftIO $ fmap (TestCount . read) <$> lookupEnv "HEDGEHOG_SKIP_TO_TEST"
+
   let
     test =
       catchAll test0 (fail . show)
@@ -239,7 +245,8 @@ checkReport cfg size0 seed0 test0 updateUI =
             []
 
         confidenceReport =
-          if coverageReached && labelsCovered then
+          -- Disable coverage checks if we skip tests.
+          if isJust mSkipToTest || (coverageReached && labelsCovered) then
             successReport
           else
             failureReport $
@@ -270,37 +277,43 @@ checkReport cfg size0 seed0 test0 updateUI =
 
       else
         case Seed.split seed of
-          (s0, s1) -> do
-            node@(NodeT x _) <-
-              runTreeT . evalGenT size s0 . runTestT $ unPropertyT test
-            case x of
-              Nothing ->
-                loop tests (discards + 1) (size + 1) s1 coverage0
+          (s0, s1) -> case mSkipToTest of
+            -- If the report says failed "after 32 tests", the test number that
+            -- failed was 31, but we want the user to be able to skip to 32 and
+            -- start with the one that failed.
+            Just n | n > tests + 1 ->
+              loop (tests + 1) discards (size + 1) s1 coverage0
+            _ -> do
+              node@(NodeT x _) <-
+                runTreeT . evalGenT size s0 . runTestT $ unPropertyT test
+              case x of
+                Nothing ->
+                  loop tests (discards + 1) (size + 1) s1 coverage0
 
-              Just (Left _, _) ->
-                let
-                  mkReport =
-                    Report (tests + 1) discards coverage0
-                in
-                  fmap mkReport $
-                    takeSmallest
-                      size
-                      seed
-                      0
-                      (ShrinkPath [])
-                      (propertyShrinkLimit cfg)
-                      (propertyShrinkRetries cfg)
-                      (updateUI . mkReport)
-                      node
+                Just (Left _, _) ->
+                  let
+                    mkReport =
+                      Report (tests + 1) discards coverage0
+                  in
+                    fmap mkReport $
+                      takeSmallest
+                        size
+                        seed
+                        0
+                        (ShrinkPath [])
+                        (propertyShrinkLimit cfg)
+                        (propertyShrinkRetries cfg)
+                        (updateUI . mkReport)
+                        node
 
-              Just (Right (), journal) ->
-                let
-                  coverage =
-                    journalCoverage journal <> coverage0
-                in
-                  loop (tests + 1) discards (size + 1) s1 coverage
-  in
-    loop 0 0 size0 seed0 mempty
+                Just (Right (), journal) ->
+                  let
+                    coverage =
+                      journalCoverage journal <> coverage0
+                  in
+                    loop (tests + 1) discards (size + 1) s1 coverage
+
+  loop 0 0 size0 seed0 mempty
 
 checkRegion ::
      MonadIO m
