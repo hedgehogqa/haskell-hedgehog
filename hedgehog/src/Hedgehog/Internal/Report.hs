@@ -58,10 +58,11 @@ import           Hedgehog.Internal.Prelude
 import           Hedgehog.Internal.Property (CoverCount(..), CoverPercentage(..))
 import           Hedgehog.Internal.Property (Coverage(..), Label(..), LabelName(..))
 import           Hedgehog.Internal.Property (PropertyName(..), Log(..), Diff(..))
-import           Hedgehog.Internal.Property (ShrinkCount(..), ShrinkPath(..), PropertyCount(..))
+import           Hedgehog.Internal.Property (ShrinkCount(..), PropertyCount(..))
 import           Hedgehog.Internal.Property (TestCount(..), DiscardCount(..))
 import           Hedgehog.Internal.Property (coverPercentage, coverageFailures)
 import           Hedgehog.Internal.Property (labelCovered)
+import           Hedgehog.Internal.Property (ShrinkPath(..), shrinkPathCompress)
 
 import           Hedgehog.Internal.Show
 import           Hedgehog.Internal.Source
@@ -328,8 +329,8 @@ ppShrinkCount = \case
   ShrinkCount n ->
     ppShow n <+> "shrinks"
 
-ppShrinkPath :: ShrinkPath -> Doc a
-ppShrinkPath (ShrinkPath p) = ppShow $ reverse p
+ppShrinkPath :: TestCount -> ShrinkPath -> Doc a
+ppShrinkPath tests path = WL.text $ shrinkPathCompress tests path
 
 ppRawPropertyCount :: PropertyCount -> Doc a
 ppRawPropertyCount (PropertyCount n) =
@@ -753,7 +754,7 @@ ppResult name (Report tests discards coverage result) = do
             ppShrinkDiscard (failureShrinks failure) discards <>
             "." <#>
             "shrink path:" <+>
-            ppShrinkPath (failureShrinkPath failure)
+            ppShrinkPath tests (failureShrinkPath failure)
             <> "."
         ] ++
         ppCoverage tests coverage ++

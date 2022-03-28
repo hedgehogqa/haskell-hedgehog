@@ -36,7 +36,7 @@ import           System.Environment (lookupEnv)
 import           Hedgehog.Internal.Config
 import           Hedgehog.Internal.Gen (evalGenT)
 import           Hedgehog.Internal.Prelude
-import           Hedgehog.Internal.Property (DiscardCount(..), ShrinkCount(..), ShrinkPath(..))
+import           Hedgehog.Internal.Property (DiscardCount(..), ShrinkCount(..))
 import           Hedgehog.Internal.Property (Group(..), GroupName(..))
 import           Hedgehog.Internal.Property (Journal(..), Coverage(..), CoverCount(..))
 import           Hedgehog.Internal.Property (Property(..), PropertyConfig(..), PropertyName(..))
@@ -47,6 +47,7 @@ import           Hedgehog.Internal.Property (TestCount(..), PropertyCount(..))
 import           Hedgehog.Internal.Property (confidenceSuccess, confidenceFailure)
 import           Hedgehog.Internal.Property (coverageSuccess, journalCoverage)
 import           Hedgehog.Internal.Property (defaultMinTests)
+import           Hedgehog.Internal.Property (ShrinkPath(..), shrinkPathDecompress)
 import           Hedgehog.Internal.Queue
 import           Hedgehog.Internal.Region
 import           Hedgehog.Internal.Report
@@ -212,12 +213,18 @@ checkReport ::
 checkReport cfg size0 seed0 test0 updateUI = do
   -- These should be parameters (or rather, combined as one parameter), but that
   -- would need changes in hspec-hedgehog.
-  mSkipToTest <-
+  mSkipToTest1 <-
     liftIO $ fmap (TestCount . read) <$> lookupEnv "HEDGEHOG_SKIP_TO_TEST"
 
-  -- We reverse before printing, so we have to reverse when reading as well.
-  mSkipToShrink <- liftIO $
-    fmap (ShrinkPath . reverse . read) <$> lookupEnv "HEDGEHOG_SKIP_TO_SHRINK"
+  mSkipToShrink1 <- liftIO $
+    fmap shrinkPathDecompress <$> lookupEnv "HEDGEHOG_SKIP_TO_SHRINK"
+
+  let (mSkipToTest, mSkipToShrink) = case (mSkipToTest1, mSkipToShrink1) of
+        (Nothing, Nothing) -> (Nothing, Nothing)
+        (Just t, Nothing) -> (Just t, Nothing)
+        (Nothing, Just (Just (t, s))) -> (Just t, Just s)
+        (Nothing, Just Nothing) -> error "could not read shrink path"
+        (Just _, Just _) -> error "Cannot skip to both test and shrink"
 
   let
     test =
