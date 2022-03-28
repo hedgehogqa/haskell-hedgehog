@@ -34,6 +34,7 @@ module Hedgehog.Internal.Property (
   , DiscardCount(..)
   , ShrinkLimit(..)
   , ShrinkCount(..)
+  , ShrinkPath(..)
   , ShrinkRetries(..)
   , withTests
   , withDiscards
@@ -330,6 +331,12 @@ newtype ShrinkLimit =
 newtype ShrinkCount =
   ShrinkCount Int
   deriving (Eq, Ord, Show, Num, Enum, Real, Integral)
+
+-- | The path taken to reach a shrink state.
+--
+newtype ShrinkPath =
+  ShrinkPath [Int]
+  deriving (Eq, Ord, Show)
 
 -- | The number of times to re-run a test during shrinking. This is useful if
 --   you are testing something which fails non-deterministically and you want to

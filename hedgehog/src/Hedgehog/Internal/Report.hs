@@ -58,7 +58,7 @@ import           Hedgehog.Internal.Prelude
 import           Hedgehog.Internal.Property (CoverCount(..), CoverPercentage(..))
 import           Hedgehog.Internal.Property (Coverage(..), Label(..), LabelName(..))
 import           Hedgehog.Internal.Property (PropertyName(..), Log(..), Diff(..))
-import           Hedgehog.Internal.Property (ShrinkCount(..), PropertyCount(..))
+import           Hedgehog.Internal.Property (ShrinkCount(..), ShrinkPath(..), PropertyCount(..))
 import           Hedgehog.Internal.Property (TestCount(..), DiscardCount(..))
 import           Hedgehog.Internal.Property (coverPercentage, coverageFailures)
 import           Hedgehog.Internal.Property (labelCovered)
@@ -94,6 +94,7 @@ data FailureReport =
       failureSize :: !Size
     , failureSeed :: !Seed
     , failureShrinks :: !ShrinkCount
+    , failureShrinkPath :: !ShrinkPath
     , failureCoverage :: !(Maybe (Coverage CoverCount))
     , failureAnnotations :: ![FailedAnnotation]
     , failureLocation :: !(Maybe Span)
@@ -270,13 +271,14 @@ mkFailure ::
      Size
   -> Seed
   -> ShrinkCount
+  -> ShrinkPath
   -> Maybe (Coverage CoverCount)
   -> Maybe Span
   -> String
   -> Maybe Diff
   -> [Log]
   -> FailureReport
-mkFailure size seed shrinks mcoverage location message diff logs =
+mkFailure size seed shrinks shrinkPath mcoverage location message diff logs =
   let
     inputs =
       mapMaybe takeAnnotation logs
@@ -284,7 +286,7 @@ mkFailure size seed shrinks mcoverage location message diff logs =
     footnotes =
       mapMaybe takeFootnote logs
   in
-    FailureReport size seed shrinks mcoverage inputs location message diff footnotes
+    FailureReport size seed shrinks shrinkPath mcoverage inputs location message diff footnotes
 
 ------------------------------------------------------------------------
 -- Pretty Printing
@@ -325,6 +327,9 @@ ppShrinkCount = \case
     "1 shrink"
   ShrinkCount n ->
     ppShow n <+> "shrinks"
+
+ppShrinkPath :: ShrinkPath -> Doc a
+ppShrinkPath (ShrinkPath p) = ppShow $ reverse p
 
 ppRawPropertyCount :: PropertyCount -> Doc a
 ppRawPropertyCount (PropertyCount n) =
@@ -612,7 +617,7 @@ ppTextLines =
   fmap WL.text . List.lines
 
 ppFailureReport :: MonadIO m => Maybe PropertyName -> TestCount -> FailureReport -> m [Doc Markup]
-ppFailureReport name tests (FailureReport size seed _ mcoverage inputs0 mlocation0 msg mdiff msgs0) = do
+ppFailureReport name tests (FailureReport size seed _ _ mcoverage inputs0 mlocation0 msg mdiff msgs0) = do
   let
     basic =
       -- Move the failure message to the end section if we have
@@ -746,7 +751,10 @@ ppResult name (Report tests discards coverage result) = do
             "after" <+>
             ppTestCount tests <>
             ppShrinkDiscard (failureShrinks failure) discards <>
-            "."
+            "." <#>
+            "shrink path:" <+>
+            ppShrinkPath (failureShrinkPath failure)
+            <> "."
         ] ++
         ppCoverage tests coverage ++
         pfailure
