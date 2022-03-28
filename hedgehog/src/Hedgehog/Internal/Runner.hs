@@ -34,7 +34,7 @@ import           Control.Monad.IO.Class (MonadIO(..))
 import           Hedgehog.Internal.Config
 import           Hedgehog.Internal.Gen (evalGenT)
 import           Hedgehog.Internal.Prelude
-import           Hedgehog.Internal.Property (DiscardCount(..), ShrinkCount(..))
+import           Hedgehog.Internal.Property (DiscardCount(..), ShrinkCount(..), ShrinkPath(..))
 import           Hedgehog.Internal.Property (Group(..), GroupName(..))
 import           Hedgehog.Internal.Property (Journal(..), Coverage(..), CoverCount(..))
 import           Hedgehog.Internal.Property (Property(..), PropertyConfig(..), PropertyName(..))
@@ -119,12 +119,13 @@ takeSmallest ::
   => Size
   -> Seed
   -> ShrinkCount
+  -> ShrinkPath
   -> ShrinkLimit
   -> ShrinkRetries
   -> (Progress -> m ())
   -> NodeT m (Maybe (Either Failure (), Journal))
   -> m Result
-takeSmallest size seed shrinks slimit retries updateUI = \case
+takeSmallest size seed shrinks shrinkPath slimit retries updateUI = \case
   NodeT Nothing _ ->
     pure GaveUp
 
@@ -133,7 +134,7 @@ takeSmallest size seed shrinks slimit retries updateUI = \case
       Left (Failure loc err mdiff) -> do
         let
           failure =
-            mkFailure size seed shrinks Nothing loc err mdiff (reverse logs)
+            mkFailure size seed shrinks shrinkPath Nothing loc err mdiff (reverse logs)
 
         updateUI $ Shrinking failure
 
@@ -141,10 +142,12 @@ takeSmallest size seed shrinks slimit retries updateUI = \case
           -- if we've hit the shrink limit, don't shrink any further
           pure $ Failed failure
         else
-          findM xs (Failed failure) $ \m -> do
+          findM (zip [0..] xs) (Failed failure) $ \(n, m) -> do
             o <- runTreeN retries m
             if isFailure o then
-              Just <$> takeSmallest size seed (shrinks + 1) slimit retries updateUI o
+              let ShrinkPath oldPath = shrinkPath
+                  newPath = ShrinkPath (n:oldPath)
+              in Just <$> takeSmallest size seed (shrinks + 1) newPath slimit retries updateUI o
             else
               return Nothing
 
@@ -228,6 +231,7 @@ checkReport cfg size0 seed0 test0 updateUI =
             size
             seed
             0
+            (ShrinkPath [])
             (Just coverage0)
             Nothing
             message
@@ -283,6 +287,7 @@ checkReport cfg size0 seed0 test0 updateUI =
                       size
                       seed
                       0
+                      (ShrinkPath [])
                       (propertyShrinkLimit cfg)
                       (propertyShrinkRetries cfg)
                       (updateUI . mkReport)
