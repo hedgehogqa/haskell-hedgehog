@@ -48,6 +48,8 @@ module Hedgehog.Internal.Property (
   , forAllWithT
   , defaultMinTests
   , discard
+  , shrinkPathCompress
+  , shrinkPathDecompress
 
   -- * Group
   , Group(..)
@@ -159,6 +161,7 @@ import qualified Control.Monad.Trans.Writer.Lazy as Lazy
 import qualified Control.Monad.Trans.Writer.Strict as Strict
 
 import qualified Data.Char as Char
+import           Data.Function (on)
 import           Data.Functor (($>))
 import           Data.Functor.Identity (Identity(..))
 import           Data.Int (Int64)
@@ -180,6 +183,7 @@ import           Hedgehog.Internal.Source
 
 import           Language.Haskell.TH.Syntax (Lift)
 
+import qualified Numeric
 
 ------------------------------------------------------------------------
 
@@ -337,6 +341,43 @@ newtype ShrinkCount =
 newtype ShrinkPath =
   ShrinkPath [Int]
   deriving (Eq, Ord, Show)
+
+shrinkPathCompress :: TestCount -> ShrinkPath -> String
+shrinkPathCompress (TestCount tests) (ShrinkPath sp) =
+  (mconcat
+    $ shows tests
+    : zipWith (\alphabet loc -> Numeric.showIntAtBase 26 (alphabet !!) loc)
+              (cycle [['a'..'z'], ['A'..'Z']])
+              (reverse sp)
+  )
+    ""
+
+shrinkPathDecompress :: String -> Maybe (TestCount, ShrinkPath)
+shrinkPathDecompress str =
+  let isDigit c = '0' <= c && c <= '9'
+      isLower c = 'a' <= c && c <= 'z'
+      isUpper c = 'A' <= c && c <= 'Z'
+
+      readPNum "" = []
+      readPNum s@(c1:_) =
+        if isDigit c1
+          then Numeric.readInt 10 isDigit (\c -> fromEnum c - fromEnum '0') s
+        else if isLower c1
+          then Numeric.readInt 26 isLower (\c -> fromEnum c - fromEnum 'a') s
+        else if isUpper c1
+          then Numeric.readInt 26 isUpper (\c -> fromEnum c - fromEnum 'A') s
+        else []
+
+      readNumMaybe s = case readPNum s of
+        [(num, "")] -> Just num
+        _ -> Nothing
+
+      groups =
+        List.groupBy ((==) `on` \c -> (isDigit c, isLower c, isUpper c)) str
+      numbers = traverse readNumMaybe groups
+  in case numbers of
+    Just (tc:sp) -> Just (TestCount tc, ShrinkPath $ reverse sp)
+    _ -> Nothing
 
 -- | The number of times to re-run a test during shrinking. This is useful if
 --   you are testing something which fails non-deterministically and you want to
