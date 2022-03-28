@@ -161,7 +161,6 @@ import qualified Control.Monad.Trans.Writer.Lazy as Lazy
 import qualified Control.Monad.Trans.Writer.Strict as Strict
 
 import qualified Data.Char as Char
-import           Data.Function (on)
 import           Data.Functor (($>))
 import           Data.Functor.Identity (Identity(..))
 import           Data.Int (Int64)
@@ -342,21 +341,48 @@ newtype ShrinkPath =
   ShrinkPath [Int]
   deriving (Eq, Ord, Show)
 
+-- | Compress a shrink path into a hopefully-short alphanumeric string.
+--
+--   We encode the path components in base 26, alternating between uppercase and
+--   lowercase alphabets to distinguish list elements. Additionally when we have
+--   runs of equal components, we use the normal base 10 encoding to indicate
+--   the length.
+--
+--   We also put the 'TestCount' at the beginning, so that that doesn't need to
+--   be specified separately.
+--
+--   This gives something which is hopefully quite short, but a human can
+--   roughly interpret it by eyeball.
+--
 shrinkPathCompress :: TestCount -> ShrinkPath -> String
 shrinkPathCompress (TestCount tests) (ShrinkPath sp) =
-  (mconcat
-    $ shows tests
-    : zipWith (\alphabet loc -> Numeric.showIntAtBase 26 (alphabet !!) loc)
-              (cycle [['a'..'z'], ['A'..'Z']])
-              (reverse sp)
-  )
-    ""
+  let groups = List.map (\l -> (head l, length l)) $ List.group (reverse sp)
+  in
+    (mconcat
+      $ shows tests
+      : zipWith (\alphabet (loc, count) ->
+                   Numeric.showIntAtBase 26 (alphabet !!) loc
+                   <> if count == 1 then mempty else shows count
+                )
+                (cycle [['a'..'z'], ['A'..'Z']])
+                groups
+    )
+      ""
 
+-- | Decompress a shrink path.
+--
+--   This satisfies
+--
+-- @
+--   shrinkPathDecompress (shrinkPathCompress a b) == Just (a, b)
+-- @
+--
 shrinkPathDecompress :: String -> Maybe (TestCount, ShrinkPath)
 shrinkPathDecompress str =
   let isDigit c = '0' <= c && c <= '9'
       isLower c = 'a' <= c && c <= 'z'
       isUpper c = 'A' <= c && c <= 'Z'
+      classifyChar c = (isDigit c, isLower c, isUpper c)
 
       readPNum "" = []
       readPNum s@(c1:_) =
@@ -372,12 +398,22 @@ shrinkPathDecompress str =
         [(num, "")] -> Just num
         _ -> Nothing
 
-      groups =
-        List.groupBy ((==) `on` \c -> (isDigit c, isLower c, isUpper c)) str
-      numbers = traverse readNumMaybe groups
-  in case numbers of
-    Just (tc:sp) -> Just (TestCount tc, ShrinkPath $ reverse sp)
-    _ -> Nothing
+      (tcStr, spStr) = List.span isDigit str
+      spGroups :: [(Maybe Int, Maybe Int)] =
+        let go [] = []
+            go (c1:cs) =
+              let (hd, tl1) = span (\c -> classifyChar c == classifyChar c1) cs
+                  (digs, tl2) = span isDigit tl1
+              in ( readNumMaybe (c1:hd)
+                 , readNumMaybe $ if null digs then "1" else digs
+                 )
+                 : go tl2
+        in go spStr
+  in do
+    tc <- readNumMaybe tcStr
+    sp <- concat <$>
+      traverse (\(mNum, mCount) -> replicate <$> mCount <*> mNum) spGroups
+    Just $ (TestCount tc, ShrinkPath $ reverse sp)
 
 -- | The number of times to re-run a test during shrinking. This is useful if
 --   you are testing something which fails non-deterministically and you want to
