@@ -1661,7 +1661,7 @@ subterm3 gx gy gz f =
 ------------------------------------------------------------------------
 -- Combinators - Combinations & Permutations
 
--- | Generates a random subsequence of a list.
+-- | Generates a strictly smaller, random subsequence of a list.
 --
 -- For example:
 --
