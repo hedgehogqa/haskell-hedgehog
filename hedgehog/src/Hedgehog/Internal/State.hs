@@ -449,17 +449,14 @@ commandGenOK (CommandA inputGen _ _ _) state =
 --   evaluated.
 --
 data Action m (state :: (Type -> Type) -> Type) =
-  forall input0 input output.
+  forall input output.
   (TraversableB input, Show (input Symbolic), Show output) =>
   Action {
-      actionInput0 ::
-        input0
-
-    , actionInput ::
+      actionInput ::
         input Symbolic
 
     , actionRefreshInput ::
-        state Symbolic -> input0 -> Maybe (input Symbolic)
+        state Symbolic -> Maybe (input Symbolic)
 
     , actionOutput ::
         Symbolic output
@@ -478,7 +475,7 @@ data Action m (state :: (Type -> Type) -> Type) =
     }
 
 instance Show (Action m state) where
-  showsPrec p (Action _ input _ (Symbolic (Name output)) _ _ _ _) =
+  showsPrec p (Action input _ (Symbolic (Name output)) _ _ _ _) =
     showParen (p > 10) $
       showString "Var " .
       showsPrec 11 output .
@@ -561,10 +558,10 @@ contextNewVar = do
 rethreadState :: [Action m state] -> State (Context state) [Action m state]
 rethreadState =
   let
-    loop (Action input0 _ refreshInput output exec require update ensure) = do
+    loop (Action _ refreshInput output exec require update ensure) = do
       Context state0 vars0 <- get
 
-      case refreshInput state0 input0 of
+      case refreshInput state0 of
         Just input | require state0 input && variablesOK input vars0 -> do
           let
             state =
@@ -574,7 +571,7 @@ rethreadState =
               insertSymbolic output vars0
 
           put $ Context state vars
-          pure $ Just $ Action input0 input refreshInput output exec require update ensure
+          pure $ Just $ Action input refreshInput output exec require update ensure
         _ ->
           pure Nothing
   in
@@ -615,7 +612,7 @@ action commands =
             callbackUpdate callbacks state0 input (Var output)
 
           pure . Just $
-            Action input input (const Just) output exec
+            Action input (const $ Just input) output exec
               (callbackRequire callbacks)
               (callbackUpdate callbacks)
               (callbackEnsure callbacks)
@@ -634,7 +631,7 @@ action commands =
               callbackUpdate callbacks state0 input (Var output)
 
             pure . Just $
-              Action input0 input mkInput output exec
+              Action input (flip mkInput input0) output exec
                 (callbackRequire callbacks)
                 (callbackUpdate callbacks)
                 (callbackEnsure callbacks)
@@ -661,7 +658,7 @@ newtype Sequential m state =
     }
 
 renderAction :: Action m state -> [String]
-renderAction (Action _ input _ (Symbolic (Name output)) _ _ _ _) =
+renderAction (Action input _ (Symbolic (Name output)) _ _ _ _) =
   let
     prefix0 =
       "Var " ++ show output ++ " = "
@@ -677,7 +674,7 @@ renderAction (Action _ input _ (Symbolic (Name output)) _ _ _ _) =
         fmap (prefix ++) xs
 
 renderActionResult :: Environment -> Action m state -> [String]
-renderActionResult env (Action _ _ _ output@(Symbolic (Name name)) _ _ _ _) =
+renderActionResult env (Action _ _ output@(Symbolic (Name name)) _ _ _ _) =
   let
     prefix0 =
       "Var " ++ show name ++ " = "
@@ -776,7 +773,7 @@ data ActionCheck state =
     }
 
 execute :: (MonadTest m, HasCallStack) => Action m state -> StateT Environment m (ActionCheck state)
-execute (Action _ sinput _ soutput exec _require update ensure) =
+execute (Action sinput _ soutput exec _require update ensure) =
   withFrozenCallStack $ do
     env0 <- get
     input <- evalEither $ reify env0 sinput
@@ -803,7 +800,7 @@ executeUpdateEnsure ::
   => (state Concrete, Environment)
   -> Action m state
   -> m (state Concrete, Environment)
-executeUpdateEnsure (state0, env0) (Action _ sinput _ soutput exec _require update ensure) =
+executeUpdateEnsure (state0, env0) (Action sinput _ soutput exec _require update ensure) =
   withFrozenCallStack $ do
     input <- evalEither $ reify env0 sinput
     output <- exec input
