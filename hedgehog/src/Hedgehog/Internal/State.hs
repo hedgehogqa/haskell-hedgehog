@@ -548,6 +548,12 @@ action commands =
     Command mgenInput exec callbacks <-
       Gen.element_ $ filter (\c -> commandGenOK c state0) commands
 
+    -- If we shrink the input, we still want to use the same output. Otherwise
+    -- any actions using this output as part of their input will be dropped. But
+    -- the existing output is still in the context, so `contextNewVar` will
+    -- create a new one. To avoid that, we generate the output before the input.
+    output <- contextNewVar
+
     input <-
       case mgenInput state0 of
         Nothing ->
@@ -559,8 +565,6 @@ action commands =
       pure Nothing
 
     else do
-      output <- contextNewVar
-
       contextUpdate $
         callbackUpdate callbacks state0 input (Var output)
 
