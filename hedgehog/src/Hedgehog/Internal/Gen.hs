@@ -1152,7 +1152,7 @@ element = \case
     error "Hedgehog.Gen.element: used with empty list"
   xs -> do
     n <- integral $ Range.constant 0 (length xs - 1)
-    pure $ xs !! toList n
+    pure $ toList xs !! n
 
 -- | Randomly selects one of the generators in the list.
 --
