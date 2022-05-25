@@ -1192,12 +1192,12 @@ constant =
 --   /The input list must be non-empty./
 --
 element :: (Foldable f, MonadGen m) => f a -> m a
-element = \case
+element fa = case toList fa of
   [] ->
     error "Hedgehog.Gen.element: used with empty list"
   xs -> do
     n <- integral $ Range.constant 0 (length xs - 1)
-    pure $ toList xs !! n
+    pure $ xs !! n
 
 -- | Randomly selects one of the elements in the list.
 --
