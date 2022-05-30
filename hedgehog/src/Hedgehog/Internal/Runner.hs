@@ -31,7 +31,6 @@ import qualified Control.Concurrent.STM.TVar as TVar
 import           Control.Monad.Catch (MonadCatch(..), catchAll)
 import           Control.Monad.IO.Class (MonadIO(..))
 import           Data.Maybe (isJust)
-import           System.Environment (lookupEnv)
 
 import           Hedgehog.Internal.Config
 import           Hedgehog.Internal.Gen (evalGenT)
@@ -47,7 +46,7 @@ import           Hedgehog.Internal.Property (TestCount(..), PropertyCount(..))
 import           Hedgehog.Internal.Property (confidenceSuccess, confidenceFailure)
 import           Hedgehog.Internal.Property (coverageSuccess, journalCoverage)
 import           Hedgehog.Internal.Property (defaultMinTests)
-import           Hedgehog.Internal.Property (ShrinkPath(..), shrinkPathDecompress)
+import           Hedgehog.Internal.Property (ShrinkPath(..))
 import           Hedgehog.Internal.Queue
 import           Hedgehog.Internal.Region
 import           Hedgehog.Internal.Report
@@ -211,20 +210,15 @@ checkReport ::
   -> (Report Progress -> m ())
   -> m (Report Result)
 checkReport cfg size0 seed0 test0 updateUI = do
-  -- These should be parameters (or rather, combined as one parameter), but that
-  -- would need changes in hspec-hedgehog.
-  mSkipToTest1 <-
-    liftIO $ fmap (TestCount . read) <$> lookupEnv "HEDGEHOG_SKIP_TO_TEST"
+  skip <- liftIO $ resolveSkip $ propertySkip cfg
 
-  mSkipToShrink1 <- liftIO $
-    fmap shrinkPathDecompress <$> lookupEnv "HEDGEHOG_SKIP_TO_SHRINK"
-
-  let (mSkipToTest, mSkipToShrink) = case (mSkipToTest1, mSkipToShrink1) of
-        (Nothing, Nothing) -> (Nothing, Nothing)
-        (Just t, Nothing) -> (Just t, Nothing)
-        (Nothing, Just (Just (t, s))) -> (Just t, Just s)
-        (Nothing, Just Nothing) -> error "could not read shrink path"
-        (Just _, Just _) -> error "Cannot skip to both test and shrink"
+  let (mSkipToTest, mSkipToShrink) = case skip of
+        SkipNothing ->
+          (Nothing, Nothing)
+        SkipToTest t ->
+          (Just t, Nothing)
+        SkipToShrink t s ->
+          (Just t, Just s)
 
   let
     test =

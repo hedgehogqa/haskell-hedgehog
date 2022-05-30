@@ -34,12 +34,14 @@ module Hedgehog.Internal.Property (
   , DiscardCount(..)
   , ShrinkLimit(..)
   , ShrinkCount(..)
+  , Skip(..)
   , ShrinkPath(..)
   , ShrinkRetries(..)
   , withTests
   , withDiscards
   , withShrinks
   , withRetries
+  , withSkip
   , property
   , test
   , forAll
@@ -277,6 +279,10 @@ data PropertyConfig =
     , propertyShrinkLimit :: !ShrinkLimit
     , propertyShrinkRetries :: !ShrinkRetries
     , propertyTerminationCriteria :: !TerminationCriteria
+
+    -- | If this is 'Nothing', we take the Skip from the environment variable
+    -- @HEDGEHOG_SKIP@.
+    , propertySkip :: Maybe Skip
     } deriving (Eq, Ord, Show, Lift)
 
 -- | The number of successful tests that need to be run before a property test
@@ -296,7 +302,7 @@ newtype TestLimit =
 --
 newtype TestCount =
   TestCount Int
-  deriving (Eq, Ord, Show, Num, Enum, Real, Integral)
+  deriving (Eq, Ord, Show, Num, Enum, Real, Integral, Lift)
 
 -- | The number of tests a property had to discard.
 --
@@ -335,11 +341,34 @@ newtype ShrinkCount =
   ShrinkCount Int
   deriving (Eq, Ord, Show, Num, Enum, Real, Integral)
 
+-- | How many of a property's tests to skip over before starting to run it.
+--
+data Skip =
+  -- | Don't skip anything.
+  --
+    SkipNothing
+
+  -- | Skip to a specific test number. If it fails, shrink as normal. If it
+  --   passes, move on to the next test.
+  --
+  | SkipToTest TestCount
+
+  -- | Skip to a specific test number and shrink state. If it fails, stop
+  --   without shrinking further. If it passes, the property will pass without
+  --   running any more tests.
+  --
+  --   Due to implementation details, all intermediate shrink states - those on
+  --   the direct path from the original test input to the target state - will
+  --   be tested too, and their results discarded.
+  --
+  | SkipToShrink TestCount ShrinkPath
+  deriving (Eq, Ord, Show, Lift)
+
 -- | The path taken to reach a shrink state.
 --
 newtype ShrinkPath =
   ShrinkPath [Int]
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Lift)
 
 -- | Compress a shrink path into a hopefully-short alphanumeric string.
 --
@@ -1075,6 +1104,8 @@ defaultConfig =
         0
     , propertyTerminationCriteria =
         NoConfidenceTermination defaultMinTests
+    , propertySkip =
+        Nothing
     }
 
 -- | The minimum amount of tests to run for a 'Property'
@@ -1160,6 +1191,12 @@ withShrinks n =
 withRetries :: ShrinkRetries -> Property -> Property
 withRetries n =
   mapConfig $ \config -> config { propertyShrinkRetries = n }
+
+-- | Set the target that a property will skip to before it starts to run.
+--
+withSkip :: Skip -> Property -> Property
+withSkip s =
+  mapConfig $ \config -> config { propertySkip = Just s }
 
 -- | Creates a property with the default configuration.
 --
