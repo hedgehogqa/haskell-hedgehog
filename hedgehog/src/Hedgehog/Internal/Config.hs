@@ -32,12 +32,13 @@ module Hedgehog.Internal.Config (
 import           Control.Monad.IO.Class (MonadIO(..))
 
 import qualified Data.Text as Text
+import           Data.Maybe (fromMaybe)
 
 import qualified GHC.Conc as Conc
 
 import           Hedgehog.Internal.Seed (Seed(..))
 import qualified Hedgehog.Internal.Seed as Seed
-import           Hedgehog.Internal.Property (Skip(..), TestCount(..), shrinkPathDecompress)
+import           Hedgehog.Internal.Property (Skip(..), skipDecompress)
 
 import           Language.Haskell.TH.Syntax (Lift)
 
@@ -174,23 +175,8 @@ detectWorkers = do
 detectSkip :: MonadIO m => m Skip
 detectSkip =
   liftIO $ do
-    mSkipToTest1 <-
-      liftIO $ fmap (TestCount . read) <$> lookupEnv "HEDGEHOG_SKIP_TO_TEST"
-
-    mSkipToShrink1 <- liftIO $
-      fmap shrinkPathDecompress <$> lookupEnv "HEDGEHOG_SKIP_TO_SHRINK"
-
-    case (mSkipToTest1, mSkipToShrink1) of
-      (Nothing, Nothing) ->
-        pure SkipNothing
-      (Just t, Nothing) ->
-        pure $ SkipToTest t
-      (Nothing, Just (Just (t, s))) ->
-        pure $ SkipToShrink t s
-      (Nothing, Just Nothing) ->
-        error "could not read shrink path"
-      (Just _, Just _) ->
-        error "Cannot skip to both test and shrink"
+    menv <- (skipDecompress =<<) <$> lookupEnv "HEDGEHOG_SKIP"
+    pure $ fromMaybe SkipNothing menv
 
 resolveColor :: MonadIO m => Maybe UseColor -> m UseColor
 resolveColor = \case

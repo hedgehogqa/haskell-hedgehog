@@ -50,8 +50,8 @@ module Hedgehog.Internal.Property (
   , forAllWithT
   , defaultMinTests
   , discard
-  , shrinkPathCompress
-  , shrinkPathDecompress
+  , skipCompress
+  , skipDecompress
 
   -- * Group
   , Group(..)
@@ -170,7 +170,7 @@ import           Data.Map (Map)
 import qualified Data.Map.Strict as Map
 import           Data.Number.Erf (invnormcdf)
 import qualified Data.List as List
-import           Data.String (IsString)
+import           Data.String (IsString(..))
 import           Data.Ratio ((%))
 import           Data.Typeable (typeOf)
 
@@ -185,6 +185,8 @@ import           Hedgehog.Internal.Source
 import           Language.Haskell.TH.Syntax (Lift)
 
 import qualified Numeric
+
+import           Text.Read (readMaybe)
 
 ------------------------------------------------------------------------
 
@@ -364,32 +366,58 @@ data Skip =
   | SkipToShrink TestCount ShrinkPath
   deriving (Eq, Ord, Show, Lift)
 
+-- | We use this instance to support usage like
+--
+-- @
+--   withTests "3:aB"
+-- @
+--
+--   It throws an error if the input is not a valid compressed 'Skip'.
+--
+instance IsString Skip where
+  fromString s =
+    case skipDecompress s of
+      Nothing ->
+        error $ "Not a valid Skip: " ++ s
+      Just skip ->
+        skip
+
 -- | The path taken to reach a shrink state.
+--
+--   This is in reverse order, most recent path element first, for efficient
+--   appending.
 --
 newtype ShrinkPath =
   ShrinkPath [Int]
   deriving (Eq, Ord, Show, Lift)
 
--- | Compress a shrink path into a hopefully-short alphanumeric string.
+-- | Compress a Skip into a hopefully-short alphanumeric string.
 --
---   We encode the path components in base 26, alternating between uppercase and
+--   The bit that might be long is the 'ShrinkPath' in 'SkipToShrink'. For that,
+--   we encode the path components in base 26, alternating between uppercase and
 --   lowercase alphabets to distinguish list elements. Additionally when we have
 --   runs of equal components, we use the normal base 10 encoding to indicate
 --   the length.
 --
---   We also put the 'TestCount' at the beginning, so that that doesn't need to
---   be specified separately.
---
 --   This gives something which is hopefully quite short, but a human can
 --   roughly interpret it by eyeball.
 --
-shrinkPathCompress :: TestCount -> ShrinkPath -> String
-shrinkPathCompress (TestCount tests) (ShrinkPath sp) =
-  let groups = List.map (\l -> (head l, length l)) $ List.group (reverse sp)
+skipCompress :: Skip -> String
+skipCompress = \case
+  SkipNothing ->
+    ""
+  SkipToTest (TestCount n) ->
+    show n
+  SkipToShrink (TestCount n) sp ->
+    show n ++ ":" ++ shrinkPathCompress sp
+
+shrinkPathCompress :: ShrinkPath -> String
+shrinkPathCompress (ShrinkPath sp) =
+  let
+    groups = List.map (\l -> (head l, length l)) $ List.group (reverse sp)
   in
     (mconcat
-      $ shows tests
-      : zipWith (\alphabet (loc, count) ->
+      $ zipWith (\alphabet (loc, count) ->
                    Numeric.showIntAtBase 26 (alphabet !!) loc
                    <> if count == 1 then mempty else shows count
                 )
@@ -398,51 +426,63 @@ shrinkPathCompress (TestCount tests) (ShrinkPath sp) =
     )
       ""
 
--- | Decompress a shrink path.
+-- | Decompress a 'Skip'.
 --
 --   This satisfies
 --
 -- @
---   shrinkPathDecompress (shrinkPathCompress a b) == Just (a, b)
+--   skipDecompress (skipCompress a) == Just a
 -- @
 --
-shrinkPathDecompress :: String -> Maybe (TestCount, ShrinkPath)
+skipDecompress :: String -> Maybe Skip
+skipDecompress str =
+  if null str then
+    Just SkipNothing
+  else do
+    let (tcStr, spStr) = span (/= ':') str
+    tc <- TestCount <$> readMaybe tcStr
+    if null spStr then
+      Just $ SkipToTest tc
+    else do
+      sp <- shrinkPathDecompress $ drop 1 spStr
+      Just $ SkipToShrink tc sp
+
+shrinkPathDecompress :: String -> Maybe ShrinkPath
 shrinkPathDecompress str =
-  let isDigit c = '0' <= c && c <= '9'
-      isLower c = 'a' <= c && c <= 'z'
-      isUpper c = 'A' <= c && c <= 'Z'
-      classifyChar c = (isDigit c, isLower c, isUpper c)
+  let
+    isDigit c = '0' <= c && c <= '9'
+    isLower c = 'a' <= c && c <= 'z'
+    isUpper c = 'A' <= c && c <= 'Z'
+    classifyChar c = (isDigit c, isLower c, isUpper c)
 
-      readPNum "" = []
-      readPNum s@(c1:_) =
-        if isDigit c1
-          then Numeric.readInt 10 isDigit (\c -> fromEnum c - fromEnum '0') s
-        else if isLower c1
-          then Numeric.readInt 26 isLower (\c -> fromEnum c - fromEnum 'a') s
-        else if isUpper c1
-          then Numeric.readInt 26 isUpper (\c -> fromEnum c - fromEnum 'A') s
-        else []
+    readSNum "" = []
+    readSNum s@(c1:_) =
+      if isDigit c1
+        then Numeric.readInt 10 isDigit (\c -> fromEnum c - fromEnum '0') s
+      else if isLower c1
+        then Numeric.readInt 26 isLower (\c -> fromEnum c - fromEnum 'a') s
+      else if isUpper c1
+        then Numeric.readInt 26 isUpper (\c -> fromEnum c - fromEnum 'A') s
+      else []
 
-      readNumMaybe s = case readPNum s of
-        [(num, "")] -> Just num
-        _ -> Nothing
+    readNumMaybe s = case readSNum s of
+      [(num, "")] -> Just num
+      _ -> Nothing
 
-      (tcStr, spStr) = List.span isDigit str
-      spGroups :: [(Maybe Int, Maybe Int)] =
-        let go [] = []
-            go (c1:cs) =
-              let (hd, tl1) = span (\c -> classifyChar c == classifyChar c1) cs
-                  (digs, tl2) = span isDigit tl1
-              in ( readNumMaybe (c1:hd)
-                 , readNumMaybe $ if null digs then "1" else digs
-                 )
-                 : go tl2
-        in go spStr
+    spGroups :: [(Maybe Int, Maybe Int)] =
+      let go [] = []
+          go (c1:cs) =
+            let (hd, tl1) = span (\c -> classifyChar c == classifyChar c1) cs
+                (digs, tl2) = span isDigit tl1
+            in ( readNumMaybe (c1:hd)
+               , readNumMaybe $ if null digs then "1" else digs
+               )
+               : go tl2
+      in go str
   in do
-    tc <- readNumMaybe tcStr
     sp <- concat <$>
       traverse (\(mNum, mCount) -> replicate <$> mCount <*> mNum) spGroups
-    Just $ (TestCount tc, ShrinkPath $ reverse sp)
+    Just $ ShrinkPath $ reverse sp
 
 -- | The number of times to re-run a test during shrinking. This is useful if
 --   you are testing something which fails non-deterministically and you want to

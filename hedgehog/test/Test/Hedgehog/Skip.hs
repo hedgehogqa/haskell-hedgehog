@@ -1,4 +1,5 @@
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -7,11 +8,16 @@
 module Test.Hedgehog.Skip where
 
 import           Control.Monad.IO.Class (MonadIO(..))
+
+import           Data.Foldable (for_)
 import           Data.IORef (IORef)
 import qualified Data.IORef as IORef
+
 import           Hedgehog
 import qualified Hedgehog.Gen as Gen
+import qualified Hedgehog.Range as Range
 import qualified Hedgehog.Internal.Config as Config
+import           Hedgehog.Internal.Property (Skip(..), ShrinkPath(..), skipCompress, skipDecompress)
 import qualified Hedgehog.Internal.Property as Property
 import qualified Hedgehog.Internal.Runner as Runner
 import           Hedgehog.Internal.Report (Report(..), Result(..), FailureReport(..))
@@ -49,13 +55,14 @@ prop_SkipNothing =
   withTests 1 . property $ do
     logRef <- liftIO $ IORef.newIORef []
     let
-      prop = Property.withSkip Property.SkipNothing $ skipTestProperty logRef
+      prop =
+        withSkip "" $ skipTestProperty logRef
 
     report <- checkProp prop
     case reportStatus report of
       Failed f -> do
         failureShrinks f === 3
-        failureShrinkPath f === Property.ShrinkPath [1, 1, 1]
+        failureShrinkPath f === ShrinkPath [1, 1, 1]
 
       _ ->
         failure
@@ -79,13 +86,14 @@ prop_SkipToFailingTest =
   withTests 1 . property $ do
     logRef <- liftIO $ IORef.newIORef []
     let
-      prop = Property.withSkip (Property.SkipToTest 3) $ skipTestProperty logRef
+      prop =
+        withSkip "3" $ skipTestProperty logRef
 
     report <- checkProp prop
     case reportStatus report of
       Failed f -> do
         failureShrinks f === 3
-        failureShrinkPath f === Property.ShrinkPath [1, 1, 1]
+        failureShrinkPath f === ShrinkPath [1, 1, 1]
 
       _ ->
         failure
@@ -107,7 +115,8 @@ prop_SkipPastFailingTest =
   withTests 1 . property $ do
     logRef <- liftIO $ IORef.newIORef []
     let
-      prop = Property.withSkip (Property.SkipToTest 4) $ skipTestProperty logRef
+      prop =
+        withSkip "4" $ skipTestProperty logRef
 
     report <- checkProp prop
     reportStatus report === OK
@@ -120,8 +129,8 @@ prop_SkipToNoShrink =
   withTests 1 . property $ do
     logRef <- liftIO $ IORef.newIORef []
     let
-      prop = Property.withSkip (Property.SkipToShrink 3 $ Property.ShrinkPath [])
-        $ skipTestProperty logRef
+      prop =
+        withSkip "3:" $ skipTestProperty logRef
 
     report <- checkProp prop
     case reportStatus report of
@@ -140,8 +149,8 @@ prop_SkipToFailingShrink =
   withTests 1 . property $ do
     logRef <- liftIO $ IORef.newIORef []
     let
-      prop = Property.withSkip (Property.SkipToShrink 3 $ Property.ShrinkPath [1, 1])
-        $ skipTestProperty logRef
+      prop =
+        withSkip "3:b2" $ skipTestProperty logRef
 
     report <- checkProp prop
     case reportStatus report of
@@ -160,15 +169,74 @@ prop_SkipToPassingShrink =
   withTests 1 . property $ do
     logRef <- liftIO $ IORef.newIORef []
     let
-      -- ShrinkPath is stored in reverse order of what you'd expect.
-      prop = Property.withSkip (Property.SkipToShrink 3 $ Property.ShrinkPath [0, 1])
-        $ skipTestProperty logRef
+      prop =
+        withSkip "3:bA" $ skipTestProperty logRef
 
     report <- checkProp prop
     reportStatus report === OK
 
     logs <- liftIO $ reverse <$> IORef.readIORef logRef
     logs === [(2, 3, False), (2, 2, False), (2, 2, True)]
+
+genSkip :: Gen Skip
+genSkip =
+  let
+    range =
+      Range.linear 0 100
+
+    genTestCount =
+      Property.TestCount <$> Gen.int range
+
+    genShrinkPath =
+      Property.ShrinkPath <$> Gen.list range (Gen.int range)
+  in
+    Gen.choice
+      [ pure SkipNothing
+      , SkipToTest <$> genTestCount
+      , SkipToShrink <$> genTestCount <*> genShrinkPath
+      ]
+
+-- | Test that `skipCompress` and `skipDecompress` roundtrip.
+prop_compressSkip :: Property
+prop_compressSkip =
+  property $ do
+    skip <- forAll genSkip
+    tripping skip Property.skipCompress Property.skipDecompress
+
+-- | Demonstrate some example compressions.
+--
+--   In general it's probably fine for compressions to change between hedgehog
+--   versions. There's not much reason to share them or save them long-term. So
+--   breaking this test isn't necessarily a problem, if it's done deliberately.
+--
+--   But it's useful to have examples, to avoid accidentally changing the
+--   compression format and to demonstrate edge cases.
+prop_compressDecompressExamples :: Property
+prop_compressDecompressExamples =
+  withTests 1 . property $ do
+    let
+      -- Each test case has a Skip, the result of compressing it, and some other
+      -- strings that would decompress to the same Skip.
+      testCases =
+        [ (SkipNothing, "", [])
+        , (SkipToTest 3, "3", ["03", "003"])
+        , (SkipToTest 197, "197", ["0197", "00197"])
+
+        -- Shrink paths are in reverse order of what you'd expect.
+        , ( SkipToShrink 5 $ Property.ShrinkPath [0, 3, 2]
+          , "5:cDa"
+          , ["5:CdA", "05:c1b0D1A1"]
+          )
+        , ( SkipToShrink 21 $ Property.ShrinkPath [26, 27, 27, 3, 5]
+          , "21:fDbb2BA"
+          , ["21:fDbbBBba"]
+          )
+        ]
+
+    for_ testCases $ \(skip, compressed, otherCompressions) -> do
+      skipCompress skip === compressed
+      for_ (compressed : otherCompressions) $ \c ->
+        skipDecompress c === Just skip
 
 tests :: IO Bool
 tests =
