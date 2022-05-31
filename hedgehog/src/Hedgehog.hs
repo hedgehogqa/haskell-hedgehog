@@ -82,6 +82,9 @@ module Hedgehog (
   , withRetries
   , ShrinkRetries
 
+  , withSkip
+  , Skip
+
   -- * Generating Test Data
   , Gen
   , GenT
@@ -185,6 +188,7 @@ import           Hedgehog.Internal.Property (Group(..), GroupName)
 import           Hedgehog.Internal.Property (Confidence, verifiedTermination, withConfidence)
 import           Hedgehog.Internal.Property (ShrinkLimit, withShrinks)
 import           Hedgehog.Internal.Property (ShrinkRetries, withRetries)
+import           Hedgehog.Internal.Property (Skip, withSkip)
 import           Hedgehog.Internal.Property (Test, TestT, property, test)
 import           Hedgehog.Internal.Property (TestLimit, withTests)
 import           Hedgehog.Internal.Property (collect, label)

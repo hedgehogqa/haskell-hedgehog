@@ -62,7 +62,7 @@ import           Hedgehog.Internal.Property (ShrinkCount(..), PropertyCount(..))
 import           Hedgehog.Internal.Property (TestCount(..), DiscardCount(..))
 import           Hedgehog.Internal.Property (coverPercentage, coverageFailures)
 import           Hedgehog.Internal.Property (labelCovered)
-import           Hedgehog.Internal.Property (ShrinkPath(..), shrinkPathCompress)
+import           Hedgehog.Internal.Property (ShrinkPath(..), skipCompress)
 
 import           Hedgehog.Internal.Show
 import           Hedgehog.Internal.Source
@@ -330,7 +330,8 @@ ppShrinkCount = \case
     ppShow n <+> "shrinks"
 
 ppShrinkPath :: TestCount -> ShrinkPath -> Doc a
-ppShrinkPath tests path = WL.text $ shrinkPathCompress tests path
+ppShrinkPath tests path =
+  WL.text $ skipCompress $ SkipToShrink tests path
 
 ppRawPropertyCount :: PropertyCount -> Doc a
 ppRawPropertyCount (PropertyCount n) =
