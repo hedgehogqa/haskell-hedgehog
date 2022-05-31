@@ -27,16 +27,20 @@ import           Hedgehog.Internal.Report (Report(..), Result(..), FailureReport
 --
 --   It ignores its seed. It fails at size 2. When it shrinks, it initially
 --   shrinks to something that will pass, and then to something that will fail.
+--
 skipTestProperty :: IORef [(Size, Int, Bool)] -> Property
 skipTestProperty logRef =
   withTests 5 . property $ do
-    val@(_, _, shouldPass) <- forAll $ do
+    val@(curSize, _, shouldPass) <- forAll $ do
       curSize <- Gen.sized pure
       (shouldPass, nShrinks) <-
         (,)
           <$> Gen.shrink (\b -> if b then [] else [True]) (pure $ curSize /= 2)
           <*> Gen.shrink (\n -> reverse [0 .. n-1]) (pure 3)
       pure (curSize, nShrinks, shouldPass)
+
+    -- Fail coverage to make sure we disable it when shrinking.
+    cover 100 "Not 4" (curSize /= 4)
 
     liftIO $ IORef.modifyIORef' logRef (val :)
     assert shouldPass
