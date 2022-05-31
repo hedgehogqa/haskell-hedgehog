@@ -329,9 +329,17 @@ ppShrinkCount = \case
   ShrinkCount n ->
     ppShow n <+> "shrinks"
 
-ppShrinkPath :: TestCount -> ShrinkPath -> Doc a
-ppShrinkPath tests path =
-  WL.text $ skipCompress $ SkipToShrink tests path
+-- | Render a compressed 'Skip'.
+--
+ppSkip :: Skip -> Doc a
+ppSkip =
+  WL.text . skipCompress
+
+-- | Render a compressed 'Skip', such that it can be read back in.
+--
+ppSkipReadable :: Skip -> Doc a
+ppSkipReadable =
+  WL.text . show . skipCompress
 
 ppRawPropertyCount :: PropertyCount -> Doc a
 ppRawPropertyCount (PropertyCount n) =
@@ -587,8 +595,8 @@ ppDeclaration decl =
       in
         WL.vsep (ppLocation : ppLines)
 
-ppReproduce :: Maybe PropertyName -> Size -> Seed -> Doc Markup
-ppReproduce name size seed =
+ppReproduce :: Maybe PropertyName -> Size -> Seed -> Skip -> Doc Markup
+ppReproduce name size seed skip =
   WL.vsep [
       markup ReproduceHeader
         "This failure can be reproduced by running:"
@@ -596,6 +604,8 @@ ppReproduce name size seed =
         "recheck" <+>
         WL.text (showsPrec 11 size "") <+>
         WL.text (showsPrec 11 seed "") <+>
+        "$ withSkip" <+>
+        ppSkipReadable skip <+>
         maybe "<property>" (WL.text . unPropertyName) name
     ]
 
@@ -619,7 +629,7 @@ ppTextLines =
   fmap WL.text . List.lines
 
 ppFailureReport :: MonadIO m => Maybe PropertyName -> TestCount -> FailureReport -> m [Doc Markup]
-ppFailureReport name tests (FailureReport size seed _ _ mcoverage inputs0 mlocation0 msg mdiff msgs0) = do
+ppFailureReport name tests (FailureReport size seed _ shrinkPath mcoverage inputs0 mlocation0 msg mdiff msgs0) = do
   let
     basic =
       -- Move the failure message to the end section if we have
@@ -691,7 +701,10 @@ ppFailureReport name tests (FailureReport size seed _ _ mcoverage inputs0 mlocat
         f xs
 
     bottom =
-      maybe [ppReproduce name size seed] (const []) mcoverage
+      maybe
+        [ppReproduce name size seed (SkipToShrink tests shrinkPath)]
+        (const [])
+        mcoverage
 
   pure .
     whenSome (mempty :) .
@@ -755,8 +768,7 @@ ppResult name (Report tests discards coverage result) = do
             ppShrinkDiscard (failureShrinks failure) discards <>
             "." <#>
             "shrink path:" <+>
-            ppShrinkPath tests (failureShrinkPath failure)
-            <> "."
+            ppSkip (SkipToShrink tests $ failureShrinkPath failure)
         ] ++
         ppCoverage tests coverage ++
         pfailure
