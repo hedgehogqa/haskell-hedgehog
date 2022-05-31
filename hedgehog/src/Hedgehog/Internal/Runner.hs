@@ -294,8 +294,7 @@ checkReport cfg size0 seed0 test0 updateUI = do
             []
 
         confidenceReport =
-          -- Disable coverage checks if we skip tests.
-          if isJust mSkipToTest || (coverageReached && labelsCovered) then
+          if coverageReached && labelsCovered then
             successReport
           else
             failureReport $
@@ -309,16 +308,20 @@ checkReport cfg size0 seed0 test0 updateUI = do
         -- at this point, we know that enough tests have been run in order to
         -- make a decision on if this was a successful run or not
         --
-        -- If we have early termination, then we need to check coverageReached / coverageUnreachable
-        pure $ case terminationCriteria of
-          EarlyTermination _ _ -> confidenceReport
-          NoEarlyTermination _ _ -> confidenceReport
-          NoConfidenceTermination _ ->
-            if labelsCovered then
-              successReport
-            else
-              failureReport $
-                "Labels not sufficently covered after " <> show tests <> " tests"
+        -- If we have early termination, then we need to check coverageReached /
+        -- coverageUnreachable. If we skip tests, we ignore coverage.
+        if isJust mSkipToTest then
+          pure successReport
+        else
+          pure $ case terminationCriteria of
+            EarlyTermination _ _ -> confidenceReport
+            NoEarlyTermination _ _ -> confidenceReport
+            NoConfidenceTermination _ ->
+              if labelsCovered then
+                successReport
+              else
+                failureReport $
+                  "Labels not sufficently covered after " <> show tests <> " tests"
 
       else if discards >= fromIntegral (propertyDiscardLimit cfg) then
         -- we've hit the discard limit, give up

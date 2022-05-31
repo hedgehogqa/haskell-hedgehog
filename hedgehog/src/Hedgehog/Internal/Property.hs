@@ -351,7 +351,7 @@ data Skip =
     SkipNothing
 
   -- | Skip to a specific test number. If it fails, shrink as normal. If it
-  --   passes, move on to the next test.
+  --   passes, move on to the next test. Coverage checks are disabled.
   --
   | SkipToTest TestCount
 
