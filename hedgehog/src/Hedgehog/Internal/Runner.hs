@@ -147,9 +147,13 @@ takeSmallest size seed shrinks shrinkPath slimit retries updateUI = \case
           findM (zip [0..] xs) (Failed failure) $ \(n, m) -> do
             o <- runTreeN retries m
             if isFailure o then
-              let ShrinkPath oldPath = shrinkPath
-                  newPath = ShrinkPath (n:oldPath)
-              in Just <$> takeSmallest size seed (shrinks + 1) newPath slimit retries updateUI o
+              let
+                ShrinkPath oldPath =
+                  shrinkPath
+                newPath =
+                  ShrinkPath (n:oldPath)
+              in
+                Just <$> takeSmallest size seed (shrinks + 1) newPath slimit retries updateUI o
             else
               return Nothing
 
@@ -194,7 +198,8 @@ skipToShrink size seed (ShrinkPath shrinkPath) updateUI =
   go shrinks (s0:ss) = \case
     NodeT _ xs ->
       case drop s0 xs of
-        [] -> pure GaveUp
+        [] ->
+          pure GaveUp
         (x:_) -> do
           o <- runTreeT x
           go (shrinks + 1) ss o
@@ -212,7 +217,9 @@ checkReport ::
 checkReport cfg size0 seed0 test0 updateUI = do
   skip <- liftIO $ resolveSkip $ propertySkip cfg
 
-  let (mSkipToTest, mSkipToShrink) = case skip of
+  let
+    (mSkipToTest, mSkipToShrink) =
+      case skip of
         SkipNothing ->
           (Nothing, Nothing)
         SkipToTest t ->
@@ -220,7 +227,6 @@ checkReport cfg size0 seed0 test0 updateUI = do
         SkipToShrink t s ->
           (Just t, Just s)
 
-  let
     test =
       catchAll test0 (fail . show)
 
@@ -338,7 +344,9 @@ checkReport cfg size0 seed0 test0 updateUI = do
             (Just _, Just shrinkPath) -> do
               node <-
                 runTreeT . evalGenT size s0 . runTestT $ unPropertyT test
-              let mkReport = Report (tests + 1) discards coverage0
+              let
+                mkReport =
+                  Report (tests + 1) discards coverage0
               mkReport
                <$> skipToShrink size s0 shrinkPath (updateUI . mkReport) node
             _ -> do

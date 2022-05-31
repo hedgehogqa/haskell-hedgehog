@@ -48,11 +48,12 @@ skipTestProperty logRef =
 checkProp :: MonadIO m => Property -> m (Report Result)
 checkProp prop = do
   seed <- Config.resolveSeed Nothing
-  liftIO $ Runner.checkReport (Property.propertyConfig prop)
-                              0
-                              seed
-                              (Property.propertyTest prop)
-                              (const $ pure ())
+  liftIO $ Runner.checkReport
+    (Property.propertyConfig prop)
+    0
+    seed
+    (Property.propertyTest prop)
+    (const $ pure ())
 
 prop_SkipNothing :: Property
 prop_SkipNothing =

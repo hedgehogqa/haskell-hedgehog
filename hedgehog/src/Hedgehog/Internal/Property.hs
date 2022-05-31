@@ -283,7 +283,7 @@ data PropertyConfig =
     , propertyTerminationCriteria :: !TerminationCriteria
 
     -- | If this is 'Nothing', we take the Skip from the environment variable
-    -- @HEDGEHOG_SKIP@.
+    --   @HEDGEHOG_SKIP@.
     , propertySkip :: Maybe Skip
     } deriving (Eq, Ord, Show, Lift)
 
@@ -343,7 +343,7 @@ newtype ShrinkCount =
   ShrinkCount Int
   deriving (Eq, Ord, Show, Num, Enum, Real, Integral)
 
--- | How many of a property's tests to skip over before starting to run it.
+-- | Where to start running a property's tests.
 --
 data Skip =
   -- | Don't skip anything.
@@ -417,12 +417,13 @@ shrinkPathCompress (ShrinkPath sp) =
     groups = List.map (\l -> (head l, length l)) $ List.group (reverse sp)
   in
     (mconcat
-      $ zipWith (\alphabet (loc, count) ->
-                   Numeric.showIntAtBase 26 (alphabet !!) loc
-                   <> if count == 1 then mempty else shows count
-                )
-                (cycle [['a'..'z'], ['A'..'Z']])
-                groups
+      $ zipWith
+          (\alphabet (loc, count) ->
+              Numeric.showIntAtBase 26 (alphabet !!) loc
+              <> if count == 1 then mempty else shows count
+          )
+          (cycle [['a'..'z'], ['A'..'Z']])
+          groups
     )
       ""
 
@@ -439,7 +440,9 @@ skipDecompress str =
   if null str then
     Just SkipNothing
   else do
-    let (tcStr, spStr) = span (/= ':') str
+    let
+      (tcStr, spStr)
+        = span (/= ':') str
     tc <- TestCount <$> readMaybe tcStr
     if null spStr then
       Just $ SkipToTest tc
@@ -457,28 +460,37 @@ shrinkPathDecompress str =
 
     readSNum "" = []
     readSNum s@(c1:_) =
-      if isDigit c1
-        then Numeric.readInt 10 isDigit (\c -> fromEnum c - fromEnum '0') s
-      else if isLower c1
-        then Numeric.readInt 26 isLower (\c -> fromEnum c - fromEnum 'a') s
-      else if isUpper c1
-        then Numeric.readInt 26 isUpper (\c -> fromEnum c - fromEnum 'A') s
-      else []
+      if isDigit c1 then
+        Numeric.readInt 10 isDigit (\c -> fromEnum c - fromEnum '0') s
+      else if isLower c1 then
+        Numeric.readInt 26 isLower (\c -> fromEnum c - fromEnum 'a') s
+      else if isUpper c1 then
+        Numeric.readInt 26 isUpper (\c -> fromEnum c - fromEnum 'A') s
+      else
+        []
 
-    readNumMaybe s = case readSNum s of
-      [(num, "")] -> Just num
-      _ -> Nothing
+    readNumMaybe s =
+      case readSNum s of
+        [(num, "")] -> Just num
+        _ -> Nothing
 
     spGroups :: [(Maybe Int, Maybe Int)] =
-      let go [] = []
-          go (c1:cs) =
-            let (hd, tl1) = span (\c -> classifyChar c == classifyChar c1) cs
-                (digs, tl2) = span isDigit tl1
-            in ( readNumMaybe (c1:hd)
-               , readNumMaybe $ if null digs then "1" else digs
-               )
-               : go tl2
-      in go str
+      let
+        go [] =
+          []
+        go (c1:cs) =
+          let
+            (hd, tl1) =
+              span (\c -> classifyChar c == classifyChar c1) cs
+            (digs, tl2) =
+              span isDigit tl1
+          in
+            ( readNumMaybe (c1:hd)
+            , readNumMaybe $ if null digs then "1" else digs
+            )
+            : go tl2
+      in
+        go str
   in do
     sp <- concat <$>
       traverse (\(mNum, mCount) -> replicate <$> mCount <*> mNum) spGroups
