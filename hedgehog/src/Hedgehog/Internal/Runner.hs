@@ -176,33 +176,34 @@ skipToShrink ::
   -> NodeT m (Maybe (Either Failure (), Journal))
   -> m Result
 skipToShrink size seed (ShrinkPath shrinkPath) updateUI =
-  go 0 shrinkPath
- where
-  go shrinks [] = \case
-    NodeT Nothing _ ->
-      pure GaveUp
+  let
+    loop shrinks [] = \case
+      NodeT Nothing _ ->
+        pure GaveUp
 
-    NodeT (Just (x, (Journal logs))) _ ->
-      case x of
-        Left (Failure loc err mdiff) -> do
-          let
-            failure =
-              mkFailure size seed shrinks (ShrinkPath shrinkPath) Nothing loc err mdiff (reverse logs)
+      NodeT (Just (x, (Journal logs))) _ ->
+        case x of
+          Left (Failure loc err mdiff) -> do
+            let
+              failure =
+                mkFailure size seed shrinks (ShrinkPath shrinkPath) Nothing loc err mdiff (reverse logs)
 
-          updateUI $ Shrinking failure
-          pure $ Failed failure
+            updateUI $ Shrinking failure
+            pure $ Failed failure
 
-        Right () ->
-          return OK
+          Right () ->
+            return OK
 
-  go shrinks (s0:ss) = \case
-    NodeT _ xs ->
-      case drop s0 xs of
-        [] ->
-          pure GaveUp
-        (x:_) -> do
-          o <- runTreeT x
-          go (shrinks + 1) ss o
+    loop shrinks (s0:ss) = \case
+      NodeT _ xs ->
+        case drop s0 xs of
+          [] ->
+            pure GaveUp
+          (x:_) -> do
+            o <- runTreeT x
+            loop (shrinks + 1) ss o
+  in
+    loop 0 shrinkPath
 
 checkReport ::
      forall m.
