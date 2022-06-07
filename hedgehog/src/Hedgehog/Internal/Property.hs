@@ -369,7 +369,7 @@ data Skip =
 -- | We use this instance to support usage like
 --
 -- @
---   withTests "3:aB"
+--   withSkip "3:aB"
 -- @
 --
 --   It throws an error if the input is not a valid compressed 'Skip'.
