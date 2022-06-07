@@ -226,13 +226,11 @@ prop_compressDecompressExamples =
         [ (SkipNothing, "", [])
         , (SkipToTest 3, "3", ["03", "003"])
         , (SkipToTest 197, "197", ["0197", "00197"])
-
-        -- Shrink paths are in reverse order of what you'd expect.
-        , ( SkipToShrink 5 $ Property.ShrinkPath [0, 3, 2]
+        , ( SkipToShrink 5 $ Property.ShrinkPath [2, 3, 0]
           , "5:cDa"
           , ["5:CdA", "05:c1b0D1A1"]
           )
-        , ( SkipToShrink 21 $ Property.ShrinkPath [26, 27, 27, 3, 5]
+        , ( SkipToShrink 21 $ Property.ShrinkPath [5, 3, 27, 27, 26]
           , "21:fDbb2BA"
           , ["21:fDbbBBba"]
           )
