@@ -119,15 +119,14 @@ runTreeN n m = do
 
 takeSmallest ::
      MonadIO m
-  => Size
-  -> ShrinkCount
+  => ShrinkCount
   -> ShrinkPath
   -> ShrinkLimit
   -> ShrinkRetries
   -> (Progress -> m ())
   -> NodeT m (Maybe (Either Failure (), Journal))
   -> m Result
-takeSmallest size shrinks0 (ShrinkPath shrinkPath0) slimit retries updateUI =
+takeSmallest shrinks0 (ShrinkPath shrinkPath0) slimit retries updateUI =
   let
     loop shrinks revShrinkPath = \case
       NodeT Nothing _ ->
@@ -140,7 +139,7 @@ takeSmallest size shrinks0 (ShrinkPath shrinkPath0) slimit retries updateUI =
               shrinkPath =
                 ShrinkPath $ reverse revShrinkPath
               failure =
-                mkFailure size shrinks shrinkPath Nothing loc err mdiff (reverse logs)
+                mkFailure shrinks shrinkPath Nothing loc err mdiff (reverse logs)
 
             updateUI $ Shrinking failure
 
@@ -169,12 +168,11 @@ takeSmallest size shrinks0 (ShrinkPath shrinkPath0) slimit retries updateUI =
 -- not possible to avoid this.
 skipToShrink ::
      MonadIO m
-  => Size
-  -> ShrinkPath
+  => ShrinkPath
   -> (Progress -> m ())
   -> NodeT m (Maybe (Either Failure (), Journal))
   -> m Result
-skipToShrink size (ShrinkPath shrinkPath) updateUI =
+skipToShrink (ShrinkPath shrinkPath) updateUI =
   let
     loop shrinks [] = \case
       NodeT Nothing _ ->
@@ -185,7 +183,7 @@ skipToShrink size (ShrinkPath shrinkPath) updateUI =
           Left (Failure loc err mdiff) -> do
             let
               failure =
-                mkFailure size shrinks (ShrinkPath shrinkPath) Nothing loc err mdiff (reverse logs)
+                mkFailure shrinks (ShrinkPath shrinkPath) Nothing loc err mdiff (reverse logs)
 
             updateUI $ Shrinking failure
             pure $ Failed failure
@@ -289,7 +287,6 @@ checkReport cfg size0 seed0 test0 updateUI = do
 
         failureReport message =
           Report tests discards coverage0 seed0 . Failed $ mkFailure
-            size
             0
             (ShrinkPath [])
             (Just coverage0)
@@ -346,8 +343,7 @@ checkReport cfg size0 seed0 test0 updateUI = do
               let
                 mkReport =
                   Report (tests + 1) discards coverage0 seed0
-              mkReport
-                <$> skipToShrink size shrinkPath (updateUI . mkReport) node
+              mkReport <$> skipToShrink shrinkPath (updateUI . mkReport) node
             _ -> do
               node@(NodeT x _) <-
                 runTreeT . evalGenT size s0 . runTestT $ unPropertyT test
@@ -362,7 +358,6 @@ checkReport cfg size0 seed0 test0 updateUI = do
                   in
                     fmap mkReport $
                       takeSmallest
-                        size
                         0
                         (ShrinkPath [])
                         (propertyShrinkLimit cfg)

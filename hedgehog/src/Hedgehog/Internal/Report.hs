@@ -66,7 +66,6 @@ import           Hedgehog.Internal.Property (ShrinkPath(..), skipCompress)
 
 import           Hedgehog.Internal.Show
 import           Hedgehog.Internal.Source
-import           Hedgehog.Range (Size)
 
 import           System.Console.ANSI (ColorIntensity(..), Color(..))
 import           System.Console.ANSI (ConsoleLayer(..), ConsoleIntensity(..))
@@ -92,8 +91,7 @@ data FailedAnnotation =
 
 data FailureReport =
   FailureReport {
-      failureSize :: !Size
-    , failureShrinks :: !ShrinkCount
+      failureShrinks :: !ShrinkCount
     , failureShrinkPath :: !ShrinkPath
     , failureCoverage :: !(Maybe (Coverage CoverCount))
     , failureAnnotations :: ![FailedAnnotation]
@@ -269,8 +267,7 @@ takeFootnote = \case
     Nothing
 
 mkFailure ::
-     Size
-  -> ShrinkCount
+     ShrinkCount
   -> ShrinkPath
   -> Maybe (Coverage CoverCount)
   -> Maybe Span
@@ -278,7 +275,7 @@ mkFailure ::
   -> Maybe Diff
   -> [Log]
   -> FailureReport
-mkFailure size shrinks shrinkPath mcoverage location message diff logs =
+mkFailure shrinks shrinkPath mcoverage location message diff logs =
   let
     inputs =
       mapMaybe takeAnnotation logs
@@ -286,7 +283,7 @@ mkFailure size shrinks shrinkPath mcoverage location message diff logs =
     footnotes =
       mapMaybe takeFootnote logs
   in
-    FailureReport size shrinks shrinkPath mcoverage inputs location message diff footnotes
+    FailureReport shrinks shrinkPath mcoverage inputs location message diff footnotes
 
 ------------------------------------------------------------------------
 -- Pretty Printing
@@ -626,7 +623,7 @@ ppTextLines =
   fmap WL.text . List.lines
 
 ppFailureReport :: MonadIO m => Maybe PropertyName -> TestCount -> Seed -> FailureReport -> m [Doc Markup]
-ppFailureReport name tests seed (FailureReport _ _ shrinkPath mcoverage inputs0 mlocation0 msg mdiff msgs0) = do
+ppFailureReport name tests seed (FailureReport _ shrinkPath mcoverage inputs0 mlocation0 msg mdiff msgs0) = do
   let
     basic =
       -- Move the failure message to the end section if we have
