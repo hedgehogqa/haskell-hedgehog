@@ -378,7 +378,7 @@ instance IsString Skip where
   fromString s =
     case skipDecompress s of
       Nothing ->
-        error $ "Not a valid Skip: " ++ s
+        error $ "fromString: Not a valid Skip: " ++ s
       Just skip ->
         skip
 
