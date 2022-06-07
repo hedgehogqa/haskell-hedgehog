@@ -32,7 +32,6 @@ module Hedgehog.Internal.Config (
 import           Control.Monad.IO.Class (MonadIO(..))
 
 import qualified Data.Text as Text
-import           Data.Maybe (fromMaybe)
 
 import qualified GHC.Conc as Conc
 
@@ -175,8 +174,18 @@ detectWorkers = do
 detectSkip :: MonadIO m => m Skip
 detectSkip =
   liftIO $ do
-    menv <- (skipDecompress =<<) <$> lookupEnv "HEDGEHOG_SKIP"
-    pure $ fromMaybe SkipNothing menv
+    menv <- lookupEnv "HEDGEHOG_SKIP"
+    case menv of
+      Nothing ->
+        pure SkipNothing
+      Just env ->
+        case skipDecompress env of
+          Nothing ->
+            -- It's clearer for the user if we error out here, rather than
+            -- silently defaulting to SkipNothing.
+            error "HEDGEHOG_SKIP is not a valid Skip."
+          Just skip ->
+            pure skip
 
 resolveColor :: MonadIO m => Maybe UseColor -> m UseColor
 resolveColor = \case
