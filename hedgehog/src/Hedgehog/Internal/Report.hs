@@ -93,7 +93,6 @@ data FailedAnnotation =
 data FailureReport =
   FailureReport {
       failureSize :: !Size
-    , failureSeed :: !Seed
     , failureShrinks :: !ShrinkCount
     , failureShrinkPath :: !ShrinkPath
     , failureCoverage :: !(Maybe (Coverage CoverCount))
@@ -129,6 +128,7 @@ data Report a =
       reportTests :: !TestCount
     , reportDiscards :: !DiscardCount
     , reportCoverage :: !(Coverage CoverCount)
+    , reportSeed :: !Seed
     , reportStatus :: !a
     } deriving (Show, Functor, Foldable, Traversable)
 
@@ -270,7 +270,6 @@ takeFootnote = \case
 
 mkFailure ::
      Size
-  -> Seed
   -> ShrinkCount
   -> ShrinkPath
   -> Maybe (Coverage CoverCount)
@@ -279,7 +278,7 @@ mkFailure ::
   -> Maybe Diff
   -> [Log]
   -> FailureReport
-mkFailure size seed shrinks shrinkPath mcoverage location message diff logs =
+mkFailure size shrinks shrinkPath mcoverage location message diff logs =
   let
     inputs =
       mapMaybe takeAnnotation logs
@@ -287,7 +286,7 @@ mkFailure size seed shrinks shrinkPath mcoverage location message diff logs =
     footnotes =
       mapMaybe takeFootnote logs
   in
-    FailureReport size seed shrinks shrinkPath mcoverage inputs location message diff footnotes
+    FailureReport size shrinks shrinkPath mcoverage inputs location message diff footnotes
 
 ------------------------------------------------------------------------
 -- Pretty Printing
@@ -595,16 +594,14 @@ ppDeclaration decl =
       in
         WL.vsep (ppLocation : ppLines)
 
-ppReproduce :: Maybe PropertyName -> Size -> Seed -> Skip -> Doc Markup
-ppReproduce name size seed skip =
+ppReproduce :: Maybe PropertyName -> Seed -> Skip -> Doc Markup
+ppReproduce name seed skip =
   WL.vsep [
       markup ReproduceHeader
         "This failure can be reproduced by running:"
     , gutter ReproduceGutter . markup ReproduceSource $
-        "recheck" <+>
-        WL.text (showsPrec 11 size "") <+>
+        "recheckAt" <+>
         WL.text (showsPrec 11 seed "") <+>
-        "$ withSkip" <+>
         ppSkipReadable skip <+>
         maybe "<property>" (WL.text . unPropertyName) name
     ]
@@ -628,8 +625,8 @@ ppTextLines :: String -> [Doc Markup]
 ppTextLines =
   fmap WL.text . List.lines
 
-ppFailureReport :: MonadIO m => Maybe PropertyName -> TestCount -> FailureReport -> m [Doc Markup]
-ppFailureReport name tests (FailureReport size seed _ shrinkPath mcoverage inputs0 mlocation0 msg mdiff msgs0) = do
+ppFailureReport :: MonadIO m => Maybe PropertyName -> TestCount -> Seed -> FailureReport -> m [Doc Markup]
+ppFailureReport name tests seed (FailureReport _ _ shrinkPath mcoverage inputs0 mlocation0 msg mdiff msgs0) = do
   let
     basic =
       -- Move the failure message to the end section if we have
@@ -702,7 +699,7 @@ ppFailureReport name tests (FailureReport size seed _ shrinkPath mcoverage input
 
     bottom =
       maybe
-        [ppReproduce name size seed (SkipToShrink tests shrinkPath)]
+        [ppReproduce name seed (SkipToShrink tests shrinkPath)]
         (const [])
         mcoverage
 
@@ -732,7 +729,7 @@ ppName = \case
     WL.text name
 
 ppProgress :: MonadIO m => Maybe PropertyName -> Report Progress -> m (Doc Markup)
-ppProgress name (Report tests discards coverage status) =
+ppProgress name (Report tests discards coverage _ status) =
   case status of
     Running ->
       pure . WL.vsep $ [
@@ -755,10 +752,10 @@ ppProgress name (Report tests discards coverage status) =
         "(shrinking)"
 
 ppResult :: MonadIO m => Maybe PropertyName -> Report Result -> m (Doc Markup)
-ppResult name (Report tests discards coverage result) = do
+ppResult name (Report tests discards coverage seed result) = do
   case result of
     Failed failure -> do
-      pfailure <- ppFailureReport name tests failure
+      pfailure <- ppFailureReport name tests seed failure
       pure . WL.vsep $ [
           icon FailedIcon '✗' . WL.align . WL.annotate FailedText $
             ppName name <+>
