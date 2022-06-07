@@ -384,9 +384,6 @@ instance IsString Skip where
 
 -- | The path taken to reach a shrink state.
 --
---   This is in reverse order, most recent path element first, for efficient
---   appending.
---
 newtype ShrinkPath =
   ShrinkPath [Int]
   deriving (Eq, Ord, Show, Lift)
@@ -414,7 +411,7 @@ skipCompress = \case
 shrinkPathCompress :: ShrinkPath -> String
 shrinkPathCompress (ShrinkPath sp) =
   let
-    groups = List.map (\l -> (head l, length l)) $ List.group (reverse sp)
+    groups = List.map (\l -> (head l, length l)) $ List.group sp
   in
     (mconcat
       $ zipWith
@@ -494,7 +491,7 @@ shrinkPathDecompress str =
   in do
     sp <- concat <$>
       traverse (\(mNum, mCount) -> replicate <$> mCount <*> mNum) spGroups
-    Just $ ShrinkPath $ reverse sp
+    Just $ ShrinkPath sp
 
 -- | The number of times to re-run a test during shrinking. This is useful if
 --   you are testing something which fails non-deterministically and you want to

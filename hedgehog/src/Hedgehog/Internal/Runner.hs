@@ -127,38 +127,38 @@ takeSmallest ::
   -> (Progress -> m ())
   -> NodeT m (Maybe (Either Failure (), Journal))
   -> m Result
-takeSmallest size seed shrinks shrinkPath slimit retries updateUI = \case
-  NodeT Nothing _ ->
-    pure GaveUp
+takeSmallest size seed shrinks0 (ShrinkPath shrinkPath0) slimit retries updateUI =
+  let
+    loop shrinks revShrinkPath = \case
+      NodeT Nothing _ ->
+        pure GaveUp
 
-  NodeT (Just (x, (Journal logs))) xs ->
-    case x of
-      Left (Failure loc err mdiff) -> do
-        let
-          failure =
-            mkFailure size seed shrinks shrinkPath Nothing loc err mdiff (reverse logs)
+      NodeT (Just (x, (Journal logs))) xs ->
+        case x of
+          Left (Failure loc err mdiff) -> do
+            let
+              shrinkPath =
+                ShrinkPath $ reverse revShrinkPath
+              failure =
+                mkFailure size seed shrinks shrinkPath Nothing loc err mdiff (reverse logs)
 
-        updateUI $ Shrinking failure
+            updateUI $ Shrinking failure
 
-        if shrinks >= fromIntegral slimit then
-          -- if we've hit the shrink limit, don't shrink any further
-          pure $ Failed failure
-        else
-          findM (zip [0..] xs) (Failed failure) $ \(n, m) -> do
-            o <- runTreeN retries m
-            if isFailure o then
-              let
-                ShrinkPath oldPath =
-                  shrinkPath
-                newPath =
-                  ShrinkPath (n:oldPath)
-              in
-                Just <$> takeSmallest size seed (shrinks + 1) newPath slimit retries updateUI o
+            if shrinks >= fromIntegral slimit then
+              -- if we've hit the shrink limit, don't shrink any further
+              pure $ Failed failure
             else
-              return Nothing
+              findM (zip [0..] xs) (Failed failure) $ \(n, m) -> do
+                o <- runTreeN retries m
+                if isFailure o then
+                  Just <$> loop (shrinks + 1) (n : revShrinkPath) o
+                else
+                  return Nothing
 
-      Right () ->
-        return OK
+          Right () ->
+            return OK
+  in
+    loop shrinks0 (reverse shrinkPath0)
 
 -- | Follow a given shrink path, instead of searching exhaustively. Assume that
 -- the end of the path is minimal, and don't try to shrink any further than
@@ -176,7 +176,7 @@ skipToShrink ::
   -> NodeT m (Maybe (Either Failure (), Journal))
   -> m Result
 skipToShrink size seed (ShrinkPath shrinkPath) updateUI =
-  go 0 (reverse shrinkPath)
+  go 0 shrinkPath
  where
   go shrinks [] = \case
     NodeT Nothing _ ->
