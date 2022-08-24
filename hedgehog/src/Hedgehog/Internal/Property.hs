@@ -51,7 +51,9 @@ module Hedgehog.Internal.Property (
   , defaultMinTests
   , discard
   , skipCompress
+  , shrinkPathCompress
   , skipDecompress
+  , shrinkPathDecompress
 
   -- * Group
   , Group(..)
@@ -408,6 +410,12 @@ skipCompress = \case
   SkipToShrink (TestCount n) sp ->
     show n ++ ":" ++ shrinkPathCompress sp
 
+-- | Compress a 'ShrinkPath' into a hopefully-short alphanumeric string.
+--
+--   We encode the path components in base 26, alternating between uppercase and
+--   lowercase alphabets to distinguish list elements. Additionally when we have
+--   runs of equal components, we use the normal base 10 encoding to indicate
+--   the length.
 shrinkPathCompress :: ShrinkPath -> String
 shrinkPathCompress (ShrinkPath sp) =
   let
@@ -447,6 +455,13 @@ skipDecompress str =
       sp <- shrinkPathDecompress $ drop 1 spStr
       Just $ SkipToShrink tc sp
 
+-- | Decompress a 'ShrinkPath'.
+--
+--   This satisfies
+--
+-- @
+--   shrinkPathDecompress (shrinkPathCompress a) == Just a
+-- @
 shrinkPathDecompress :: String -> Maybe ShrinkPath
 shrinkPathDecompress str =
   let
