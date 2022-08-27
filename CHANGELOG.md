@@ -1,6 +1,17 @@
+## Version 1.2 (2022-08-28)
+
+* Allow skipping to a specific test number or shrink result ([#454][454], [@ChickenProp][ChickenProp])
+  * Export shrinkPathCompress and shrinkPathDecompress ([#462][462], [@mbg][mbg])
+* Support GHC 9.4 ([#461][461], [@ysangkok][ysangkok])
+* Allow newer dependencies ([#457][457], [@ysangkok][ysangkok])
+* Add Gen.subset ([#451][451], [@chris-martin][chris-martin])
+* Add example for Gen.subsequence ([#450][450], [@chris-martin][chris-martin])
+* Don't drop actions depending on shrunk predecessors ([#453][453], [@ChickenProp][ChickenProp])
+
 ## Version 1.1.1 (2022-01-29)
 
 * Support using fixed seed via `HEDGEHOG_SEED` ([#446][446], [@simfleischman][simfleischman] / [@moodmosaic][moodmosaic])
+* Compatibility with text-2.0 ([#443][443], [@sjakobi][sjakobi])
 * Better 'cover' example code in haddocks ([#423][423], [@jhrcek][jhrcek])
 
 ## Version 1.1 (2022-01-27)
@@ -241,12 +252,34 @@
   https://github.com/patrickt
 [simfleischman]:
   https://github.com/simfleischman
+[ChickenProp]:
+  https://github.com/ChickenProp
+[ysangkok]:
+  https://github.com/ysangkok
+[mbg]:
+  https://github.com/mbg
 [jhrcek]:
   https://github.com/jhrcek
 
 
+[462]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/462
+[461]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/461
+[457]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/457
+[454]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/454
+[453]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/453
+[451]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/451
+[450]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/450
 [446]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/446
+[443]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/443
 [436]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/436
 [423]:
