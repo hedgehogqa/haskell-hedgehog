@@ -7,6 +7,8 @@ on:
     types:
       - opened
       - synchronize
+      - edited
+
 jobs:
   build:
     strategy:
