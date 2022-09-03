@@ -8,6 +8,11 @@
 * Add example for Gen.subsequence ([#450][450], [@chris-martin][chris-martin])
 * Don't drop actions depending on shrunk predecessors ([#453][453], [@ChickenProp][ChickenProp])
 
+## Version 1.1.2 (2022-09-02)
+
+* Support GHC 9.4 ([#461][461], [@ysangkok][ysangkok])
+* Allow newer dependencies ([#457][457], [@ysangkok][ysangkok])
+
 ## Version 1.1.1 (2022-01-29)
 
 * Support using fixed seed via `HEDGEHOG_SEED` ([#446][446], [@simfleischman][simfleischman] / [@moodmosaic][moodmosaic])
