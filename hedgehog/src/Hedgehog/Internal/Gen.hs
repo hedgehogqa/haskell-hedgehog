@@ -1149,7 +1149,7 @@ constant =
 element :: (Foldable f, MonadGen m) => f a -> m a
 element fa = case toList fa of
   [] ->
-    error "Hedgehog.Gen.element: used with empty list"
+    error "Hedgehog.Gen.element: used with empty Foldable"
   xs -> do
     n <- integral $ Range.constant 0 (length xs - 1)
     pure $ xs !! n
