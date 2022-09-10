@@ -5,7 +5,7 @@ module Hedgehog.Internal.Exception (
   ) where
 
 import           Control.Exception (Exception(..), AsyncException, SomeException(..), evaluate)
-import           Control.Monad.Catch (MonadCatch(..), throwM)
+import           Control.Exception.Safe (MonadCatch, catch, throwM)
 
 import           System.IO.Unsafe (unsafePerformIO)
 

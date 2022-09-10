@@ -29,7 +29,7 @@ module Hedgehog.Internal.Runner (
 
 import           Control.Concurrent.STM (TVar, atomically)
 import qualified Control.Concurrent.STM.TVar as TVar
-import           Control.Monad.Catch (MonadCatch(..), catchAll)
+import           Control.Exception.Safe (MonadCatch, catchAny)
 import           Control.Monad.IO.Class (MonadIO(..))
 import           Data.Maybe (isJust)
 
@@ -226,7 +226,7 @@ checkReport cfg size0 seed0 test0 updateUI = do
           (Just t, Just s)
 
     test =
-      catchAll test0 (fail . show)
+      catchAny test0 (fail . show)
 
     terminationCriteria =
       propertyTerminationCriteria cfg
