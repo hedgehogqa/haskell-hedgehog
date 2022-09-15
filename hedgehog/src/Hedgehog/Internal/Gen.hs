@@ -1744,6 +1744,10 @@ shuffleSeq xs =
 
 -- | Generate a sample from a generator.
 --
+-- This function is useful for examining a 'Gen' in GHCi or other contexts.
+-- It is not appropriate for use in a test suite directly. You will only
+-- get a single sample from this function, and it will not give you
+-- a property test. The seed is random, so the test is not deterministic.
 sample :: MonadIO m => Gen a -> m a
 sample gen =
   liftIO $
