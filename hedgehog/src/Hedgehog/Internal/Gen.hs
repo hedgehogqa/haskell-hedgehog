@@ -1749,7 +1749,7 @@ shuffleSeq xs =
 -- get a single sample from this function, and it will not give you
 -- a property test. The seed is random, so the test is not deterministic.
 --
--- If you only want a single test to run, then user @'withTests' 1@:
+-- If you only want a single test to run, then use @'withTests' 1@:
 --
 -- @
 -- prop_OnlyRunOnce :: Property
