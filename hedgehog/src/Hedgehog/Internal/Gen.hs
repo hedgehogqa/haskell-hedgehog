@@ -1748,6 +1748,16 @@ shuffleSeq xs =
 -- It is not appropriate for use in a test suite directly. You will only
 -- get a single sample from this function, and it will not give you
 -- a property test. The seed is random, so the test is not deterministic.
+--
+-- If you only want a single test to run, then user @'withTests' 1@:
+--
+-- @
+-- prop_OnlyRunOnce :: Property
+-- prop_OnlyRunOnce =
+--   'withTests' 1 $ 'property' $ do
+--     i <- Gen.int
+--     i /== 0
+-- @
 sample :: MonadIO m => Gen a -> m a
 sample gen =
   liftIO $
