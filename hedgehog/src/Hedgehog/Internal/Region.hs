@@ -14,7 +14,7 @@ module Hedgehog.Internal.Region (
 import           Control.Concurrent.STM (STM, TVar)
 import qualified Control.Concurrent.STM.TMVar as TMVar
 import qualified Control.Concurrent.STM.TVar as TVar
-import           Control.Monad.Catch (MonadMask(..), bracket)
+import           Control.Exception.Safe (MonadMask, bracket)
 import           Control.Monad.IO.Class (MonadIO(..))
 
 import           System.Console.Regions (ConsoleRegion, RegionLayout(..), LiftRegion(..))

@@ -52,8 +52,8 @@ module Hedgehog.Internal.State (
   ) where
 
 import qualified Control.Concurrent.Async.Lifted as Async
+import           Control.Exception.Safe (MonadCatch)
 import           Control.Monad (foldM, foldM_)
-import           Control.Monad.Catch (MonadCatch)
 import           Control.Monad.State.Class (MonadState, get, put, modify)
 import           Control.Monad.Morph (MFunctor(..))
 import           Control.Monad.Trans.Class (lift)

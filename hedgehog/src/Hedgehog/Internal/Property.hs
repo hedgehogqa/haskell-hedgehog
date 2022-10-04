@@ -136,10 +136,10 @@ module Hedgehog.Internal.Property (
 
 import           Control.Applicative (Alternative(..))
 import           Control.DeepSeq (NFData, rnf)
+import           Control.Exception.Safe (MonadThrow, MonadCatch)
+import           Control.Exception.Safe (SomeException(..), displayException)
 import           Control.Monad (MonadPlus(..), (<=<))
 import           Control.Monad.Base (MonadBase(..))
-import           Control.Monad.Catch (MonadThrow(..), MonadCatch(..))
-import           Control.Monad.Catch (SomeException(..), displayException)
 import           Control.Monad.Error.Class (MonadError(..))
 import qualified Control.Monad.Fail as Fail
 import           Control.Monad.IO.Class (MonadIO(..))

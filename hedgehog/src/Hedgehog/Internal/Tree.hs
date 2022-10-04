@@ -50,10 +50,11 @@ module Hedgehog.Internal.Tree (
   ) where
 
 import           Control.Applicative (Alternative(..), liftA2)
+import           Control.Exception.Safe (Exception)
 import           Control.Monad (MonadPlus(..), guard, join)
 import           Control.Monad.Base (MonadBase(..))
+import           Control.Monad.Catch (MonadThrow(throwM), MonadCatch(catch))
 import           Control.Monad.Trans.Control ()
-import           Control.Monad.Catch (MonadThrow(..), MonadCatch(..), Exception)
 import           Control.Monad.Error.Class (MonadError(..))
 import           Control.Monad.IO.Class (MonadIO(..))
 import           Control.Monad.Morph (MFunctor(..), MMonad(..), generalize)
