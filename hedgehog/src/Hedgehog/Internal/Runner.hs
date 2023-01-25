@@ -12,7 +12,6 @@
 module Hedgehog.Internal.Runner (
   -- * Running Individual Properties
     check
-  , recheck
   , recheckAt
 
   -- * Running Groups of Properties
@@ -41,7 +40,7 @@ import           Hedgehog.Internal.Property (Group(..), GroupName(..))
 import           Hedgehog.Internal.Property (Journal(..), Coverage(..), CoverCount(..))
 import           Hedgehog.Internal.Property (Property(..), PropertyConfig(..), PropertyName(..))
 import           Hedgehog.Internal.Property (PropertyT(..), Failure(..), runTestT)
-import           Hedgehog.Internal.Property (ShrinkLimit, ShrinkRetries, withTests, withSkip)
+import           Hedgehog.Internal.Property (ShrinkLimit, ShrinkRetries, withSkip)
 import           Hedgehog.Internal.Property (TerminationCriteria(..))
 import           Hedgehog.Internal.Property (TestCount(..), PropertyCount(..))
 import           Hedgehog.Internal.Property (confidenceSuccess, confidenceFailure)
@@ -425,16 +424,8 @@ check prop = do
   liftIO . displayRegion $ \region ->
     (== OK) . reportStatus <$> checkNamed region color Nothing Nothing prop
 
--- | Check a property using a specific size and seed.
+-- | Check a property using a specific seed and skip.
 --
-recheck :: MonadIO m => Size -> Seed -> Property -> m ()
-recheck size seed prop0 = do
-  color <- detectColor
-  let prop = withTests 1 prop0
-  _ <- liftIO . displayRegion $ \region ->
-    checkRegion region color Nothing size seed prop
-  pure ()
-
 recheckAt :: MonadIO m => Seed -> Skip -> Property -> m ()
 recheckAt seed skip prop0 = do
   color <- detectColor
