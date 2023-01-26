@@ -137,6 +137,7 @@ test-suite test
     Test.Hedgehog.Filter
     Test.Hedgehog.Maybe
     Test.Hedgehog.Seed
+    Test.Hedgehog.Size
     Test.Hedgehog.Skip
     Test.Hedgehog.State
     Test.Hedgehog.Text
