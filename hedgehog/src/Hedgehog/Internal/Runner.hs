@@ -41,7 +41,7 @@ import           Hedgehog.Internal.Property (Journal(..), Coverage(..), CoverCou
 import           Hedgehog.Internal.Property (Property(..), PropertyConfig(..), PropertyName(..))
 import           Hedgehog.Internal.Property (PropertyT(..), Failure(..), runTestT)
 import           Hedgehog.Internal.Property (ShrinkLimit, ShrinkRetries, withSkip)
-import           Hedgehog.Internal.Property (TerminationCriteria(..))
+import           Hedgehog.Internal.Property (TerminationCriteria(..), TestLimit(..))
 import           Hedgehog.Internal.Property (TestCount(..), PropertyCount(..))
 import           Hedgehog.Internal.Property (confidenceSuccess, confidenceFailure)
 import           Hedgehog.Internal.Property (coverageSuccess, journalCoverage)
@@ -52,7 +52,7 @@ import           Hedgehog.Internal.Region
 import           Hedgehog.Internal.Report
 import qualified Hedgehog.Internal.Seed as Seed
 import           Hedgehog.Internal.Tree (TreeT(..), NodeT(..))
-import           Hedgehog.Range (Size)
+import           Hedgehog.Range (Size(..))
 
 import           Language.Haskell.TH.Syntax (Lift)
 
@@ -206,12 +206,11 @@ checkReport ::
      MonadIO m
   => MonadCatch m
   => PropertyConfig
-  -> Size
   -> Seed
   -> PropertyT m ()
   -> (Report Progress -> m ())
   -> m (Report Result)
-checkReport cfg size0 seed0 test0 updateUI = do
+checkReport cfg seed0 test0 updateUI = do
   skip <- liftIO $ resolveSkip $ propertySkip cfg
 
   let
@@ -254,14 +253,17 @@ checkReport cfg size0 seed0 test0 updateUI = do
     loop ::
          TestCount
       -> DiscardCount
-      -> Size
+      -> DiscardCount
       -> Seed
       -> Coverage CoverCount
       -> m (Report Result)
-    loop !tests !discards !size !seed !coverage0 = do
+    loop !tests !discards !recentDiscards !seed !coverage0 = do
       updateUI $ Report tests discards coverage0 seed0 Running
 
       let
+        size =
+          calculateSize terminationCriteria tests recentDiscards
+
         coverageReached =
           successVerified tests coverage0
 
@@ -301,11 +303,7 @@ checkReport cfg size0 seed0 test0 updateUI = do
             failureReport $
               "Test coverage cannot be reached after " <> show tests <> " tests"
 
-      if size > 99 then
-        -- size has reached limit, reset to 0
-        loop tests discards 0 seed coverage0
-
-      else if enoughTestsRun then
+      if enoughTestsRun then
         -- at this point, we know that enough tests have been run in order to
         -- make a decision on if this was a successful run or not
         --
@@ -335,7 +333,7 @@ checkReport cfg size0 seed0 test0 updateUI = do
             -- failed was 31, but we want the user to be able to skip to 32 and
             -- start with the one that failed.
             (Just n, _) | n > tests + 1 ->
-              loop (tests + 1) discards (size + 1) s1 coverage0
+              loop (tests + 1) discards recentDiscards s1 coverage0
             (Just _, Just shrinkPath) -> do
               node <-
                 runTreeT . evalGenT size s0 . runTestT $ unPropertyT test
@@ -348,7 +346,7 @@ checkReport cfg size0 seed0 test0 updateUI = do
                 runTreeT . evalGenT size s0 . runTestT $ unPropertyT test
               case x of
                 Nothing ->
-                  loop tests (discards + 1) (size + 1) s1 coverage0
+                  loop tests (discards + 1) (recentDiscards + 1) s1 coverage0
 
                 Just (Left _, _) ->
                   let
@@ -369,23 +367,78 @@ checkReport cfg size0 seed0 test0 updateUI = do
                     coverage =
                       journalCoverage journal <> coverage0
                   in
-                    loop (tests + 1) discards (size + 1) s1 coverage
+                    loop (tests + 1) discards 0 s1 coverage
 
-  loop 0 0 size0 seed0 mempty
+  loop 0 0 0 seed0 mempty
+
+calculateSize :: TerminationCriteria -> TestCount -> DiscardCount -> Size
+calculateSize term (TestCount tests) (DiscardCount discards) =
+  let
+    growDiscards (Size n) =
+      -- If we're discarding a lot, try larger sizes. When we succeed, we should
+      -- reset the discard count we pass here.
+      Size $ min 99 $ n + (discards `div` 10)
+
+    steppingSizer (TestLimit limit) =
+      -- `tests` runs from 0 up to `limit - 1`, so exactly `limit` tests get
+      -- run. Suppose `limit` is (100n + r). Then we do `n` cycles where size
+      -- goes 0,1,...,99, and then for the final `r` tests, we try to increase
+      -- from 0 to 99 in equal increments. So if `r` is 10 we go 0,11,22,...,99.
+      --
+      -- If we can't reach 99 we get as close as we can in equal increments
+      -- without going over, and if `r` is 1 we just run the final test at size
+      -- 0.
+      --
+      -- More examples:
+      --   r == 2: 0, 99
+      --   r == 3: 0, 49, 98
+      --   r == 4: 0, 33, 66, 99
+      --   r == 5: 0, 24, 48, 72, 96
+
+      let
+        (fullCycles, leftOvers) = limit `divMod` 100
+        (cyclesCompleted, cyclePos) = tests `divMod` 100
+      in
+        if tests >= limit then
+          error "test count is higher than limit"
+        else if cyclesCompleted < fullCycles then
+          Size cyclePos
+        else
+          -- leftOvers must be >= 1, or one of the previous branches would have
+          -- run.
+          if leftOvers == 1 then
+            Size 0
+          else
+            let step = 99 `div` (leftOvers - 1)
+            in Size $ cyclePos * step
+  in
+    growDiscards $ case term of
+      -- Run exactly `limit` tests.
+      NoConfidenceTermination limit ->
+        steppingSizer limit
+
+      -- Run exactly `limit` tests, but also use a confidence threshold for
+      -- coverage.
+      NoEarlyTermination _ limit ->
+        steppingSizer limit
+
+      -- Run some multiple of 100 tests. The TestLimit is ignored. That's likely
+      -- a bug elsewhere, but it makes this bit easy.
+      EarlyTermination _ _ ->
+        Size $ tests `mod` 100
 
 checkRegion ::
      MonadIO m
   => Region
   -> UseColor
   -> Maybe PropertyName
-  -> Size
   -> Seed
   -> Property
   -> m (Report Result)
-checkRegion region color name size seed prop =
+checkRegion region color name size prop =
   liftIO $ do
     result <-
-      checkReport (propertyConfig prop) size seed (propertyTest prop) $ \progress -> do
+      checkReport (propertyConfig prop) size (propertyTest prop) $ \progress -> do
         ppprogress <- renderProgress color name progress
         case reportStatus progress of
           Running ->
@@ -414,7 +467,7 @@ checkNamed ::
   -> m (Report Result)
 checkNamed region color name mseed prop = do
   seed <- resolveSeed mseed
-  checkRegion region color name 0 seed prop
+  checkRegion region color name seed prop
 
 -- | Check a property.
 --
@@ -431,7 +484,7 @@ recheckAt seed skip prop0 = do
   color <- detectColor
   let prop = withSkip skip prop0
   _ <- liftIO . displayRegion $ \region ->
-    checkRegion region color Nothing 0 seed prop
+    checkRegion region color Nothing seed prop
   pure ()
 
 -- | Check a group of properties using the specified runner config.
