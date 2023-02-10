@@ -111,6 +111,7 @@ library
     Hedgehog.Internal.Shrink
     Hedgehog.Internal.Source
     Hedgehog.Internal.State
+    Hedgehog.Internal.TestCount
     Hedgehog.Internal.TH
     Hedgehog.Internal.Tree
     Hedgehog.Internal.Tripping

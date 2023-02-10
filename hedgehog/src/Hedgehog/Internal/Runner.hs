@@ -339,14 +339,14 @@ checkReport cfg size0 seed0 test0 updateUI = do
               loop (tests + 1) discards (size + 1) s1 coverage0
             (Just _, Just shrinkPath) -> do
               node <-
-                runTreeT . evalGenT size s0 . runTestT $ unPropertyT test
+                runTreeT . evalGenT tests size s0 . runTestT $ unPropertyT test
               let
                 mkReport =
                   Report (tests + 1) discards coverage0 seed0
               mkReport <$> skipToShrink shrinkPath (updateUI . mkReport) node
             _ -> do
               node@(NodeT x _) <-
-                runTreeT . evalGenT size s0 . runTestT $ unPropertyT test
+                runTreeT . evalGenT tests size s0 . runTestT $ unPropertyT test
               case x of
                 Nothing ->
                   loop tests (discards + 1) (size + 1) s1 coverage0
