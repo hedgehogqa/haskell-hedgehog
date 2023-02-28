@@ -1,3 +1,7 @@
+## Version 1.2.1 (unreleased)
+
+* Export `Hedgehog.Internal.Seed.seed` ([#477][477], [@sol][sol])
+
 ## Version 1.2 (2022-08-28)
 
 * Allow skipping to a specific test number or shrink result ([#454][454], [@ChickenProp][ChickenProp])
