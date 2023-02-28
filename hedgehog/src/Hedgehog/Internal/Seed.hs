@@ -46,6 +46,7 @@ module Hedgehog.Internal.Seed (
   , mix64variant13
   , mix32
   , mixGamma
+  , global
   ) where
 
 import           Control.Monad.IO.Class (MonadIO(..))
