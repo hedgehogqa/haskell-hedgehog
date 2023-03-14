@@ -49,7 +49,10 @@ module Hedgehog.Internal.Tree (
   , renderT
   ) where
 
-import           Control.Applicative (Alternative(..), liftA2)
+#if !MIN_VERSION_base(4,18,0)
+import           Control.Applicative (liftA2)
+#endif
+import           Control.Applicative (Alternative(..))
 import           Control.Exception.Safe (Exception)
 import           Control.Monad (MonadPlus(..), guard, join)
 import           Control.Monad.Base (MonadBase(..))

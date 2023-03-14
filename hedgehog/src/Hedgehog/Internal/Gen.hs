@@ -175,7 +175,10 @@ module Hedgehog.Internal.Gen (
   , subtermMVec
   ) where
 
-import           Control.Applicative (Alternative(..),liftA2)
+#if !MIN_VERSION_base(4,18,0)
+import           Control.Applicative (liftA2)
+#endif
+import           Control.Applicative (Alternative(..))
 import           Control.Monad (MonadPlus(..), filterM, guard, replicateM, join)
 import           Control.Monad.Base (MonadBase(..))
 import           Control.Monad.Catch (MonadThrow(throwM), MonadCatch(catch))
