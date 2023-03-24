@@ -13,8 +13,8 @@ jobs:
       fail-fast: false
       matrix:
         os:    [macos-latest, ubuntu-latest, windows-latest]
-        cabal: ["3.8.1.0"]
-        ghc:   ["8.0.2", "8.2.2", "8.4.4", "8.6.5", "8.8.4", "8.10.7", "9.2.4", "9.4.1"]
+        cabal: ["3.10.1.0"]
+        ghc:   ["8.0.2", "8.2.2", "8.4.4", "8.6.5", "8.8.4", "8.10.7", "9.2.7", "9.4.4"]
         exclude:
           # https://github.com/haskell/text/pull/404
           - os: windows-latest
@@ -25,8 +25,8 @@ jobs:
     runs-on: ${{ matrix.os }}
 
     steps:
-      - uses: actions/checkout@v2
-      - uses: haskell/actions/setup@v1
+      - uses: actions/checkout@v3
+      - uses: haskell/actions/setup@v2
         id: setup-haskell-cabal
         with:
           ghc-version: ${{ matrix.ghc }}
@@ -35,7 +35,7 @@ jobs:
         run: |
           cabal v2-update
           cabal v2-freeze $CONFIG
-      - uses: actions/cache@v2.1.5
+      - uses: actions/cache@v3
         with:
           path: |
             ${{ steps.setup-haskell-cabal.outputs.cabal-store }}
