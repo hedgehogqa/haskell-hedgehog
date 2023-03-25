@@ -53,3 +53,4 @@ jobs:
       - name: Build haddock
         run: |
           cabal haddock all
+        if: matrix.ghc != '8.0.2' && matrix.ghc != '8.2.2' && matrix.ghc != '8.4.4'
