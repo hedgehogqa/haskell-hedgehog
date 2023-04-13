@@ -1328,19 +1328,33 @@ fromPred p a = a <$ guard (p a)
 
 -- | Generates a value that satisfies a predicate.
 --
---   This is essentially:
+--   Shrinks of the generated value will also satisfy the predicate. From the
+--   original generator's shrink tree, any values that fail the predicate will
+--   be removed, but any subsequent shrinks that satisfy it will be retained.
+--   Compared to 'filter', shrinking may be slower but will be optimal.
 --
--- @
---   filter p gen = 'mfilter' p gen '<|>' filter p gen
--- @
---
---   It differs from the above in that we keep some state to avoid looping
---   forever. If we trigger these limits then the whole generator is discarded.
+--   It's possible that the predicate will never pass, or will only pass at a
+--   larger size than we're currently running at. To avoid looping forever, we
+--   limit the number of retries, and grow the size with each retry. If we retry
+--   too many times then the whole generator is discarded.
 --
 filter :: (MonadGen m, GenBase m ~ Identity) => (a -> Bool) -> m a -> m a
 filter p =
   mapMaybe (fromPred p)
 
+-- | Generates a value which is the result of the given function returning a
+--   'Just'.
+--
+--   The original generator's shrink tree will be retained, with values
+--   returning 'Nothing' removed. Subsequent shrinks of those values will be
+--   retained. Compared to 'mapMaybeT', shrinking may be slower but will be
+--   optimal.
+--
+--   It's possible that the function will never return 'Just', or will only do
+--   so a larger size than we're currently running at. To avoid looping forever,
+--   we limit the number of retries, and grow the size with each retry. If we
+--   retry too many times then the whole generator is discarded.
+--
 mapMaybe :: (MonadGen m, GenBase m ~ Identity) => (a -> Maybe b) -> m a -> m b
 mapMaybe p gen0 =
   let
@@ -1358,10 +1372,50 @@ mapMaybe p gen0 =
   in
     try 0
 
+-- | Generates a value that satisfies a predicate.
+--
+--   Shrinks of the generated value will also satisfy the predicate. From the
+--   original generator's shrink tree, any values that fail the predicate will
+--   be removed, along with their subsequent shrinks. Compared to 'filter',
+--   shrinking may be faster but may also be less optimal.
+--
+--   The type is also more general, because the shrink behavior from 'filter'
+--   would force the entire shrink tree to be evaluated when applied to an
+--   impure tree.
+--
+--   This is essentially:
+--
+-- @
+--   filterT p gen = 'mfilter' p gen '<|>' filterT p gen
+-- @
+--
+--   But that could loop forever, if the predicate will never pass or will only
+--   pass at a larger size than we're currently running at. We differ from the
+--   above in keeping some state to avoid that. We limit the number of retries,
+--   and grow the size with each retry. If we retry too many times then the
+--   whole generator is discarded.
+--
 filterT :: MonadGen m => (a -> Bool) -> m a -> m a
 filterT p =
   mapMaybeT (fromPred p)
 
+-- | Generates a value which is the result of the given function returning a
+--   'Just'.
+--
+--   The original generator's shrink tree will be retained, with values
+--   returning 'Nothing' removed. Subsequent shrinks of those values will be
+--   retained. Compared to 'mapMaybeT', shrinking may be slower but will be
+--   optimal.
+--
+--   The type is also more general, because the shrink behavior from 'mapMaybe'
+--   would force the entire shrink tree to be evaluated when applied to an
+--   impure tree.
+--
+--   It's possible that the function will never return 'Just', or will only do
+--   so a larger size than we're currently running at. To avoid looping forever,
+--   we limit the number of retries, and grow the size with each retry. If we
+--   retry too many times then the whole generator is discarded.
+--
 mapMaybeT :: MonadGen m => (a -> Maybe b) -> m a -> m b
 mapMaybeT p gen0 =
   let

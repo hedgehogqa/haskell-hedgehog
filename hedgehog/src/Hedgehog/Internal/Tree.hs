@@ -188,7 +188,7 @@ expand f m =
     pure . NodeT x $
       fmap (expand f) xs ++ unfoldForest f x
 
--- | Throw away @n@ levels of a tree's children.
+-- | Throw away all but the top @n@ levels of a tree's children.
 --
 --   /@prune 0@ will throw away all of a tree's children./
 --
