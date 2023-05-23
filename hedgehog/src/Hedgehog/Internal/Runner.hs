@@ -3,6 +3,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveLift #-}
 {-# LANGUAGE DoAndIfThenElse #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NoImplicitPrelude #-}
@@ -31,7 +32,10 @@ import           Control.Concurrent.STM (TVar, atomically)
 import qualified Control.Concurrent.STM.TVar as TVar
 import           Control.Exception.Safe (MonadCatch, catchAny)
 import           Control.Monad.IO.Class (MonadIO(..))
+import           Control.Monad.Trans.Control (MonadBaseControl (..))
+import           Data.IORef (newIORef, readIORef, writeIORef)
 import           Data.Maybe (isJust)
+import qualified System.Timeout as T
 
 import           Hedgehog.Internal.Config
 import           Hedgehog.Internal.Gen (evalGenT)
@@ -42,6 +46,7 @@ import           Hedgehog.Internal.Property (Journal(..), Coverage(..), CoverCou
 import           Hedgehog.Internal.Property (Property(..), PropertyConfig(..), PropertyName(..))
 import           Hedgehog.Internal.Property (PropertyT(..), Failure(..), runTestT)
 import           Hedgehog.Internal.Property (ShrinkLimit, ShrinkRetries, withTests, withSkip)
+import           Hedgehog.Internal.Property (ShrinkTimeoutMicros (..))
 import           Hedgehog.Internal.Property (TerminationCriteria(..))
 import           Hedgehog.Internal.Property (TestCount(..), PropertyCount(..))
 import           Hedgehog.Internal.Property (confidenceSuccess, confidenceFailure)
@@ -118,17 +123,27 @@ runTreeN n m = do
     pure o
 
 takeSmallest ::
-     MonadIO m
+     forall m.
+   ( MonadBaseControl IO m
+   , MonadIO m
+   )
   => ShrinkCount
   -> ShrinkPath
   -> ShrinkLimit
+  -> Maybe ShrinkTimeoutMicros
   -> ShrinkRetries
   -> (Progress -> m ())
   -> NodeT m (Maybe (Either Failure (), Journal))
   -> m Result
-takeSmallest shrinks0 (ShrinkPath shrinkPath0) slimit retries updateUI =
+takeSmallest shrinks0 (ShrinkPath shrinkPath0) slimit mstimeoutMicros retries updateUI =
   let
-    loop shrinks revShrinkPath = \case
+    loop ::
+         ShrinkCount
+      -> [Int]
+      -> (Result -> m ())
+      -> NodeT m (Maybe (Either Failure (), Journal))
+      -> m Result
+    loop shrinks revShrinkPath updateResultSoFar = \case
       NodeT Nothing _ ->
         pure GaveUp
 
@@ -141,6 +156,7 @@ takeSmallest shrinks0 (ShrinkPath shrinkPath0) slimit retries updateUI =
               failure =
                 mkFailure shrinks shrinkPath Nothing loc err mdiff (reverse logs)
 
+            updateResultSoFar (Failed failure)
             updateUI $ Shrinking failure
 
             if shrinks >= fromIntegral slimit then
@@ -150,14 +166,27 @@ takeSmallest shrinks0 (ShrinkPath shrinkPath0) slimit retries updateUI =
               findM (zip [0..] xs) (Failed failure) $ \(n, m) -> do
                 o <- runTreeN retries m
                 if isFailure o then
-                  Just <$> loop (shrinks + 1) (n : revShrinkPath) o
+                  Just <$> loop (shrinks + 1) (n : revShrinkPath) updateResultSoFar o
                 else
                   return Nothing
 
           Right () ->
             return OK
-  in
-    loop shrinks0 (reverse shrinkPath0)
+    runLoop = loop shrinks0 (reverse shrinkPath0)
+  in case mstimeoutMicros of
+       -- no timeout, shrink normally
+       Nothing -> runLoop (const (pure ()))
+       -- run the loop in the timeout
+       Just (ShrinkTimeoutMicros timeoutMicros) -> \nodeT -> do
+          resultSoFar <- liftIO $ newIORef Nothing
+          let updateResultSoFar = liftIO . writeIORef resultSoFar . Just
+          timeout timeoutMicros (runLoop updateResultSoFar nodeT) >>= \case
+            -- timed out, return preliminary result if it exists
+            Nothing -> liftIO (readIORef resultSoFar) <&> \case
+              Nothing -> GaveUp
+              Just r -> r
+            -- did not time out, return result
+            Just r -> pure r
 
 -- | Follow a given shrink path, instead of searching exhaustively. Assume that
 -- the end of the path is minimal, and don't try to shrink any further than
@@ -204,7 +233,9 @@ skipToShrink (ShrinkPath shrinkPath) updateUI =
 
 checkReport ::
      forall m.
-     MonadIO m
+   ( MonadBaseControl IO m
+   , MonadIO m
+   )
   => MonadCatch m
   => PropertyConfig
   -> Size
@@ -364,6 +395,7 @@ checkReport cfg size0 seed0 test0 updateUI = do
                         0
                         (ShrinkPath [])
                         (propertyShrinkLimit cfg)
+                        (propertyShrinkTimeoutMicros cfg)
                         (propertyShrinkRetries cfg)
                         (updateUI . mkReport)
                         node
@@ -597,3 +629,16 @@ checkParallel =
       , runnerVerbosity =
           Nothing
       }
+
+-- vendored from lifted-base
+timeout :: MonadBaseControl IO m => Int -> m a -> m (Maybe a)
+timeout t m =
+  liftBaseWith (\runInIO -> T.timeout t (runInIO m)) >>=
+    maybe (pure Nothing) (fmap Just . restoreM)
+
+-- vendored from base's Data.Functor until base < 4.11.0.0 is dropped
+-- (ghc 8.4.1)
+(<&>) :: Functor f => f a -> (a -> b) -> f b
+as <&> f = f <$> as
+
+infixl 1 <&>
