@@ -10,6 +10,7 @@ import qualified Test.Example.References
 import qualified Test.Example.Registry
 import qualified Test.Example.Resource
 import qualified Test.Example.Roundtrip
+import qualified Test.Example.Shrink
 import qualified Test.Example.STLC
 
 main :: IO ()
@@ -28,6 +29,7 @@ main = do
     , Test.Example.Registry.tests
     , Test.Example.Resource.tests
     , Test.Example.Roundtrip.tests
+    , Test.Example.Shrink.tests
     , Test.Example.STLC.tests
     ]
 
