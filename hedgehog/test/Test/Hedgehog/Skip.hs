@@ -7,6 +7,7 @@
 
 module Test.Hedgehog.Skip where
 
+import           Control.Monad (when)
 import           Control.Monad.IO.Class (MonadIO(..))
 
 import           Data.Foldable (for_)
@@ -25,24 +26,27 @@ import           Hedgehog.Internal.Report (Report(..), Result(..), FailureReport
 -- | We use this property to help test skipping. It keeps a log of every time it
 --   runs in the 'IORef' it's passed.
 --
---   It ignores its seed. It fails at size 2. When it shrinks, it initially
---   shrinks to something that will pass, and then to something that will fail.
+--   It ignores its seed. It discards at size 1 and fails at size 2. When it
+--   shrinks, it initially shrinks to something that will pass, and then to
+--   something that will fail.
 --
-skipTestProperty :: IORef [(Size, Int, Bool)] -> Property
+skipTestProperty :: IORef [(Size, Int, Bool, Bool)] -> Property
 skipTestProperty logRef =
   withTests 5 . property $ do
-    val@(curSize, _, shouldPass) <- forAll $ do
+    val@(curSize, _, shouldDiscard, shouldPass) <- forAll $ do
       curSize <- Gen.sized pure
-      (shouldPass, nShrinks) <-
-        (,)
-          <$> Gen.shrink (\b -> if b then [] else [True]) (pure $ curSize /= 2)
+      (shouldDiscard, shouldPass, nShrinks) <-
+        (,,)
+          <$> pure (curSize == 1)
+          <*> Gen.shrink (\b -> if b then [] else [True]) (pure $ curSize /= 2)
           <*> Gen.shrink (\n -> reverse [0 .. n-1]) (pure 3)
-      pure (curSize, nShrinks, shouldPass)
+      pure (curSize, nShrinks, shouldDiscard, shouldPass)
 
     -- Fail coverage to make sure we disable it when shrinking.
     cover 100 "Not 4" (curSize /= 4)
 
     liftIO $ IORef.modifyIORef' logRef (val :)
+    when shouldDiscard discard
     assert shouldPass
 
 checkProp :: MonadIO m => Property -> m (Report Result)
@@ -69,21 +73,22 @@ prop_SkipNothing =
         failureShrinks f === 3
         failureShrinkPath f === ShrinkPath [1, 1, 1]
 
-      _ ->
+      _ -> do
+        annotateShow report
         failure
 
     logs <- liftIO $ reverse <$> IORef.readIORef logRef
     logs ===
-      [ (0, 3, True)
-      , (1, 3, True)
-      , (2, 3, False)
-      , (2, 3, True)
-      , (2, 2, False)
-      , (2, 2, True)
-      , (2, 1, False)
-      , (2, 1, True)
-      , (2, 0, False)
-      , (2, 0, True)
+      [ (0, 3, False, True)
+      , (1, 3, True, True)
+      , (2, 3, False, False)
+      , (2, 3, False, True)
+      , (2, 2, False, False)
+      , (2, 2, False, True)
+      , (2, 1, False, False)
+      , (2, 1, False, True)
+      , (2, 0, False, False)
+      , (2, 0, False, True)
       ]
 
 prop_SkipToFailingTest :: Property
@@ -105,14 +110,14 @@ prop_SkipToFailingTest =
 
     logs <- liftIO $ reverse <$> IORef.readIORef logRef
     logs ===
-      [ (2, 3, False)
-      , (2, 3, True)
-      , (2, 2, False)
-      , (2, 2, True)
-      , (2, 1, False)
-      , (2, 1, True)
-      , (2, 0, False)
-      , (2, 0, True)
+      [ (2, 3, False, False)
+      , (2, 3, False, True)
+      , (2, 2, False, False)
+      , (2, 2, False, True)
+      , (2, 1, False, False)
+      , (2, 1, False, True)
+      , (2, 0, False, False)
+      , (2, 0, False, True)
       ]
 
 prop_SkipPastFailingTest :: Property
@@ -127,7 +132,7 @@ prop_SkipPastFailingTest =
     reportStatus report === OK
 
     logs <- liftIO $ reverse <$> IORef.readIORef logRef
-    logs === [(3, 3, True), (4, 3, True)]
+    logs === [(3, 3, False, True), (4, 3, False, True)]
 
 prop_SkipToNoShrink :: Property
 prop_SkipToNoShrink =
@@ -147,7 +152,7 @@ prop_SkipToNoShrink =
         failure
 
     logs <- liftIO $ reverse <$> IORef.readIORef logRef
-    logs === [(2, 3, False)]
+    logs === [(2, 3, False, False)]
 
 prop_SkipToFailingShrink :: Property
 prop_SkipToFailingShrink =
@@ -167,7 +172,7 @@ prop_SkipToFailingShrink =
         failure
 
     logs <- liftIO $ reverse <$> IORef.readIORef logRef
-    logs === [(2, 3, False), (2, 2, False), (2, 1, False)]
+    logs === [(2, 3, False, False), (2, 2, False, False), (2, 1, False, False)]
 
 prop_SkipToPassingShrink :: Property
 prop_SkipToPassingShrink =
@@ -181,7 +186,39 @@ prop_SkipToPassingShrink =
     reportStatus report === OK
 
     logs <- liftIO $ reverse <$> IORef.readIORef logRef
-    logs === [(2, 3, False), (2, 2, False), (2, 2, True)]
+    logs === [(2, 3, False, False), (2, 2, False, False), (2, 2, False, True)]
+
+prop_SkipToReportedShrink :: Property
+prop_SkipToReportedShrink =
+  withTests 1 . property $ do
+    logRef <- liftIO $ IORef.newIORef []
+
+    report1 <- checkProp $ skipTestProperty logRef
+    failure1 <- case reportStatus report1 of
+      Failed f -> pure f
+      _ -> do
+        annotateShow report1
+        failure
+
+    let
+      skip = SkipToShrink (reportTests report1)
+                          (reportDiscards report1)
+                          (failureShrinkPath failure1)
+
+
+    report2 <- checkProp $ withSkip skip $ skipTestProperty logRef
+    failure2 <- case reportStatus report2 of
+      Failed f -> pure f
+      _ -> do
+        annotateShow report2
+        failure
+
+    failure1 === failure2
+
+    reportTests report1 === 2
+    reportTests report2 === 2
+    reportDiscards report1 === 1
+    reportDiscards report2 === 1
 
 genSkip :: Gen Skip
 genSkip =
@@ -192,13 +229,16 @@ genSkip =
     genTestCount =
       Property.TestCount <$> Gen.int range
 
+    genDiscardCount =
+      Property.DiscardCount <$> Gen.int range
+
     genShrinkPath =
       Property.ShrinkPath <$> Gen.list range (Gen.int range)
   in
     Gen.choice
       [ pure SkipNothing
-      , SkipToTest <$> genTestCount
-      , SkipToShrink <$> genTestCount <*> genShrinkPath
+      , SkipToTest <$> genTestCount <*> genDiscardCount
+      , SkipToShrink <$> genTestCount <*> genDiscardCount <*> genShrinkPath
       ]
 
 -- | Test that `skipCompress` and `skipDecompress` roundtrip.
@@ -224,15 +264,15 @@ prop_compressDecompressExamples =
       -- strings that would decompress to the same Skip.
       testCases =
         [ (SkipNothing, "", [])
-        , (SkipToTest 3, "3", ["03", "003"])
-        , (SkipToTest 197, "197", ["0197", "00197"])
-        , ( SkipToShrink 5 $ Property.ShrinkPath [2, 3, 0]
+        , (SkipToTest 3 0, "3", ["03", "003", "3/0", "03/00"])
+        , (SkipToTest 197 1, "197/1", ["0197/1", "00197/01"])
+        , ( SkipToShrink 5 0 $ Property.ShrinkPath [2, 3, 0]
           , "5:cDa"
           , ["5:CdA", "05:c1b0D1A1"]
           )
-        , ( SkipToShrink 21 $ Property.ShrinkPath [5, 3, 27, 27, 26]
-          , "21:fDbb2BA"
-          , ["21:fDbbBBba"]
+        , ( SkipToShrink 21 3 $ Property.ShrinkPath [5, 3, 27, 27, 26]
+          , "21/3:fDbb2BA"
+          , ["21/3:fDbbBBba"]
           )
         ]
 

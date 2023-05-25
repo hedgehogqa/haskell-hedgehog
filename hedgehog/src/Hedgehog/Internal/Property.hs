@@ -312,7 +312,7 @@ newtype TestCount =
 --
 newtype DiscardCount =
   DiscardCount Int
-  deriving (Eq, Ord, Show, Num, Enum, Real, Integral)
+  deriving (Eq, Ord, Show, Num, Enum, Real, Integral, Lift)
 
 -- | The number of discards to allow before giving up.
 --
@@ -355,7 +355,10 @@ data Skip =
   -- | Skip to a specific test number. If it fails, shrink as normal. If it
   --   passes, move on to the next test. Coverage checks are disabled.
   --
-  | SkipToTest TestCount
+  --   We also need to count discards, since failing "after 7 tests" points at a
+  --   different generated value than failing "after 7 tests and 5 discards".
+  --
+  | SkipToTest TestCount DiscardCount
 
   -- | Skip to a specific test number and shrink state. If it fails, stop
   --   without shrinking further. If it passes, the property will pass without
@@ -365,7 +368,7 @@ data Skip =
   --   the direct path from the original test input to the target state - will
   --   be tested too, and their results discarded.
   --
-  | SkipToShrink TestCount ShrinkPath
+  | SkipToShrink TestCount DiscardCount ShrinkPath
   deriving (Eq, Ord, Show, Lift)
 
 -- | We use this instance to support usage like
@@ -402,13 +405,17 @@ newtype ShrinkPath =
 --   roughly interpret it by eyeball.
 --
 skipCompress :: Skip -> String
-skipCompress = \case
-  SkipNothing ->
-    ""
-  SkipToTest (TestCount n) ->
-    show n
-  SkipToShrink (TestCount n) sp ->
-    show n ++ ":" ++ shrinkPathCompress sp
+skipCompress =
+  let
+    showTD (TestCount t) (DiscardCount d) =
+      show t ++ (if d == 0 then "" else "/" ++ show d)
+  in \case
+    SkipNothing ->
+      ""
+    SkipToTest t d->
+      showTD t d
+    SkipToShrink t d sp ->
+      showTD t d ++ ":" ++ shrinkPathCompress sp
 
 -- | Compress a 'ShrinkPath' into a hopefully-short alphanumeric string.
 --
@@ -446,14 +453,22 @@ skipDecompress str =
     Just SkipNothing
   else do
     let
-      (tcStr, spStr)
+      (tcDcStr, spStr)
         = span (/= ':') str
+
+      (tcStr, dcStr)
+        = span (/= '/') tcDcStr
+
     tc <- TestCount <$> readMaybe tcStr
+    dc <- DiscardCount <$> if null dcStr
+      then Just 0
+      else readMaybe (drop 1 dcStr)
+
     if null spStr then
-      Just $ SkipToTest tc
+      Just $ SkipToTest tc dc
     else do
       sp <- shrinkPathDecompress $ drop 1 spStr
-      Just $ SkipToShrink tc sp
+      Just $ SkipToShrink tc dc sp
 
 -- | Decompress a 'ShrinkPath'.
 --
