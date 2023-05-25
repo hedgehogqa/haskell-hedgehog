@@ -622,8 +622,8 @@ ppTextLines :: String -> [Doc Markup]
 ppTextLines =
   fmap WL.text . List.lines
 
-ppFailureReport :: MonadIO m => Maybe PropertyName -> TestCount -> Seed -> FailureReport -> m [Doc Markup]
-ppFailureReport name tests seed (FailureReport _ shrinkPath mcoverage inputs0 mlocation0 msg mdiff msgs0) = do
+ppFailureReport :: MonadIO m => Maybe PropertyName -> TestCount -> DiscardCount -> Seed -> FailureReport -> m [Doc Markup]
+ppFailureReport name tests discards seed (FailureReport _ shrinkPath mcoverage inputs0 mlocation0 msg mdiff msgs0) = do
   let
     basic =
       -- Move the failure message to the end section if we have
@@ -696,7 +696,7 @@ ppFailureReport name tests seed (FailureReport _ shrinkPath mcoverage inputs0 ml
 
     bottom =
       maybe
-        [ppReproduce name seed (SkipToShrink tests shrinkPath)]
+        [ppReproduce name seed (SkipToShrink tests discards shrinkPath)]
         (const [])
         mcoverage
 
@@ -752,7 +752,7 @@ ppResult :: MonadIO m => Maybe PropertyName -> Report Result -> m (Doc Markup)
 ppResult name (Report tests discards coverage seed result) = do
   case result of
     Failed failure -> do
-      pfailure <- ppFailureReport name tests seed failure
+      pfailure <- ppFailureReport name tests discards seed failure
       pure . WL.vsep $ [
           icon FailedIcon '✗' . WL.align . WL.annotate FailedText $
             ppName name <+>
@@ -762,7 +762,7 @@ ppResult name (Report tests discards coverage seed result) = do
             ppShrinkDiscard (failureShrinks failure) discards <>
             "." <#>
             "shrink path:" <+>
-            ppSkip (SkipToShrink tests $ failureShrinkPath failure)
+            ppSkip (SkipToShrink tests discards $ failureShrinkPath failure)
         ] ++
         ppCoverage tests coverage ++
         pfailure

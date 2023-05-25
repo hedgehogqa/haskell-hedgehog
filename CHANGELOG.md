@@ -1,3 +1,7 @@
+## Version 1.4 (unreleased)
+
+* Fix skipping to tests/shrinks when tests have been discarded ([#489][489], [@ChickenProp][ChickenProp])
+
 ## Version 1.3 (2023-06-22)
 
 * Better documentation for `Var` ([#491][491], [@endgame][endgame])

@@ -220,10 +220,10 @@ checkReport cfg size0 seed0 test0 updateUI = do
       case skip of
         SkipNothing ->
           (Nothing, Nothing)
-        SkipToTest t ->
-          (Just t, Nothing)
-        SkipToShrink t s ->
-          (Just t, Just s)
+        SkipToTest t d ->
+          (Just (t, d), Nothing)
+        SkipToShrink t d s ->
+          (Just (t, d), Just s)
 
     test =
       catchAny test0 (fail . show)
@@ -335,8 +335,11 @@ checkReport cfg size0 seed0 test0 updateUI = do
             -- If the report says failed "after 32 tests", the test number that
             -- failed was 31, but we want the user to be able to skip to 32 and
             -- start with the one that failed.
-            (Just n, _) | n > tests + 1 ->
-              loop (tests + 1) discards (size + 1) s1 coverage0
+            (Just (n, d), _)
+              | n > tests + 1 ->
+                loop (tests + 1) discards (size + 1) s1 coverage0
+              | d > discards ->
+                loop tests (discards + 1) (size + 1) s1 coverage0
             (Just _, Just shrinkPath) -> do
               node <-
                 runTreeT . evalGenT size s0 . runTestT $ unPropertyT test
