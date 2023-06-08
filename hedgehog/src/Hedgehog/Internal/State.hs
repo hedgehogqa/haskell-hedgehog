@@ -170,8 +170,8 @@ instance Ord1 Concrete where
 --   type of variable because it is used in both the generation and the
 --   execution phase.
 --
---   The order of arguments makes 'Var' 'HTraverable', which is how 'Symbolic'
---   values are turned into 'Concrete' ones.
+--   The order of arguments makes 'Var' 'FunctorB' and 'TraversableB', which is
+--   how 'Symbolic' values are turned into 'Concrete' ones.
 --
 newtype Var a v =
   Var (v a)
