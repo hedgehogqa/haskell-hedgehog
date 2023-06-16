@@ -135,6 +135,11 @@ newtype Concrete a where
   Concrete :: a -> Concrete a
   deriving (Eq, Ord, Functor, Foldable, Traversable)
 
+-- | @since 1.2.1
+instance Applicative Concrete where
+  pure = Concrete
+  Concrete f <*> Concrete x = Concrete $ f x
+
 instance Show a => Show (Concrete a) where
   showsPrec =
     showsPrec1
