@@ -1,5 +1,6 @@
 ## Version 1.2.1 (unreleased)
 
+* Add `instance Applicative Concrete` ([#493][493], [@endgame][endgame])
 * Export `Hedgehog.Internal.Seed.seed` ([#477][477], [@sol][sol])
 
 ## Version 1.2 (2022-08-28)
@@ -271,6 +272,8 @@
   https://github.com/jhrcek
 
 
+[493]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/493
 [462]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/462
 [461]:
