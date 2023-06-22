@@ -1,6 +1,15 @@
-## Version 1.2.1 (unreleased)
+## Version 1.3 (2023-06-22)
 
+* Better documentation for `Var` ([#491][491], [@endgame][endgame])
+* Bump upper bounds for `ansi-terminal` ([#486][486], [@mpilgrem][mpilgrem])
+* Better documentation for `Gen.filter[T]`, `Gen.mapMaybe[T]`, `Tree.prune` ([#485][485], [@ChickenProp][ChickenProp])
+* Update Github CI actions, exclude Haddocks for old GHCs ([#482][482], [@ysangkok][ysangkok])
+* Support GHC 9.6 ([#481][481], [@ysangkok][ysangkok])
+* Bump upper bounds for `resourcet` and `primitive` ([#478][478], [@shlevy][shlevy])
 * Export `Hedgehog.Internal.Seed.seed` ([#477][477], [@sol][sol])
+* Better documentation for `sample` ([#468][468], [@parsonsmatt][parsonsmatt])
+* Replace exceptions dependency with safe-exceptions ([#466][466], [@ocharles][ocharles])
+* Generalise `Hedgehog.Gen.element` ([#411](411), [@ocharles][ocharles])
 
 ## Version 1.2 (2022-08-28)
 
@@ -271,6 +280,30 @@
   https://github.com/jhrcek
 
 
+[parsonsmatt]:
+  https://github.com/parsonsmatt
+[shlevy]:
+  https://github.com/shlevy
+
+
+[491]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/491
+[486]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/486
+[485]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/485
+[482]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/482
+[481]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/481
+[478]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/478
+[477]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/477
+[468]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/468
+[466]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/466
 [462]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/462
 [461]:
@@ -301,6 +334,8 @@
   https://github.com/hedgehogqa/haskell-hedgehog/pull/413
 [412]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/412
+[411]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/411
 [409]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/409
 [408]:
