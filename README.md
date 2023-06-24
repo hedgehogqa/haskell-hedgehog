@@ -89,6 +89,16 @@ You can then load the module in GHCi, and run it:
 
 ```
 
+## In Memory of Jacob Stanley
+
+As we come to the end of our guide to haskell-hedgehog, we'd like to take a moment to remember and honor one of its key contributors, our dear friend, author and co-founder, Jacob Stanley.
+
+Jacob's passion for Haskell and his commitment to creating high-quality, reliable software was truly inspiring. His work has shaped haskell-hedgehog in countless ways, and without him, it wouldn't be the project it is today.
+
+Jacob passed away unexpectedly on April 9th. His absence is deeply felt, but his impact on this project, and on all of us who had the privilege to work with him, remains. We continue to maintain and develop haskell-hedgehog in his memory and in honor of his dedication to excellence in programming.
+
+As you explore haskell-hedgehog, and possibly contribute to its ongoing development, we invite you to join us in remembering Jacob Stanley — a tremendous developer, collaborator, and friend.
+
 <div align="center">
 <br />
 <img width="307" src="https://github.com/hedgehogqa/haskell-hedgehog/raw/master/img/hedgehog-logo-grey.png" />
