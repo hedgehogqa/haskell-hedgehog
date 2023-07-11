@@ -1016,7 +1016,7 @@ evalEither = \case
 --
 evalEitherM :: (MonadTest m, Show x, MonadCatch m, HasCallStack) => m (Either x a) -> m a
 evalEitherM =
-  evalEither <=< evalM
+  withFrozenCallStack $ evalEither <=< evalM
 
 -- | Fails the test if the 'ExceptT' is 'Left', otherwise returns the value in
 --   the 'Right'.
@@ -1040,7 +1040,7 @@ evalMaybe = \case
 --
 evalMaybeM :: (MonadTest m, Show a, MonadCatch m, HasCallStack) => m (Maybe a) -> m a
 evalMaybeM =
-  evalMaybe <=< evalM
+  withFrozenCallStack $ evalMaybe <=< evalM
 
 ------------------------------------------------------------------------
 -- PropertyT
