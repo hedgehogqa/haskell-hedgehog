@@ -25,14 +25,15 @@ import           Hedgehog.Internal.Report (Report(..), Result(..), FailureReport
 -- | We use this property to help test skipping. It keeps a log of every time it
 --   runs in the 'IORef' it's passed.
 --
---   It ignores its seed. It fails at size 2. When it shrinks, it initially
+--   It ignores its seed. The third test fails. When it shrinks, it initially
 --   shrinks to something that will pass, and then to something that will fail.
 --
 skipTestProperty :: IORef [(Size, Int, Bool)] -> Property
 skipTestProperty logRef =
   withTests 5 . property $ do
     val@(curSize, _, shouldPass) <- forAll $ do
-      curSize <- Gen.sized pure
+      -- With 5 tests, size goes 0, 24, 48, 72, 96.
+      curSize <- Gen.sized $ pure . (`div` 24)
       (shouldPass, nShrinks) <-
         (,)
           <$> Gen.shrink (\b -> if b then [] else [True]) (pure $ curSize /= 2)
@@ -50,7 +51,6 @@ checkProp prop = do
   seed <- Config.resolveSeed Nothing
   liftIO $ Runner.checkReport
     (Property.propertyConfig prop)
-    0
     seed
     (Property.propertyTest prop)
     (const $ pure ())
