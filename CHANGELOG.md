@@ -282,6 +282,8 @@
   https://github.com/mbg
 [jhrcek]:
   https://github.com/jhrcek
+[sol]:
+  https://github.com/sol
 
 
 [parsonsmatt]:
