@@ -1,0 +1,4 @@
+packages: .
+if impl(ghc >= 9.6)
+  package hedgehog
+    ghc-options: -Wwarn=x-partial
