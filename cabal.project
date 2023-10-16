@@ -12,8 +12,12 @@ packages:
 -- program-options
 --   ghc-options: -Wall -Werror
 
-package hedgehog
-  ghc-options: -Wall -Werror
+if impl(ghc >= 9.8)
+  package hedgehog
+    ghc-options: -Wall -Werror -Wwarn=x-partial
+else
+  package hedgehog
+    ghc-options: -Wall -Werror
 package hedgehog-corpus
   ghc-options: -Wall -Werror
 package hedgehog-dieharder
