@@ -38,13 +38,19 @@ module Hedgehog.Internal.State (
   , commandGenOK
 
   -- * Actions
+  , Context(..)
   , Action(..)
   , Sequential(..)
   , Parallel(..)
   , takeVariables
   , variablesOK
+  , mkContext
+  , contextUpdate
+  , contextNewVar
   , dropInvalid
   , action
+  , genActions
+  , executeUpdateEnsure
   , sequential
   , parallel
   , executeSequential
