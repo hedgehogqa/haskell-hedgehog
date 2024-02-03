@@ -54,7 +54,7 @@ library
       base                            >= 4.9        && < 5
     , ansi-terminal                   >= 0.6        && < 1.1
     , async                           >= 2.0        && < 2.3
-    , barbies                         >= 1.0        && < 2.1
+    , barbies                         >= 1.0        && < 2.2
     , bytestring                      >= 0.10       && < 0.13
     , concurrent-output               >= 1.7        && < 1.11
     , containers                      >= 0.4        && < 0.7
