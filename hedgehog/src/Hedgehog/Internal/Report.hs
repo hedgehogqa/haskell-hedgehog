@@ -22,13 +22,18 @@ module Hedgehog.Internal.Report (
   , Style(..)
   , Markup(..)
 
+  , Context(..)
+  , Lines
+
   , renderProgress
   , renderResult
+  , renderResultWith
   , renderSummary
   , renderDoc
 
   , ppProgress
   , ppResult
+  , ppResultWith
   , ppSummary
 
   , fromResult
@@ -181,7 +186,7 @@ summaryTotal (Summary x1 x2 x3 x4 x5) =
 
 data Line a =
   Line {
-      _lineAnnotation :: !a
+      lineAnnotation :: !a
     , lineNumber :: !LineNo
     , _lineSource :: !String
     } deriving (Eq, Ord, Show, Functor)
@@ -553,9 +558,45 @@ ppFailureLocation msgs mdiff sloc =
     pure $
       mapSource (styleFailure . insertDoc) decl
 
+type Annotation = (Style, [(Style, Doc Markup)])
+
+newtype Lines = Lines Int
+  deriving (Eq, Num)
+
+instance Show Lines where
+  showsPrec p (Lines n) = showsPrec p n
+
+data Context = FullContext | Context Lines
+
+applyContext :: Context -> Declaration Annotation -> Declaration Annotation
+applyContext context decl = case context of
+  FullContext -> decl
+  Context n -> decl { declarationSource = limitContextTo n (declarationSource decl) }
+
+limitContextTo :: Lines -> Map LineNo (Line Annotation) -> Map LineNo (Line Annotation)
+limitContextTo (Lines context) = Map.fromList . skipBoring . Map.toList
+  where
+    skipBoring xs = case span isBoring xs of
+      (boring, []) -> take context boring
+      (boring, rest) -> takeEnd context boring <> keepInteresting rest
+
+    keepInteresting xs = case break isBoring xs of
+      (interesting, rest) -> interesting <> take context rest <> skipBoring rest
+
+    isBoring = isBoringAnnotation . lineAnnotation . snd
+
+takeEnd :: Int -> [a] -> [a]
+takeEnd n = reverse . take n . reverse
+
+isBoringAnnotation :: Annotation -> Bool
+isBoringAnnotation = \ case
+  (StyleDefault, []) -> True
+  _ -> False
+
+
 ppDeclaration :: Declaration (Style, [(Style, Doc Markup)]) -> Doc Markup
-ppDeclaration decl =
-  case Map.maxView $ declarationSource decl of
+ppDeclaration decl = let source = declarationSource decl in
+  case Map.maxView source of
     Nothing ->
       mempty
     Just (lastLine, _) ->
@@ -572,13 +613,28 @@ ppDeclaration decl =
         ppLineNo =
           WL.text . printf ("%" <> show digits <> "d") . unLineNo
 
+        ppEmptyNo :: Doc a
         ppEmptyNo =
           WL.text $ replicate digits ' '
 
+        ppSource :: Style -> LineNo -> String -> Doc Markup
         ppSource style n src =
+          (if isOmittedLine (pred n) then addVerticalEllipsis else id) $
           markup (StyledLineNo style) (ppLineNo n) <+>
           markup (StyledBorder style) "┃" <+>
           markup (StyledSource style) (WL.text src)
+
+        addVerticalEllipsis =
+          (verticalEllipsis <#>)
+
+        verticalEllipsis =
+          "\x22ee"
+
+        isOmittedLine n =
+          n >= firstLine && Map.notMember n source
+
+        firstLine =
+          fst $ Map.findMin source
 
         ppAnnot (style, doc) =
           markup (StyledLineNo style) ppEmptyNo <+>
@@ -586,12 +642,12 @@ ppDeclaration decl =
           doc
 
         ppLines = do
-          Line (style, xs) n src <- Map.elems $ declarationSource decl
+          Line (style, xs) n src <- Map.elems source
           ppSource style n src : fmap ppAnnot xs
       in
         WL.vsep (ppLocation : ppLines)
 
-ppReproduce :: Maybe PropertyName -> Seed -> Skip -> Doc Markup
+ppReproduce :: Maybe PropertyName -> Seed -> Skip -> Doc Markup -- FIXME
 ppReproduce name seed skip =
   WL.vsep [
       markup ReproduceHeader
@@ -622,8 +678,8 @@ ppTextLines :: String -> [Doc Markup]
 ppTextLines =
   fmap WL.text . List.lines
 
-ppFailureReport :: MonadIO m => Maybe PropertyName -> TestCount -> DiscardCount -> Seed -> FailureReport -> m [Doc Markup]
-ppFailureReport name tests discards seed (FailureReport _ shrinkPath mcoverage inputs0 mlocation0 msg mdiff msgs0) = do
+ppFailureReport :: MonadIO m => Context -> Maybe PropertyName -> TestCount -> DiscardCount -> Seed -> FailureReport -> m [Doc Markup]
+ppFailureReport context name tests discards seed (FailureReport _ shrinkPath mcoverage inputs0 mlocation0 msg mdiff msgs0) = do
   let
     basic =
       -- Move the failure message to the end section if we have
@@ -677,10 +733,10 @@ ppFailureReport name tests discards seed (FailureReport _ shrinkPath mcoverage i
   (args, idecls) <- fmap partitionEithers $ zipWithM ppFailedInput [0..] inputs0
 
   let
+    decls :: [Declaration (Style, [(Style, Doc Markup)])]
     decls =
-      mergeDeclarations .
-      catMaybes $
-        mlocation : coverageLocations <> fmap pure idecls
+      mergeDeclarations $
+      catMaybes (mlocation : coverageLocations) <> idecls
 
     with xs f =
       if null xs then
@@ -711,7 +767,7 @@ ppFailureReport name tests discards seed (FailureReport _ shrinkPath mcoverage i
       with args $
         WL.punctuate WL.line
     , with decls $
-        WL.punctuate WL.line . fmap ppDeclaration
+        WL.punctuate WL.line . fmap (ppDeclaration . applyContext context)
     , with msgs1 $
         id
     , with bottom $
@@ -747,12 +803,14 @@ ppProgress name (Report tests discards coverage _ status) =
         ppTestCount tests <>
         ppShrinkDiscard (failureShrinks failure) discards <+>
         "(shrinking)"
-
 ppResult :: MonadIO m => Maybe PropertyName -> Report Result -> m (Doc Markup)
-ppResult name (Report tests discards coverage seed result) = do
+ppResult = ppResultWith FullContext
+
+ppResultWith :: MonadIO m => Context -> Maybe PropertyName -> Report Result -> m (Doc Markup)
+ppResultWith context name (Report tests discards coverage seed result) = do
   case result of
     Failed failure -> do
-      pfailure <- ppFailureReport name tests discards seed failure
+      pfailure <- ppFailureReport context name tests discards seed failure
       pure . WL.vsep $ [
           icon FailedIcon '✗' . WL.align . WL.annotate FailedText $
             ppName name <+>
@@ -1224,8 +1282,11 @@ renderProgress color name x =
   renderDoc color =<< ppProgress name x
 
 renderResult :: MonadIO m => UseColor -> Maybe PropertyName -> Report Result -> m String
-renderResult color name x =
-  renderDoc color =<< ppResult name x
+renderResult = renderResultWith FullContext
+
+renderResultWith :: MonadIO m => Context -> UseColor -> Maybe PropertyName -> Report Result -> m String
+renderResultWith context color name x =
+  renderDoc color =<< ppResultWith context name x
 
 renderSummary :: MonadIO m => UseColor -> Summary -> m String
 renderSummary color x =
