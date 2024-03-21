@@ -138,6 +138,7 @@ test-suite test
     Test.Hedgehog.Maybe
     Test.Hedgehog.Seed
     Test.Hedgehog.Skip
+    Test.Hedgehog.State
     Test.Hedgehog.Text
     Test.Hedgehog.Zip
 
