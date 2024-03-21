@@ -1,3 +1,7 @@
+## Unreleased
+
+* Add `Hedgehog.withShrinkTimeoutMicros` ([#488][488], [@tbidne][tbidne])
+
 ## Version 1.4 (2023-08-07)
 
 * Fix skipping to tests/shrinks when tests have been discarded ([#489][489], [@ChickenProp][ChickenProp])
@@ -282,6 +286,10 @@
   https://github.com/mbg
 [jhrcek]:
   https://github.com/jhrcek
+[sol]:
+  https://github.com/sol
+[tbidne]:
+  https://github.com/tbidne
 
 
 [parsonsmatt]:
@@ -296,6 +304,8 @@
   https://github.com/hedgehogqa/haskell-hedgehog/pull/489
 [486]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/486
+[488]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/488
 [485]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/485
 [482]:
