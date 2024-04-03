@@ -572,9 +572,11 @@ ppDeclaration decl =
         ppLineNo =
           WL.text . printf ("%" <> show digits <> "d") . unLineNo
 
+        ppEmptyNo :: Doc a
         ppEmptyNo =
           WL.text $ replicate digits ' '
 
+        ppSource :: Style -> LineNo -> String -> Doc Markup
         ppSource style n src =
           markup (StyledLineNo style) (ppLineNo n) <+>
           markup (StyledBorder style) "┃" <+>
@@ -677,10 +679,10 @@ ppFailureReport name tests discards seed (FailureReport _ shrinkPath mcoverage i
   (args, idecls) <- fmap partitionEithers $ zipWithM ppFailedInput [0..] inputs0
 
   let
+    decls :: [Declaration (Style, [(Style, Doc Markup)])]
     decls =
-      mergeDeclarations .
-      catMaybes $
-        mlocation : coverageLocations <> fmap pure idecls
+      mergeDeclarations $
+      catMaybes (mlocation : coverageLocations) <> idecls
 
     with xs f =
       if null xs then
