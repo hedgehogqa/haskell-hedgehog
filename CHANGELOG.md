@@ -1,3 +1,7 @@
+## Unreleased (minor)
+
+* Remove redundant `Show` constraints on `evalMaybe`, `evalMaybeM`
+
 ## Version 1.4 (2023-08-07)
 
 * Fix skipping to tests/shrinks when tests have been discarded ([#489][489], [@ChickenProp][ChickenProp])

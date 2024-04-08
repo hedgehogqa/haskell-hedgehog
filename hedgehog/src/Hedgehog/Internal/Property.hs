@@ -1043,7 +1043,7 @@ evalExceptT m =
 -- | Fails the test if the 'Maybe' is 'Nothing', otherwise returns the value in
 --   the 'Just'.
 --
-evalMaybe :: (MonadTest m, Show a, HasCallStack) => Maybe a -> m a
+evalMaybe :: (MonadTest m, HasCallStack) => Maybe a -> m a
 evalMaybe = \case
   Nothing ->
     withFrozenCallStack $ failWith Nothing "the value was Nothing"
@@ -1053,7 +1053,7 @@ evalMaybe = \case
 -- | Fails the test if the action throws an exception, or if the
 --   'Maybe' is 'Nothing', otherwise returns the value in the 'Just'.
 --
-evalMaybeM :: (MonadTest m, Show a, MonadCatch m, HasCallStack) => m (Maybe a) -> m a
+evalMaybeM :: (MonadTest m, MonadCatch m, HasCallStack) => m (Maybe a) -> m a
 evalMaybeM =
   evalMaybe <=< evalM
 
