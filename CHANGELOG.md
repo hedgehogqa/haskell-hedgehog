@@ -1,4 +1,4 @@
-## Unreleased (minor)
+## Version 1.5 (unreleased)
 
 * Remove redundant `Show` constraints on `evalMaybe`, `evalMaybeM`
 
