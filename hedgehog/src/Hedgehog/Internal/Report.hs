@@ -778,9 +778,11 @@ ppFailureReport context name tests discards seed (FailureReport _ shrinkPath mco
 ppName :: Maybe PropertyName -> Doc a
 ppName = \case
   Nothing ->
-    "<interactive>"
+    "<interactive>" <> WL.space
+  Just "" ->
+    mempty
   Just (PropertyName name) ->
-    WL.text name
+    WL.text name <> WL.space
 
 ppProgress :: MonadIO m => Maybe PropertyName -> Report Progress -> m (Doc Markup)
 ppProgress name (Report tests discards coverage _ status) =
@@ -788,7 +790,7 @@ ppProgress name (Report tests discards coverage _ status) =
     Running ->
       pure . WL.vsep $ [
           icon RunningIcon '●' . WL.annotate RunningHeader $
-            ppName name <+>
+            ppName name <>
             "passed" <+>
             ppTestCount tests <>
             ppWithDiscardCount discards <+>
@@ -798,7 +800,7 @@ ppProgress name (Report tests discards coverage _ status) =
 
     Shrinking failure ->
       pure . icon ShrinkingIcon '↯' . WL.annotate ShrinkingHeader $
-        ppName name <+>
+        ppName name <>
         "failed" <+> ppFailedAtLocation (failureLocation failure) <#>
         "after" <+>
         ppTestCount tests <>
@@ -815,7 +817,7 @@ ppResultWith context name (Report tests discards coverage seed result) = do
       pfailure <- ppFailureReport context name tests discards seed failure
       pure . WL.vsep $ [
           icon FailedIcon '✗' . WL.align . WL.annotate FailedText $
-            ppName name <+>
+            ppName name <>
             "failed" <+> ppFailedAtLocation (failureLocation failure) <#>
             "after" <+>
             ppTestCount tests <>
@@ -830,7 +832,7 @@ ppResultWith context name (Report tests discards coverage seed result) = do
     GaveUp ->
       pure . WL.vsep $ [
           icon GaveUpIcon '⚐' . WL.annotate GaveUpText $
-            ppName name <+>
+            ppName name <>
             "gave up after" <+>
             ppDiscardCount discards <>
             ", passed" <+>
@@ -842,7 +844,7 @@ ppResultWith context name (Report tests discards coverage seed result) = do
     OK ->
       pure . WL.vsep $ [
           icon SuccessIcon '✓' . WL.annotate SuccessText $
-            ppName name <+>
+            ppName name <>
             "passed" <+>
             ppTestCount tests <>
             "."
