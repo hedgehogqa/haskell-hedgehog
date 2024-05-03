@@ -323,7 +323,7 @@ checkReport cfg size0 seed0 test0 updateUI = do
                 successReport
               else
                 failureReport $
-                  "Labels not sufficently covered after " <> show tests <> " tests"
+                  "Labels not sufficiently covered after " <> show tests <> " tests"
 
       else if discards >= fromIntegral (propertyDiscardLimit cfg) then
         -- we've hit the discard limit, give up

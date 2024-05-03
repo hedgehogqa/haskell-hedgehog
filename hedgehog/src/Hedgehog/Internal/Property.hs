@@ -306,7 +306,11 @@ newtype TestLimit =
 --
 newtype TestCount =
   TestCount Int
-  deriving (Eq, Ord, Show, Num, Enum, Real, Integral, Lift)
+  deriving (Eq, Ord, Num, Enum, Real, Integral, Lift)
+
+instance Show TestCount where
+  showsPrec p (TestCount n) =
+    showsPrec p n
 
 -- | The number of tests a property had to discard.
 --
