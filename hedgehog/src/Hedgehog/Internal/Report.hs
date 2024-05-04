@@ -820,13 +820,23 @@ ppResultWith config name (Report tests discards coverage seed result) = do
       pure . WL.vsep $ [
           icon FailedIcon '✗' . WL.align . WL.annotate FailedText $
             ppName name <>
-            "failed" <+> ppFailedAtLocation (failureLocation failure) <#>
-            "after" <+>
+            (
+              if configPrintFailedAtLocation config then
+                "failed" <+> ppFailedAtLocation (failureLocation failure) <#> "after"
+              else
+                "failed after"
+            ) <+>
             ppTestCount tests <>
             ppShrinkDiscard (failureShrinks failure) discards <>
-            "." <#>
-            "shrink path:" <+>
-            ppSkip (SkipToShrink tests discards $ failureShrinkPath failure)
+            "." <>
+            (
+              if configPrintReproduceMessage config then
+                WL.line <>
+                "shrink path:" <+>
+                ppSkip (SkipToShrink tests discards $ failureShrinkPath failure)
+              else
+                mempty
+            )
         ] ++
         ppCoverage tests coverage ++
         pfailure
@@ -1293,11 +1303,12 @@ renderResult = renderResultWith defaultConfig
 data Config =
   Config {
       configContext :: Context
+    , configPrintFailedAtLocation :: Bool
     , configPrintReproduceMessage :: Bool
     }
 
 defaultConfig :: Config
-defaultConfig = Config FullContext True
+defaultConfig = Config FullContext True True
 
 renderResultWith :: MonadIO m => Config -> UseColor -> Maybe PropertyName -> Report Result -> m String
 renderResultWith config color name x =
