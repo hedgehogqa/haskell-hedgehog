@@ -26,6 +26,7 @@ module Hedgehog.Internal.Report (
   , defaultConfig
   , Context(..)
   , Lines
+  , PrintPrefixIcons(..)
 
   , renderProgress
   , renderResult
@@ -307,9 +308,10 @@ gutter :: Markup -> Doc Markup -> Doc Markup
 gutter m x =
   markup m ">" <+> x
 
-icon :: Markup -> Char -> Doc Markup -> Doc Markup
-icon m i x =
-  markup m (WL.char i) <+> x
+icon :: PrintPrefixIcons -> Markup -> Char -> Doc Markup -> Doc Markup
+icon p m i x = case p of
+  DisablePrefixIcons -> x
+  EnablePrefixIcons -> markup m (WL.char i) <+> x
 
 ppTestCount :: TestCount -> Doc a
 ppTestCount = \case
@@ -569,6 +571,7 @@ instance Show Lines where
   showsPrec p (Lines n) = showsPrec p n
 
 data Context = FullContext | Context Lines
+  deriving (Eq, Show)
 
 applyContext :: Context -> Declaration Annotation -> Declaration Annotation
 applyContext context decl = case context of
@@ -763,7 +766,7 @@ ppFailureReport config name tests discards seed (FailureReport _ shrinkPath mcov
     whenSome (mempty :) .
     whenSome (++ [mempty]) .
     WL.punctuate WL.line .
-    fmap (WL.vsep . fmap (WL.indent 2)) .
+    fmap (WL.vsep . fmap (indentBy $ configPrintPrefixIcons config)) .
     fmap (id :: [Doc Markup] -> [Doc Markup]) .
     List.filter (not . null) $
     concat [
@@ -776,6 +779,13 @@ ppFailureReport config name tests discards seed (FailureReport _ shrinkPath mcov
     , with bottom $
         id
     ]
+
+indentBy :: PrintPrefixIcons -> Doc a -> Doc a
+indentBy = \case
+  DisablePrefixIcons ->
+    id
+  EnablePrefixIcons ->
+    WL.indent 2
 
 ppName :: Maybe PropertyName -> Doc a
 ppName = \case
@@ -791,17 +801,17 @@ ppProgress name (Report tests discards coverage _ status) =
   case status of
     Running ->
       pure . WL.vsep $ [
-          icon RunningIcon '●' . WL.annotate RunningHeader $
+          icon EnablePrefixIcons RunningIcon '●' . WL.annotate RunningHeader $
             ppName name <>
             "passed" <+>
             ppTestCount tests <>
             ppWithDiscardCount discards <+>
             "(running)"
         ] ++
-        ppCoverage tests coverage
+        ppCoverage EnablePrefixIcons tests coverage
 
     Shrinking failure ->
-      pure . icon ShrinkingIcon '↯' . WL.annotate ShrinkingHeader $
+      pure . icon EnablePrefixIcons ShrinkingIcon '↯' . WL.annotate ShrinkingHeader $
         ppName name <>
         "failed" <+> ppFailedAtLocation (failureLocation failure) <#>
         "after" <+>
@@ -818,7 +828,7 @@ ppResultWith config name (Report tests discards coverage seed result) = do
     Failed failure -> do
       pfailure <- ppFailureReport config name tests discards seed failure
       pure . WL.vsep $ [
-          icon FailedIcon '✗' . WL.align . WL.annotate FailedText $
+          icon (configPrintPrefixIcons config) FailedIcon '✗' . WL.align . WL.annotate FailedText $
             ppName name <>
             (
               if configPrintFailedAtLocation config then
@@ -838,12 +848,12 @@ ppResultWith config name (Report tests discards coverage seed result) = do
                 mempty
             )
         ] ++
-        ppCoverage tests coverage ++
+        ppCoverage (configPrintPrefixIcons config) tests coverage ++
         pfailure
 
     GaveUp ->
       pure . WL.vsep $ [
-          icon GaveUpIcon '⚐' . WL.annotate GaveUpText $
+          icon (configPrintPrefixIcons config) GaveUpIcon '⚐' . WL.annotate GaveUpText $
             ppName name <>
             "gave up after" <+>
             ppDiscardCount discards <>
@@ -851,17 +861,17 @@ ppResultWith config name (Report tests discards coverage seed result) = do
             ppTestCount tests <>
             "."
         ] ++
-        ppCoverage tests coverage
+        ppCoverage (configPrintPrefixIcons config) tests coverage
 
     OK ->
       pure . WL.vsep $ [
-          icon SuccessIcon '✓' . WL.annotate SuccessText $
+          icon (configPrintPrefixIcons config) SuccessIcon '✓' . WL.annotate SuccessText $
             ppName name <>
             "passed" <+>
             ppTestCount tests <>
             "."
         ] ++
-        ppCoverage tests coverage
+        ppCoverage (configPrintPrefixIcons config) tests coverage
 
 ppFailedAtLocation :: Maybe Span -> Doc Markup
 ppFailedAtLocation = \case
@@ -873,12 +883,12 @@ ppFailedAtLocation = \case
   Nothing ->
     mempty
 
-ppCoverage :: TestCount -> Coverage CoverCount -> [Doc Markup]
-ppCoverage tests x =
+ppCoverage :: PrintPrefixIcons -> TestCount -> Coverage CoverCount -> [Doc Markup]
+ppCoverage icons tests x =
   if Map.null (coverageLabels x) then
     mempty
   else
-    fmap (ppLabel tests (coverageWidth tests x)) .
+    fmap (ppLabel icons tests (coverageWidth tests x)) .
     List.sortOn labelLocation $
     Map.elems (coverageLabels x)
 
@@ -950,8 +960,8 @@ ppLeftPad n doc =
   in
     pad <> doc
 
-ppLabel :: TestCount -> ColumnWidth -> Label CoverCount -> Doc Markup
-ppLabel tests w x@(MkLabel name _ minimum_ count) =
+ppLabel :: PrintPrefixIcons -> TestCount -> ColumnWidth -> Label CoverCount -> Doc Markup
+ppLabel icons tests w x@(MkLabel name _ minimum_ count) =
   let
     covered =
       labelCovered tests x
@@ -965,11 +975,14 @@ ppLabel tests w x@(MkLabel name _ minimum_ count) =
     lborder =
       WL.annotate (StyledBorder StyleDefault)
 
-    licon =
-      if not covered then
-        WL.annotate CoverageText "⚠ "
-      else
-        "  "
+    licon = case icons of
+      DisablePrefixIcons ->
+        mempty
+      EnablePrefixIcons ->
+        if not covered then
+          WL.annotate CoverageText "⚠ "
+        else
+          "  "
 
     lname =
       WL.fill (widthName w) (ppLabelName name)
@@ -1123,13 +1136,13 @@ ppWhenNonZero suffix n =
 annotateSummary :: Summary -> Doc Markup -> Doc Markup
 annotateSummary summary =
   if summaryFailed summary > 0 then
-    icon FailedIcon '✗' . WL.annotate FailedText
+    icon EnablePrefixIcons FailedIcon '✗' . WL.annotate FailedText
   else if summaryGaveUp summary > 0 then
-    icon GaveUpIcon '⚐' . WL.annotate GaveUpText
+    icon EnablePrefixIcons GaveUpIcon '⚐' . WL.annotate GaveUpText
   else if summaryWaiting summary > 0 || summaryRunning summary > 0 then
-    icon WaitingIcon '○' . WL.annotate WaitingHeader
+    icon EnablePrefixIcons WaitingIcon '○' . WL.annotate WaitingHeader
   else
-    icon SuccessIcon '✓' . WL.annotate SuccessText
+    icon EnablePrefixIcons SuccessIcon '✓' . WL.annotate SuccessText
 
 ppSummary :: MonadIO m => Summary -> m (Doc Markup)
 ppSummary summary =
@@ -1305,10 +1318,20 @@ data Config =
       configContext :: Context
     , configPrintFailedAtLocation :: Bool
     , configPrintReproduceMessage :: Bool
-    }
+    , configPrintPrefixIcons :: PrintPrefixIcons
+    } deriving (Eq, Show)
+
+-- | Whether to add icons to the start of important output lines or not.
+--
+data PrintPrefixIcons =
+    DisablePrefixIcons
+    -- ^ Do not add icons to the start of important output lines.
+  | EnablePrefixIcons
+    -- ^ Add icons to the start of important output lines.
+    deriving (Eq, Show)
 
 defaultConfig :: Config
-defaultConfig = Config FullContext True True
+defaultConfig = Config FullContext True True EnablePrefixIcons
 
 renderResultWith :: MonadIO m => Config -> UseColor -> Maybe PropertyName -> Report Result -> m String
 renderResultWith config color name x =
