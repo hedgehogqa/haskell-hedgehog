@@ -840,7 +840,7 @@ ppResultWith config name (Report tests discards coverage seed result) = do
             ppShrinkDiscard (failureShrinks failure) discards <>
             "." <>
             (
-              if configPrintReproduceMessage config then
+              if configPrintShrinkPath config then
                 WL.line <>
                 "shrink path:" <+>
                 ppSkip (SkipToShrink tests discards $ failureShrinkPath failure)
@@ -1317,6 +1317,7 @@ data Config =
   Config {
       configContext :: Context
     , configPrintFailedAtLocation :: Bool
+    , configPrintShrinkPath :: Bool
     , configPrintReproduceMessage :: Bool
     , configPrintPrefixIcons :: PrintPrefixIcons
     } deriving (Eq, Show)
@@ -1331,7 +1332,7 @@ data PrintPrefixIcons =
     deriving (Eq, Show)
 
 defaultConfig :: Config
-defaultConfig = Config FullContext True True EnablePrefixIcons
+defaultConfig = Config FullContext True True True EnablePrefixIcons
 
 renderResultWith :: MonadIO m => Config -> UseColor -> Maybe PropertyName -> Report Result -> m String
 renderResultWith config color name x =
