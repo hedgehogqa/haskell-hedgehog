@@ -1,6 +1,23 @@
-## Version 1.5 (unreleased)
+## Version 1.5 (2024-07-25)
 
-* Remove redundant `Show` constraints on `evalMaybe`, `evalMaybeM`
+* Bump containers and filepath dependencies ([#533](533), [@erikd][erikd])
+* Hedgehog.Internal.Report: Add `configPrintShrinkPath` ([#531](531), [@sol][sol])
+* Allow GHC 9.10 ([#530](530), [@erikd][erikd])
+* hedgehog-{example,quickcheck,test-laws}: Raise QuickCheck bound ([#529](529), [@JackKelly-Bellroy][JackKelly-Bellroy])
+* Allow to omit icons at the start of important output lines ([#524](524), [@sol][sol])
+* Allow to omit source location from report ([#523](523), [@sol][sol])
+* Fix "insufficient coverage" message ([#521](521), [@sol][sol])
+* Support empty property names ([#520](520), [@sol][sol])
+* Allow to disable the `recheckAt`-message ([#519](519), [@sol][sol])
+* Remove redundant `Show` constraints: `evalMaybe`, `evalMaybeM` ([#516](516), [@endgame][endgame])
+* Relax upper bound on `ansi-terminal` ([#515](515), [@moodmosaic][moodmosaic])
+* Report.hs refactoring ([#514](514), [@sol][sol])
+* Relax time dependency to < 1.15 ([#513](513), [@tomjaguarpaw][tomjaguarpaw])
+* Bump barbies upper bound ([#510](510), [@jchia][jchia])
+* Support primitive 0.9 ([#509](509), [@Vekhir][Vekhir])
+* Show less context on failure ([#505](505), [@sol][sol])
+* Allow GHC 9.8 ([#504](504), [@tomjaguarpaw][tomjaguarpaw])
+* Wrap `evalMaybeM` and `evalEitherM` in `withFrozenCallStack` ([#499](499), [@ocharles][ocharles])
 
 ## Version 1.4 (2023-08-07)
 
@@ -286,14 +303,55 @@
   https://github.com/mbg
 [jhrcek]:
   https://github.com/jhrcek
-
-
 [parsonsmatt]:
   https://github.com/parsonsmatt
 [shlevy]:
   https://github.com/shlevy
+[sol]:
+  https://github.com/sol
+[JackKelly-Bellroy]:
+  https://github.com/JackKelly-Bellroy
+[jchia]:
+  https://github.com/jchia
+[Vekhir]:
+  https://github.com/Vekhir
 
-
+[533]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/533
+[531]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/531
+[530]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/530
+[529]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/529
+[524]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/524
+[523]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/523
+[521]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/521
+[520]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/520
+[519]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/519
+[516]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/516
+[515]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/515
+[514]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/514
+[513]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/513
+[510]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/510
+[509]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/509
+[505]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/505
+[504]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/504
+[499]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/499
 [491]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/491
 [489]:
