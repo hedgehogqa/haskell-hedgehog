@@ -1,3 +1,7 @@
+## Unreleased
+
+* Add `Hedgehog.withShrinkTimeoutMicros` ([#488][488], [@tbidne][tbidne])
+
 ## Version 1.5 (2024-07-25)
 
 * Bump containers and filepath dependencies ([#533](533), [@erikd][erikd])
@@ -315,6 +319,8 @@
   https://github.com/jchia
 [Vekhir]:
   https://github.com/Vekhir
+[tbidne]:
+  https://github.com/tbidne
 
 [533]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/533
@@ -358,6 +364,8 @@
   https://github.com/hedgehogqa/haskell-hedgehog/pull/489
 [486]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/486
+[488]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/488
 [485]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/485
 [482]:
