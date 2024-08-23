@@ -231,6 +231,7 @@ import           Hedgehog.Internal.Prelude hiding (either, maybe, seq)
 import           Hedgehog.Internal.Seed (Seed)
 import qualified Hedgehog.Internal.Seed as Seed
 import qualified Hedgehog.Internal.Shrink as Shrink
+import           Hedgehog.Internal.Source (HasCallStack, withFrozenCallStack)
 import           Hedgehog.Internal.Tree (Tree, TreeT(..), NodeT(..))
 import qualified Hedgehog.Internal.Tree as Tree
 import           Hedgehog.Range (Size, Range)
@@ -749,18 +750,19 @@ resize size gen =
 
 -- | Adjust the size parameter by transforming it with the given function.
 --
-scale :: MonadGen m => (Size -> Size) -> m a -> m a
+scale :: (HasCallStack, MonadGen m) => (Size -> Size) -> m a -> m a
 scale f =
-  withGenT $ \gen ->
-    GenT $ \size0 seed ->
-      let
-        size =
-          f size0
-      in
-        if size < 0 then
-          error "Hedgehog.Gen.scale: negative size"
-        else
-          runGenT size seed gen
+  withFrozenCallStack $
+    withGenT $ \gen ->
+      GenT $ \size0 seed ->
+        let
+          size =
+            f size0
+        in
+          if size < 0 then
+            error "Hedgehog.Gen.scale: negative size"
+          else
+            runGenT size seed gen
 
 -- | Make a generator smaller by scaling its size parameter.
 --
@@ -1191,8 +1193,8 @@ constant =
 --
 --   /The input list must be non-empty./
 --
-element :: (Foldable f, MonadGen m) => f a -> m a
-element fa = case toList fa of
+element :: (HasCallStack, Foldable f, MonadGen m) => f a -> m a
+element fa = withFrozenCallStack $ case toList fa of
   [] ->
     error "Hedgehog.Gen.element: used with empty Foldable"
   xs -> do
@@ -1205,8 +1207,8 @@ element fa = case toList fa of
 --
 --   /The input list must be non-empty./
 --
-element_ :: MonadGen m => [a] -> m a
-element_ = \case
+element_ :: (HasCallStack, MonadGen m) => [a] -> m a
+element_ = withFrozenCallStack . \case
   [] ->
     error "Hedgehog.Gen.element: used with empty list"
   xs -> do
@@ -1219,8 +1221,8 @@ element_ = \case
 --
 --   /The input list must be non-empty./
 --
-choice :: MonadGen m => [m a] -> m a
-choice = \case
+choice :: (HasCallStack, MonadGen m) => [m a] -> m a
+choice = withFrozenCallStack . \case
   [] ->
     error "Hedgehog.Gen.choice: used with empty list"
   xs -> do
@@ -1234,8 +1236,8 @@ choice = \case
 --
 --   /The input list must be non-empty./
 --
-frequency :: MonadGen m => [(Int, m a)] -> m a
-frequency = \case
+frequency :: (HasCallStack, MonadGen m) => [(Int, m a)] -> m a
+frequency = withFrozenCallStack . \case
   [] ->
     error "Hedgehog.Gen.frequency: used with empty list"
   xs0 -> do
@@ -1815,22 +1817,23 @@ shuffleSeq xs =
 --     i <- Gen.int
 --     i /== 0
 -- @
-sample :: MonadIO m => Gen a -> m a
+sample :: (HasCallStack, MonadIO m) => Gen a -> m a
 sample gen =
-  liftIO $
-    let
-      loop n =
-        if n <= 0 then
-          error "Hedgehog.Gen.sample: too many discards, could not generate a sample"
-        else do
-          seed <- Seed.random
-          case evalGen 30 seed gen of
-            Nothing ->
-              loop (n - 1)
-            Just x ->
-              pure $ Tree.treeValue x
-    in
-      loop (100 :: Int)
+  withFrozenCallStack $
+    liftIO $
+      let
+        loop n =
+          if n <= 0 then
+            error "Hedgehog.Gen.sample: too many discards, could not generate a sample"
+          else do
+            seed <- Seed.random
+            case evalGen 30 seed gen of
+              Nothing ->
+                loop (n - 1)
+              Just x ->
+                pure $ Tree.treeValue x
+      in
+        loop (100 :: Int)
 
 -- | Run a generator with a random seed and print the outcome, and the first
 --   level of shrinks.
