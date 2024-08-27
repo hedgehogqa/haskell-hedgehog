@@ -1,4 +1,4 @@
-## Version 1.6 (unreleased)
+## Version 1.6 (2024-08-27)
 
 * Add callstacks to generators that can error ([#538][538], [@ChickenProp][ChickenProp])
 * Drop support for GHC 8.0.2 ([#538][538], [@ChickenProp][ChickenProp])
