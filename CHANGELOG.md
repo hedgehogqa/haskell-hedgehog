@@ -1,3 +1,8 @@
+## Version 1.6 (unreleased)
+
+* Add callstacks to generators that can error ([#538][538], [@ChickenProp][ChickenProp])
+* Drop support for GHC 8.0.2 ([#538][538], [@ChickenProp][ChickenProp])
+
 ## Version 1.5 (2024-07-25)
 
 * Bump containers and filepath dependencies ([#533][533], [@erikd][erikd])
@@ -316,6 +321,8 @@
 [Vekhir]:
   https://github.com/Vekhir
 
+[538]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/538
 [533]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/533
 [531]:
