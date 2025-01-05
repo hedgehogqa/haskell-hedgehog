@@ -23,12 +23,17 @@ cabal-version:
 build-type:
   Simple
 tested-with:
-    GHC == 8.0.2
-  , GHC == 8.2.2
+    GHC == 8.2.2
   , GHC == 8.4.4
   , GHC == 8.6.5
   , GHC == 8.8.3
   , GHC == 8.10.1
+  , GHC == 9.2.7
+  , GHC == 9.4.8
+  , GHC == 9.6.6
+  , GHC == 9.8.4
+  , GHC == 9.10.1
+  , GHC == 9.12.1
 
 library
   hs-source-dirs:
