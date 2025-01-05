@@ -41,7 +41,7 @@ tested-with:
 
 source-repository head
   type: git
-  location: git://github.com/hedgehogqa/haskell-hedgehog.git
+  location: https://github.com/hedgehogqa/haskell-hedgehog
 
 test-suite test
   type:
