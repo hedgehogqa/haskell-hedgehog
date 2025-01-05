@@ -31,6 +31,11 @@ tested-with:
   , GHC == 8.6.5
   , GHC == 8.8.3
   , GHC == 8.10.1
+  , GHC == 9.2.7
+  , GHC == 9.4.4
+  , GHC == 9.8.2
+  , GHC == 9.10.1
+  , GHC == 9.12.1
 
 executable dieharder-input
   main-is:

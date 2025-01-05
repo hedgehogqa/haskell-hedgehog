@@ -38,7 +38,11 @@ tested-with:
   , GHC == 8.6.5
   , GHC == 8.8.3
   , GHC == 8.10.1
-  , GHC == 9.2.1
+  , GHC == 9.2.7
+  , GHC == 9.4.4
+  , GHC == 9.8.2
+  , GHC == 9.10.1
+  , GHC == 9.12.1
 extra-source-files:
   README.md
   CHANGELOG.md
@@ -71,7 +75,7 @@ library
     , resourcet                       >= 1.1        && < 1.4
     , safe-exceptions                 >= 0.1        && < 0.2
     , stm                             >= 2.4        && < 2.6
-    , template-haskell                >= 2.10       && < 2.23
+    , template-haskell                >= 2.10       && < 2.24
     , text                            >= 1.1        && < 2.2
     , time                            >= 1.4        && < 1.15
     , transformers                    >= 0.5        && < 0.7
