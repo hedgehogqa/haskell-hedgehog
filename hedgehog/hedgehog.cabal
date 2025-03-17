@@ -62,7 +62,7 @@ library
     , barbies                         >= 1.0        && < 2.2
     , bytestring                      >= 0.10       && < 0.13
     , concurrent-output               >= 1.7        && < 1.11
-    , containers                      >= 0.4        && < 0.8
+    , containers                      >= 0.4        && < 0.9
     , deepseq                         >= 1.1.0.0    && < 1.6
     , directory                       >= 1.2        && < 1.4
     , erf                             >= 2.0        && < 2.1
@@ -149,7 +149,7 @@ test-suite test
   build-depends:
       hedgehog
     , base                            >= 3          && < 5
-    , containers                      >= 0.4        && < 0.8
+    , containers                      >= 0.4        && < 0.9
     , mmorph                          >= 1.0        && < 1.3
     , mtl                             >= 2.1        && < 2.4
     , pretty-show                     >= 1.6        && < 1.11
