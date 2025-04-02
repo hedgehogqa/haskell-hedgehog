@@ -113,7 +113,7 @@ As you explore haskell-hedgehog, and possibly contribute to its ongoing developm
  [hackage-shield]: https://img.shields.io/hackage/v/hedgehog.svg?style=flat
 
  [github-shield]: https://github.com/hedgehogqa/haskell-hedgehog/actions/workflows/ci.yaml/badge.svg
- [github-ci]: https://github.com/hedgehogqa/haskell-hedgehog/actions/workflows/ci.yaml
+ [github-ci]: https://github.com/hedgehogqa/haskell-hedgehog/actions/workflows/haskell-ci.yml
 
  [haddock-hedgehog]: http://hackage.haskell.org/package/hedgehog/docs/Hedgehog.html
  [haddock-hedgehog-gen]: http://hackage.haskell.org/package/hedgehog/docs/Hedgehog-Gen.html
