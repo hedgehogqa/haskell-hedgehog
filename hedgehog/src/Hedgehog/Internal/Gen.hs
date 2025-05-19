@@ -512,6 +512,7 @@ instance Monad m => Applicative (GenT m) where
             runGenT size sm m
 
   (*>) _ m = m
+  (<*) m _ = m
 
 --
 -- implementation: satisfies law (ap = <*>)
