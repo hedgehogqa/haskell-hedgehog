@@ -499,6 +499,9 @@ instance Functor m => Functor (GenT m) where
 --
 -- implementation: parallel shrinking
 --
+-- | This Applicative instance is not lawful with regards to the Monad instance.
+-- This is because using applicative allows us to do parallel shrinking, but
+-- Monad does not allow that.
 instance Monad m => Applicative (GenT m) where
   pure =
     fromTreeMaybeT . pure
