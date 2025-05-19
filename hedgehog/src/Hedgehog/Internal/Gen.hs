@@ -514,8 +514,8 @@ instance Monad m => Applicative (GenT m) where
             runGenT size sf f `mzip`
             runGenT size sm m
 
-  (*>) _ m = m
-  (<*) m _ = m
+  (*>) a b = a >>= const b
+  (<*) a b = const a =<< b
 
 --
 -- implementation: satisfies law (ap = <*>)
