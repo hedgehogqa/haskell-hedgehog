@@ -511,6 +511,8 @@ instance Monad m => Applicative (GenT m) where
             runGenT size sf f `mzip`
             runGenT size sm m
 
+  (*>) _ m = m
+
 --
 -- implementation: satisfies law (ap = <*>)
 --
