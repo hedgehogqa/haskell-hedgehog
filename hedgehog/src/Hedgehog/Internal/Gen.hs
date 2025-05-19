@@ -528,9 +528,6 @@ instance Monad m => Applicative (GenT m) where
 --          runGenT size sm m
 
 instance Monad m => Monad (GenT m) where
-  return =
-    pure
-
   (>>=) m k =
     GenT $ \size seed ->
       case Seed.split seed of
