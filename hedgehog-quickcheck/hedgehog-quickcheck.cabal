@@ -57,7 +57,7 @@ library
   build-depends:
       base                            >= 3          && < 5
     , hedgehog                        >= 0.5        && < 1.7
-    , QuickCheck                      >= 2.7        && < 2.16
+    , QuickCheck                      >= 2.7        && < 2.17
     , transformers                    >= 0.4        && < 0.7
 
   ghc-options:
