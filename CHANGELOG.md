@@ -1,3 +1,7 @@
+## Unreleased
+
+* Add `Hedgehog.withShrinkTimeoutMicros` ([#488][488], [@tbidne][tbidne])
+
 ## Version 1.6 (2024-08-27)
 
 * Add callstacks to generators that can error ([#538][538], [@ChickenProp][ChickenProp])
@@ -320,6 +324,8 @@
   https://github.com/jchia
 [Vekhir]:
   https://github.com/Vekhir
+[tbidne]:
+  https://github.com/tbidne
 
 [538]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/538
@@ -365,6 +371,8 @@
   https://github.com/hedgehogqa/haskell-hedgehog/pull/489
 [486]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/486
+[488]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/488
 [485]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/485
 [482]:
