@@ -1,3 +1,7 @@
+## Version 1.6.1 (2025-05-19)
+
+* Improve Applicative's `(*>)` ([#546][546], [@L0neGamer][L0neGamer])
+
 ## Version 1.6 (2024-08-27)
 
 * Add callstacks to generators that can error ([#538][538], [@ChickenProp][ChickenProp])

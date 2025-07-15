@@ -499,6 +499,9 @@ instance Functor m => Functor (GenT m) where
 --
 -- implementation: parallel shrinking
 --
+-- | This Applicative instance is not lawful with regards to the Monad instance.
+-- This is because using applicative allows us to do parallel shrinking, but
+-- Monad does not allow that.
 instance Monad m => Applicative (GenT m) where
   pure =
     fromTreeMaybeT . pure
@@ -510,6 +513,9 @@ instance Monad m => Applicative (GenT m) where
           uncurry ($) <$>
             runGenT size sf f `mzip`
             runGenT size sm m
+
+  (*>) a b = a >>= const b
+  (<*) a b = const a =<< b
 
 --
 -- implementation: satisfies law (ap = <*>)
@@ -525,9 +531,6 @@ instance Monad m => Applicative (GenT m) where
 --          runGenT size sm m
 
 instance Monad m => Monad (GenT m) where
-  return =
-    pure
-
   (>>=) m k =
     GenT $ \size seed ->
       case Seed.split seed of
