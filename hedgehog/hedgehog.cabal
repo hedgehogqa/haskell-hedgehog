@@ -92,6 +92,7 @@ library
     Hedgehog.Range
 
     Hedgehog.Internal.Barbie
+    Hedgehog.Internal.Check
     Hedgehog.Internal.Config
     Hedgehog.Internal.Discovery
     Hedgehog.Internal.Distributive
