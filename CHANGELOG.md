@@ -1,5 +1,8 @@
-## Version 1.6 (2024-08-27)
+## Version 1.6 (2025-09-08)
 
+* Fix GitHub CI URL ([#545][545], [@tmcgilchrist][tmcgilchrist])
+* Bump upper bounds for containers and random ([#544][544], [@moodmosaic][moodmosaic])
+* Support GHC 9.12 ([#540][540], [@erikd][erikd])
 * Add callstacks to generators that can error ([#538][538], [@ChickenProp][ChickenProp])
 * Drop support for GHC 8.0.2 ([#538][538], [@ChickenProp][ChickenProp])
 
@@ -320,7 +323,13 @@
   https://github.com/jchia
 [Vekhir]:
   https://github.com/Vekhir
+[tmcgilchrist]:
+  https://github.com/tmcgilchrist
 
+[544]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/544
+[540]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/540
 [538]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/538
 [533]:
