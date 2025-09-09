@@ -17,7 +17,7 @@ https://preview.webflow.com/preview/hedgehogqa?utm_medium=preview_link&utm_sourc
 
 <div align="left">
 
-[Hedgehog](http://hedgehog.qa/) automatically generates a comprehensive array of test cases, exercising your software in ways human testers would never imagine.
+[Hedgehog](https://web.archive.org/web/20240329171125/https://hedgehog.qa/) automatically generates a comprehensive array of test cases, exercising your software in ways human testers would never imagine.
 
 Generate hundreds of test cases automatically, exposing even the most insidious of corner cases. Failures are automatically simplified, giving developers coherent, intelligible error messages.
 
