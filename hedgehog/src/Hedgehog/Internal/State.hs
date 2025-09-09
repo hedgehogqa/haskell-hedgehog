@@ -35,7 +35,6 @@ module Hedgehog.Internal.State (
   -- * Commands
   , Command(..)
   , Callback(..)
-  , commandGenOK
 
   -- * Actions
   , Action(..)
@@ -402,11 +401,26 @@ data Command gen m (state :: (Type -> Type) -> Type) =
         [Callback input output state]
     }
 
--- | Checks that input for a command can be executed in the given state.
+
+-- | An actionable command is a command that can generate an action given
+--   the current symbolic state, that is, its @commandGen@ returns @Just@.
 --
-commandGenOK :: Command gen m state -> state Symbolic -> Bool
-commandGenOK (Command inputGen _ _) state =
-  Maybe.isJust (inputGen state)
+--   This is an internal type required to hold on to the existential
+--   types when building actions.
+--
+data Actionable gen m (state :: (Type -> Type) -> Type) =
+  forall input output.
+  (TraversableB input, Show (input Symbolic), Show output, Typeable output) =>
+  Actionable {
+      _actionableGen ::
+        gen (input Symbolic)
+
+    , _actionableExecute ::
+        input Concrete -> m output
+
+    , _actionableCallbacks ::
+        [Callback input output state]
+    }
 
 -- | An instantiation of a 'Command' which can be executed, and its effect
 --   evaluated.
@@ -545,21 +559,19 @@ action commands =
   Gen.justT $ do
     Context state0 _ <- get
 
-    Command mgenInput exec callbacks <-
-      Gen.element_ $ filter (\c -> commandGenOK c state0) commands
+    Actionable genInput exec callbacks <-
+      Gen.element_
+        [ Actionable gen exec callbacks
+        | Command inputGen exec callbacks <- commands
+        , Just gen <- [inputGen state0]
+        ]
 
     -- If we shrink the input, we still want to use the same output. Otherwise
     -- any actions using this output as part of their input will be dropped. But
     -- the existing output is still in the context, so `contextNewVar` will
     -- create a new one. To avoid that, we generate the output before the input.
     output <- contextNewVar
-
-    input <-
-      case mgenInput state0 of
-        Nothing ->
-          error "genCommand: internal error, tried to use generator with invalid state."
-        Just gen ->
-          hoist lift $ Gen.toGenT gen
+    input  <- hoist lift $ Gen.toGenT genInput
 
     if not $ callbackRequire callbacks state0 input then
       pure Nothing
@@ -650,7 +662,7 @@ sequential ::
   -> [Command gen m state]
   -> gen (Sequential m state)
 sequential range initial commands =
-  fmap (Sequential . fst) $
+  Sequential . fst <$>
     genActions range commands (mkContext initial)
 
 -- | A sequential prefix of actions to execute, with two branches to execute in parallel.
@@ -808,9 +820,8 @@ linearize initial branch1 branch2 =
   withFrozenCallStack $
     let
       ok =
-        any successful .
-        fmap (checkActions initial) $
-        interleave branch1 branch2
+        any (successful . checkActions initial) $
+          interleave branch1 branch2
     in
       if ok then
         pure ()
