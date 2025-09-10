@@ -1208,7 +1208,7 @@ element fa = withFrozenCallStack $ case toList fa of
 --   /The input list must be non-empty./
 --
 element_ :: (HasCallStack, MonadGen m) => [a] -> m a
-element_ = withFrozenCallStack . \case
+element_ l = withFrozenCallStack $ case l of
   [] ->
     error "Hedgehog.Gen.element: used with empty list"
   xs -> do
@@ -1222,7 +1222,7 @@ element_ = withFrozenCallStack . \case
 --   /The input list must be non-empty./
 --
 choice :: (HasCallStack, MonadGen m) => [m a] -> m a
-choice = withFrozenCallStack . \case
+choice l = withFrozenCallStack $ case l of
   [] ->
     error "Hedgehog.Gen.choice: used with empty list"
   xs -> do
@@ -1237,7 +1237,7 @@ choice = withFrozenCallStack . \case
 --   /The input list must be non-empty./
 --
 frequency :: (HasCallStack, MonadGen m) => [(Int, m a)] -> m a
-frequency = withFrozenCallStack . \case
+frequency l = withFrozenCallStack $ case l of
   [] ->
     error "Hedgehog.Gen.frequency: used with empty list"
   xs0 -> do
