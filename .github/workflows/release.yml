@@ -1,0 +1,75 @@
+name: Release Hedgehog
+
+on:
+  push:
+    tags:
+      - "*"
+
+jobs:
+  release:
+    name: Build and Release Hedgehog
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout repository with full history
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+
+      - name: Install GHCup
+        run: |
+          mkdir -p "$HOME/.ghcup/bin"
+          curl -sL https://downloads.haskell.org/ghcup/0.1.30.0/x86_64-linux-ghcup-0.1.30.0 > "$HOME/.ghcup/bin/ghcup"
+          chmod a+x "$HOME/.ghcup/bin/ghcup"
+
+      - name: Install GHC
+        run: |
+          "$HOME/.ghcup/bin/ghcup" install ghc 9.12.2
+          "$HOME/.ghcup/bin/ghcup" set ghc 9.12.2
+
+      - name: Install cabal-install
+        run: |
+          "$HOME/.ghcup/bin/ghcup" install cabal 3.16.0.0
+          echo "$HOME/.ghcup/bin" >> $GITHUB_PATH
+          echo "$HOME/.cabal/bin" >> $GITHUB_PATH
+
+      - name: Cabal update
+        run: cabal update
+
+      - name: Prepare Hedgehog tarball
+        run: |
+          VERSION=${GITHUB_REF_NAME}
+          PKG_DIR="hedgehog-$VERSION"
+
+          # Clean and create package directory.
+          rm -rf "$PKG_DIR"
+          mkdir "$PKG_DIR"
+
+          # Copy files from hedgehog subdirectory to package directory.
+          cp hedgehog/hedgehog.cabal "$PKG_DIR/"
+          cp hedgehog/LICENSE "$PKG_DIR/"
+          cp -r hedgehog/src "$PKG_DIR/"
+          cp -r hedgehog/test "$PKG_DIR/"
+
+          # Copy CHANGELOG and README from root.
+          cp CHANGELOG.md "$PKG_DIR/"
+          cp README.md "$PKG_DIR/"
+
+          # Create tarball with USTAR format.
+          tar --format=ustar -czvf "hedgehog-$VERSION.tar.gz" "$PKG_DIR"
+
+          # Verify contents.
+          echo "Tarball contents:"
+          tar -tzf "hedgehog-$VERSION.tar.gz"
+
+      - name: Check Hedgehog package
+        run: |
+          VERSION=${GITHUB_REF_NAME}
+          tar -xzf "hedgehog-$VERSION.tar.gz" -C /tmp
+          cd "/tmp/hedgehog-$VERSION"
+          cabal check
+
+      - name: Upload to Hackage
+        run: cabal upload --publish hedgehog-${GITHUB_REF_NAME}.tar.gz
+        env:
+          HACKAGE_TOKEN: ${{ secrets.HACKAGE_TOKEN }}
