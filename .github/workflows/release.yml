@@ -51,6 +51,6 @@ jobs:
         run: |
           VERSION=${GITHUB_REF_NAME}
           SDIST=$(ls dist-newstyle/sdist/hedgehog-$VERSION.tar.gz)
-          cabal upload --publish "$SDIST"
+          cabal upload "$SDIST"
         env:
           HACKAGE_TOKEN: ${{ secrets.HACKAGE_TOKEN }}
