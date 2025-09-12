@@ -14,7 +14,7 @@ jobs:
       - name: Checkout repository with full history
         uses: actions/checkout@v5
         with:
-          fetch-depth: 0
+          fetch-depth: 1
 
       - name: Install GHCup
         run: |
