@@ -36,40 +36,21 @@ jobs:
       - name: Cabal update
         run: cabal update
 
-      - name: Prepare Hedgehog tarball
-        run: |
-          VERSION=${GITHUB_REF_NAME}
-          PKG_DIR="hedgehog-$VERSION"
-
-          # Clean and create package directory.
-          rm -rf "$PKG_DIR"
-          mkdir "$PKG_DIR"
-
-          # Copy files from hedgehog subdirectory to package directory.
-          cp hedgehog/hedgehog.cabal "$PKG_DIR/"
-          cp hedgehog/LICENSE "$PKG_DIR/"
-          cp -r hedgehog/src "$PKG_DIR/"
-          cp -r hedgehog/test "$PKG_DIR/"
-
-          # Copy CHANGELOG and README from root.
-          cp CHANGELOG.md "$PKG_DIR/"
-          cp README.md "$PKG_DIR/"
-
-          # Create tarball with USTAR format.
-          tar --format=ustar -czvf "hedgehog-$VERSION.tar.gz" "$PKG_DIR"
-
-          # Verify contents.
-          echo "Tarball contents:"
-          tar -tzf "hedgehog-$VERSION.tar.gz"
+      - name: Build source distribution
+        run: cabal sdist hedgehog/hedgehog.cabal
 
       - name: Check Hedgehog package
         run: |
           VERSION=${GITHUB_REF_NAME}
-          tar -xzf "hedgehog-$VERSION.tar.gz" -C /tmp
+          SDIST=$(ls dist-newstyle/sdist/hedgehog-$VERSION.tar.gz)
+          tar -xzf "$SDIST" -C /tmp
           cd "/tmp/hedgehog-$VERSION"
           cabal check
 
       - name: Upload to Hackage
-        run: cabal upload --publish hedgehog-${GITHUB_REF_NAME}.tar.gz
+        run: |
+          VERSION=${GITHUB_REF_NAME}
+          SDIST=$(ls dist-newstyle/sdist/hedgehog-$VERSION.tar.gz)
+          cabal upload --publish "$SDIST"
         env:
           HACKAGE_TOKEN: ${{ secrets.HACKAGE_TOKEN }}
