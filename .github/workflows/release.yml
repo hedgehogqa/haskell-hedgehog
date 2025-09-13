@@ -1,0 +1,56 @@
+name: Release Hedgehog
+
+on:
+  push:
+    tags:
+      - "*"
+
+jobs:
+  release:
+    name: Build and Release Hedgehog
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout repository with full history
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+
+      - name: Install GHCup
+        run: |
+          mkdir -p "$HOME/.ghcup/bin"
+          curl -sL https://downloads.haskell.org/ghcup/0.1.30.0/x86_64-linux-ghcup-0.1.30.0 > "$HOME/.ghcup/bin/ghcup"
+          chmod a+x "$HOME/.ghcup/bin/ghcup"
+
+      - name: Install GHC
+        run: |
+          "$HOME/.ghcup/bin/ghcup" install ghc 9.12.2
+          "$HOME/.ghcup/bin/ghcup" set ghc 9.12.2
+
+      - name: Install cabal-install
+        run: |
+          "$HOME/.ghcup/bin/ghcup" install cabal 3.16.0.0
+          echo "$HOME/.ghcup/bin" >> $GITHUB_PATH
+          echo "$HOME/.cabal/bin" >> $GITHUB_PATH
+
+      - name: Cabal update
+        run: cabal update
+
+      - name: Build source distribution
+        run: cabal sdist hedgehog/hedgehog.cabal
+
+      - name: Check Hedgehog package
+        run: |
+          VERSION=${GITHUB_REF_NAME}
+          SDIST=$(ls dist-newstyle/sdist/hedgehog-$VERSION.tar.gz)
+          tar -xzf "$SDIST" -C /tmp
+          cd "/tmp/hedgehog-$VERSION"
+          cabal check
+
+      - name: Upload to Hackage
+        run: |
+          VERSION=${GITHUB_REF_NAME}
+          SDIST=$(ls dist-newstyle/sdist/hedgehog-$VERSION.tar.gz)
+          cabal upload "$SDIST"
+        env:
+          HACKAGE_TOKEN: ${{ secrets.HACKAGE_TOKEN }}
