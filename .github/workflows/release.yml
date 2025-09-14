@@ -39,6 +39,8 @@ jobs:
       - name: Build source distribution
         run: cabal sdist hedgehog/hedgehog.cabal
 
+      # If the version in the tag doesn't match the version in the .cabal file,
+      # `cabal check` will fail. This ensures they are in sync.
       - name: Check Hedgehog package
         run: |
           VERSION=${GITHUB_REF_NAME}
