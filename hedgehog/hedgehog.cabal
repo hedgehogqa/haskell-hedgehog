@@ -1,4 +1,4 @@
-version: 1.6
+version: 1.7
 
 name:
   hedgehog
@@ -7,13 +7,13 @@ author:
 maintainer:
   Jacob Stanley <jacob@stanley.io>
 homepage:
-  https://hedgehog.qa
+  http://github.com/hedgehogqa/haskell-hedgehog
 bug-reports:
   https://github.com/hedgehogqa/haskell-hedgehog/issues
 synopsis:
   Release with confidence.
 description:
-  <http://hedgehog.qa/ Hedgehog> automatically generates a comprehensive array
+  <http://github.com/hedgehogqa/haskell-hedgehog/ Hedgehog> automatically generates a comprehensive array
   of test cases, exercising your software in ways human testers would never
   imagine.
   .
