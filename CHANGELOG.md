@@ -1,3 +1,9 @@
+## Version 1.7 (2025-09-22)
+
+* Fix eta-reduction issues for GHC 9.0; add CI and cabal support for GHC 9.0.2 ([#557][557], [@tomjaguarpaw][tomjaguarpaw])
+* Allow lifted-async 0.11 ([#556][556], [@felixonmars][felixonmars])
+* Remove `fromJust` call by using a separate existential wrapper ([#554][554], [@HuwCampbell][HuwCampbell])
+
 ## Version 1.6 (2025-09-08)
 
 * Fix GitHub CI URL ([#545][545], [@tmcgilchrist][tmcgilchrist])
@@ -326,6 +332,12 @@
 [tmcgilchrist]:
   https://github.com/tmcgilchrist
 
+[557]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/557
+[556]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/556
+[554]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/554
 [544]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/544
 [540]:
