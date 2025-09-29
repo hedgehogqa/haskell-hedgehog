@@ -741,7 +741,7 @@ execute (Action sinput soutput exec _require update ensure) =
         (\s0 -> update s0 input (Var coutput))
         (\s0 s -> ensure s0 s input output)
 
--- | Executes a single action in the given evironment.
+-- | Executes a single action in the given environment.
 --
 executeUpdateEnsure ::
      (MonadTest m, HasCallStack)
