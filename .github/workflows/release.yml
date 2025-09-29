@@ -1,0 +1,58 @@
+name: Release Hedgehog
+
+on:
+  push:
+    tags:
+      - "*"
+
+jobs:
+  release:
+    name: Build and Release Hedgehog
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+        with:
+          fetch-depth: 1
+
+      - name: Install GHCup
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://get-ghcup.haskell.org \
+            | BOOTSTRAP_HASKELL_NONINTERACTIVE=1 sh -s -- -y
+          echo "$HOME/.ghcup/bin" >> $GITHUB_PATH
+          echo "$HOME/.cabal/bin" >> $GITHUB_PATH
+
+      - name: Install latest recommended GHC
+        run: |
+          ghcup install ghc recommended
+          ghcup set ghc recommended
+
+      - name: Install latest recommended cabal
+        run: |
+          ghcup install cabal recommended
+          ghcup set cabal recommended
+
+      - name: Cabal update
+        run: cabal update
+
+      - name: Build source distribution
+        run: cabal sdist hedgehog/hedgehog.cabal
+
+      # If the version in the tag doesn't match the version in the .cabal file,
+      # `cabal check` will fail. This ensures they are in sync.
+      - name: Check Hedgehog package
+        run: |
+          VERSION=${GITHUB_REF_NAME}
+          SDIST=$(ls dist-newstyle/sdist/hedgehog-$VERSION.tar.gz)
+          tar -xzf "$SDIST" -C /tmp
+          cd "/tmp/hedgehog-$VERSION"
+          cabal check
+
+      - name: Upload to Hackage
+        run: |
+          VERSION=${GITHUB_REF_NAME}
+          SDIST=$(ls dist-newstyle/sdist/hedgehog-$VERSION.tar.gz)
+          cabal upload "$SDIST"
+        env:
+          HACKAGE_TOKEN: ${{ secrets.HACKAGE_TOKEN }}
