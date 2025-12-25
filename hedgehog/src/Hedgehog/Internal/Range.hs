@@ -452,14 +452,17 @@ exponentialFloatFrom z x y =
 --
 scaleExponential :: Integral a => Size -> a -> a -> a
 scaleExponential sz z0 n0 =
-  let
-    z =
-      fromIntegral z0
+  if sz >= 99 then
+    n0
+  else
+    let
+      z =
+        fromIntegral z0
 
-    n =
-      fromIntegral n0
-  in
-    round (scaleExponentialFloat sz z n :: Double)
+      n =
+        fromIntegral n0
+    in
+      round (scaleExponentialFloat sz z n :: Double)
 
 -- | Scale a floating-point number exponentially with the size parameter.
 --
