@@ -28,3 +28,7 @@ package hedgehog-quickcheck
   ghc-options: -Wall -Werror
 package hedgehog-test-laws
   ghc-options: -Wall -Werror
+
+if impl(ghc >= 9.14)
+  allow-newer:
+    , lifted-async:base
