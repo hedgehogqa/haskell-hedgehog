@@ -2,6 +2,7 @@ import           Hedgehog.Main (defaultMain)
 
 import qualified Test.Hedgehog.Applicative
 import qualified Test.Hedgehog.Confidence
+import qualified Test.Hedgehog.Discovery
 import qualified Test.Hedgehog.Filter
 import qualified Test.Hedgehog.Maybe
 import qualified Test.Hedgehog.Seed
@@ -15,6 +16,7 @@ main =
   defaultMain [
       Test.Hedgehog.Applicative.tests
     , Test.Hedgehog.Confidence.tests
+    , Test.Hedgehog.Discovery.tests
     , Test.Hedgehog.Filter.tests
     , Test.Hedgehog.Maybe.tests
     , Test.Hedgehog.Seed.tests

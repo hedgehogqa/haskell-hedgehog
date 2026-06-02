@@ -164,6 +164,22 @@ classified =
     ko =
       Classified Comment
 
+    -- Consume a string literal body after the opening quote, up to and
+    -- including the closing quote, honouring backslash escapes. Characters
+    -- inside a string are code, so a "{-" within it must not open a comment.
+    string k = \case
+      [] ->
+        []
+
+      x@(Pos _ '\\') : y : xs ->
+        ok x : ok y : string k xs
+
+      x@(Pos _ '"') : xs ->
+        ok x : k xs
+
+      x : xs ->
+        ok x : string k xs
+
     loop nesting in_line = \case
       [] ->
         []
@@ -173,6 +189,9 @@ classified =
 
       x : xs | in_line ->
         ko x : loop nesting in_line xs
+
+      x@(Pos _ '"') : xs | nesting <= 0 ->
+        ok x : string (loop nesting in_line) xs
 
       x@(Pos _ '{') : y@(Pos _ '-') : xs ->
         ko x : ko y : loop (nesting + 1) in_line xs
