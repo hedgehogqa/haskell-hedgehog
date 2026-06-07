@@ -123,39 +123,35 @@ takeSmallest ::
   -> ShrinkPath
   -> ShrinkLimit
   -> ShrinkRetries
-  -> (Progress -> m ())
-  -> NodeT m (Maybe (Either Failure (), Journal))
-  -> m Result
+  -> (FailureReport -> m ())
+  -> Failure
+  -> Journal
+  -> [TreeT m (Maybe (Either Failure (), Journal))]
+  -> m FailureReport
 takeSmallest shrinks0 (ShrinkPath shrinkPath0) slimit retries updateUI =
   let
-    loop shrinks revShrinkPath = \case
-      NodeT Nothing _ ->
-        pure GaveUp
+    loop shrinks revShrinkPath (Failure loc err mdiff) (Journal logs) xs = do
+      let
+        shrinkPath =
+          ShrinkPath $ reverse revShrinkPath
+        failure =
+          mkFailure shrinks shrinkPath Nothing loc err mdiff (reverse logs)
 
-      NodeT (Just (x, (Journal logs))) xs ->
-        case x of
-          Left (Failure loc err mdiff) -> do
-            let
-              shrinkPath =
-                ShrinkPath $ reverse revShrinkPath
-              failure =
-                mkFailure shrinks shrinkPath Nothing loc err mdiff (reverse logs)
+      updateUI failure
 
-            updateUI $ Shrinking failure
+      if shrinks >= fromIntegral slimit then
+        -- if we've hit the shrink limit, don't shrink any further
+        pure failure
+      else
+        findM (zip [0..] xs) failure $ \(n, m) -> do
+          o <- runTreeN retries m
+          case o of
+            NodeT (Just (Left smallerFailure, smallerLogs)) children ->
+              Just <$>
+                loop (shrinks + 1) (n : revShrinkPath) smallerFailure smallerLogs children
+            _ ->
+              return Nothing
 
-            if shrinks >= fromIntegral slimit then
-              -- if we've hit the shrink limit, don't shrink any further
-              pure $ Failed failure
-            else
-              findM (zip [0..] xs) (Failed failure) $ \(n, m) -> do
-                o <- runTreeN retries m
-                if isFailure o then
-                  Just <$> loop (shrinks + 1) (n : revShrinkPath) o
-                else
-                  return Nothing
-
-          Right () ->
-            return OK
   in
     loop shrinks0 (reverse shrinkPath0)
 
@@ -348,25 +344,27 @@ checkReport cfg size0 seed0 test0 updateUI = do
                   Report (tests + 1) discards coverage0 seed0
               mkReport <$> skipToShrink shrinkPath (updateUI . mkReport) node
             _ -> do
-              node@(NodeT x _) <-
+              NodeT x trees <-
                 runTreeT . evalGenT size s0 . runTestT $ unPropertyT test
               case x of
                 Nothing ->
                   loop tests (discards + 1) (size + 1) s1 coverage0
 
-                Just (Left _, _) ->
+                Just (Left failure, journal) ->
                   let
                     mkReport =
                       Report (tests + 1) discards coverage0 seed0
                   in
-                    fmap mkReport $
+                    fmap (mkReport . Failed) $
                       takeSmallest
                         0
                         (ShrinkPath [])
                         (propertyShrinkLimit cfg)
                         (propertyShrinkRetries cfg)
-                        (updateUI . mkReport)
-                        node
+                        (updateUI . mkReport . Shrinking)
+                        failure
+                        journal
+                        trees
 
                 Just (Right (), journal) ->
                   let
