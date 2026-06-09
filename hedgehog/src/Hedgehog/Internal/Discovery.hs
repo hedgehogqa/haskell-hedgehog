@@ -190,6 +190,15 @@ classified =
       x : xs | in_line ->
         ko x : loop nesting in_line xs
 
+      -- A double quote inside a character literal, i.e. '"' or '\"', must
+      -- not start a string literal. Other character literals cannot affect
+      -- classification, so they need no special handling here.
+      x@(Pos _ '\'') : y@(Pos _ '"') : z@(Pos _ '\'') : xs | nesting <= 0 ->
+        ok x : ok y : ok z : loop nesting in_line xs
+
+      x@(Pos _ '\'') : y@(Pos _ '\\') : z@(Pos _ '"') : w@(Pos _ '\'') : xs | nesting <= 0 ->
+        ok x : ok y : ok z : ok w : loop nesting in_line xs
+
       x@(Pos _ '"') : xs | nesting <= 0 ->
         ok x : string (loop nesting in_line) xs
 
