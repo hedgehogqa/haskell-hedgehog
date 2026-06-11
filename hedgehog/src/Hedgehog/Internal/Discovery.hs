@@ -164,6 +164,39 @@ classified =
     ko =
       Classified Comment
 
+    -- Consume a string literal body after the opening quote, up to and
+    -- including the closing quote, honouring backslash escapes. Characters
+    -- inside a string are code, so a "{-" within it must not open a comment.
+    string k = \case
+      [] ->
+        []
+
+      x@(Pos _ '\\') : y : xs ->
+        ok x : ok y : string k xs
+
+      x@(Pos _ '"') : xs ->
+        ok x : k xs
+
+      x : xs ->
+        ok x : string k xs
+
+    -- Consume a multiline string literal body after the opening @"""@, up to
+    -- and including the closing @"""@, honouring backslash escapes. As with
+    -- ordinary strings, its contents are code, so a "{-" inside one must not
+    -- open a comment.
+    multiline k = \case
+      [] ->
+        []
+
+      x@(Pos _ '\\') : y : xs ->
+        ok x : ok y : multiline k xs
+
+      x@(Pos _ '"') : y@(Pos _ '"') : z@(Pos _ '"') : xs ->
+        ok x : ok y : ok z : k xs
+
+      x : xs ->
+        ok x : multiline k xs
+
     loop nesting in_line = \case
       [] ->
         []
@@ -173,6 +206,21 @@ classified =
 
       x : xs | in_line ->
         ko x : loop nesting in_line xs
+
+      -- A double quote inside a character literal, i.e. '"' or '\"', must
+      -- not start a string literal. Other character literals cannot affect
+      -- classification, so they need no special handling here.
+      x@(Pos _ '\'') : y@(Pos _ '"') : z@(Pos _ '\'') : xs | nesting <= 0 ->
+        ok x : ok y : ok z : loop nesting in_line xs
+
+      x@(Pos _ '\'') : y@(Pos _ '\\') : z@(Pos _ '"') : w@(Pos _ '\'') : xs | nesting <= 0 ->
+        ok x : ok y : ok z : ok w : loop nesting in_line xs
+
+      x@(Pos _ '"') : y@(Pos _ '"') : z@(Pos _ '"') : xs | nesting <= 0 ->
+        ok x : ok y : ok z : multiline (loop nesting in_line) xs
+
+      x@(Pos _ '"') : xs | nesting <= 0 ->
+        ok x : string (loop nesting in_line) xs
 
       x@(Pos _ '{') : y@(Pos _ '-') : xs ->
         ko x : ko y : loop (nesting + 1) in_line xs
