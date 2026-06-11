@@ -91,6 +91,24 @@ prop_block_comment_tokens_in_string_are_code =
       , "prop_after = ()"
       ] === ["prop_after"]
 
+-- | A @{-@ inside a multiline string literal is code, not the start of a
+--   block comment, so declarations after one are still discovered. An odd
+--   double quote within the body must not leave the classifier mid-string
+--   when the closing @"""@ is reached.
+--
+prop_block_comment_token_in_multiline_string_is_code :: Property
+prop_block_comment_token_in_multiline_string_is_code =
+  withTests 1 . property $
+    discovered
+      [ "module Test where"
+      , ""
+      , "banner ="
+      , "  \"\"\"say \" and {- not a comment"
+      , "  still inside\"\"\""
+      , ""
+      , "prop_after = ()"
+      ] === ["prop_after"]
+
 discovered :: [String] -> [String]
 discovered =
   fmap unPropertyName . Map.keys . findProperties "prop_" "Test.hs" . unlines
