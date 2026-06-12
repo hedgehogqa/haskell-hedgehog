@@ -3,6 +3,7 @@
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveLift #-}
 {-# LANGUAGE DoAndIfThenElse #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NoImplicitPrelude #-}
@@ -31,7 +32,10 @@ import           Control.Concurrent.STM (TVar, atomically)
 import qualified Control.Concurrent.STM.TVar as TVar
 import           Control.Exception.Safe (MonadCatch, catchAny)
 import           Control.Monad.IO.Class (MonadIO(..))
+import           Control.Monad.Trans.Control (MonadBaseControl (..))
+import           Data.IORef (newIORef, readIORef, atomicWriteIORef)
 import           Data.Maybe (isJust)
+import qualified System.Timeout as T
 
 import           Hedgehog.Internal.Config
 import           Hedgehog.Internal.Gen (evalGenT)
@@ -48,6 +52,7 @@ import           Hedgehog.Internal.Property (confidenceSuccess, confidenceFailur
 import           Hedgehog.Internal.Property (coverageSuccess, journalCoverage)
 import           Hedgehog.Internal.Property (defaultMinTests)
 import           Hedgehog.Internal.Property (ShrinkPath(..))
+import           Hedgehog.Internal.Property (ShrinkTimeoutMicros (..))
 import           Hedgehog.Internal.Queue
 import           Hedgehog.Internal.Region
 import           Hedgehog.Internal.Report
@@ -118,46 +123,88 @@ runTreeN n m = do
     pure o
 
 takeSmallest ::
-     MonadIO m
+     forall m.
+     ( MonadBaseControl IO m
+     , MonadIO m
+     )
   => ShrinkCount
   -> ShrinkPath
   -> ShrinkLimit
+  -> Maybe ShrinkTimeoutMicros
   -> ShrinkRetries
-  -> (Progress -> m ())
-  -> NodeT m (Maybe (Either Failure (), Journal))
-  -> m Result
-takeSmallest shrinks0 (ShrinkPath shrinkPath0) slimit retries updateUI =
-  let
-    loop shrinks revShrinkPath = \case
-      NodeT Nothing _ ->
-        pure GaveUp
+  -> (FailureReport -> m ())
+  -> Failure
+  -> Journal
+  -> [TreeT m (Maybe (Either Failure (), Journal))]
+  -> m FailureReport
+takeSmallest
+  shrinks0
+  (ShrinkPath shrinkPath0)
+  slimit
+  mSTimeoutMicros
+  retries
+  updateUI
+  initFailure@(Failure initLoc initErr initMdiff)
+  initJournal@(Journal initLogs)
+  initXs = do
 
-      NodeT (Just (x, (Journal logs))) xs ->
-        case x of
-          Left (Failure loc err mdiff) -> do
-            let
-              shrinkPath =
-                ShrinkPath $ reverse revShrinkPath
-              failure =
-                mkFailure shrinks shrinkPath Nothing loc err mdiff (reverse logs)
+    let initFailureReport =
+          mkFailure
+            shrinks0
+            (ShrinkPath $ reverse shrinkPath0)
+            Nothing
+            initLoc
+            initErr
+            initMdiff
+            (reverse initLogs)
 
-            updateUI $ Shrinking failure
+    resultSoFarRef <- liftIO $ newIORef initFailureReport
+    let
+      -- If we are given a timeout, we need to do two things:
+      --
+      -- 1. Save the latest result, in case the timeout is reached.
+      -- 2. Run the loop with the timeout.
+      --
+      -- Otherwise we can run the loop normally with no special update/end
+      -- logic.
+      updateSoFar :: FailureReport -> m ()
+      runLoop :: m FailureReport -> m FailureReport
+      (updateSoFar, runLoop) = case mSTimeoutMicros of
+        Nothing -> (\_ -> pure (), id)
+        Just (ShrinkTimeoutMicros timeoutMicros) ->
+          ( \(!newReport) -> liftIO $ atomicWriteIORef resultSoFarRef newReport
+          , \loopFn -> do
+            mResult <- timeout timeoutMicros loopFn
+            case mResult of
+              Nothing -> liftIO $ readIORef resultSoFarRef
+              Just result -> pure result
+          )
 
-            if shrinks >= fromIntegral slimit then
-              -- if we've hit the shrink limit, don't shrink any further
-              pure $ Failed failure
-            else
-              findM (zip [0..] xs) (Failed failure) $ \(n, m) -> do
-                o <- runTreeN retries m
-                if isFailure o then
-                  Just <$> loop (shrinks + 1) (n : revShrinkPath) o
-                else
-                  return Nothing
+      loop shrinks revShrinkPath (Failure loc err mdiff) (Journal logs) xs = do
+        let
+          shrinkPath =
+            ShrinkPath $ reverse revShrinkPath
+          failure =
+            mkFailure shrinks shrinkPath Nothing loc err mdiff (reverse logs)
 
-          Right () ->
-            return OK
-  in
-    loop shrinks0 (reverse shrinkPath0)
+        -- Potentially save result, if we have a timeout.
+        updateSoFar failure
+        updateUI failure
+
+        if shrinks >= fromIntegral slimit then
+          -- if we've hit the shrink limit, don't shrink any further
+          pure failure
+        else
+          findM (zip [0..] xs) failure $ \(n, m) -> do
+            o <- runTreeN retries m
+            case o of
+              NodeT (Just (Left smallerFailure, smallerLogs)) children ->
+                Just <$>
+                  loop (shrinks + 1) (n : revShrinkPath) smallerFailure smallerLogs children
+              _ ->
+                return Nothing
+
+    runLoop $ loop shrinks0 (reverse shrinkPath0) initFailure initJournal initXs
 
 -- | Follow a given shrink path, instead of searching exhaustively. Assume that
 -- the end of the path is minimal, and don't try to shrink any further than
@@ -204,7 +251,9 @@ skipToShrink (ShrinkPath shrinkPath) updateUI =
 
 checkReport ::
      forall m.
-     MonadIO m
+     ( MonadBaseControl IO m
+     , MonadIO m
+     )
   => MonadCatch m
   => PropertyConfig
   -> Size
@@ -348,25 +397,28 @@ checkReport cfg size0 seed0 test0 updateUI = do
                   Report (tests + 1) discards coverage0 seed0
               mkReport <$> skipToShrink shrinkPath (updateUI . mkReport) node
             _ -> do
-              node@(NodeT x _) <-
+              NodeT x trees <-
                 runTreeT . evalGenT size s0 . runTestT $ unPropertyT test
               case x of
                 Nothing ->
                   loop tests (discards + 1) (size + 1) s1 coverage0
 
-                Just (Left _, _) ->
+                Just (Left failure, journal) ->
                   let
                     mkReport =
                       Report (tests + 1) discards coverage0 seed0
                   in
-                    fmap mkReport $
+                    fmap (mkReport . Failed) $
                       takeSmallest
                         0
                         (ShrinkPath [])
                         (propertyShrinkLimit cfg)
+                        (propertyShrinkTimeoutMicros cfg)
                         (propertyShrinkRetries cfg)
-                        (updateUI . mkReport)
-                        node
+                        (updateUI . mkReport . Shrinking)
+                        failure
+                        journal
+                        trees
 
                 Just (Right (), journal) ->
                   let
@@ -597,3 +649,9 @@ checkParallel =
       , runnerVerbosity =
           Nothing
       }
+
+-- vendored from lifted-base
+timeout :: MonadBaseControl IO m => Int -> m a -> m (Maybe a)
+timeout t m =
+  liftBaseWith (\runInIO -> T.timeout t (runInIO m)) >>=
+    maybe (pure Nothing) (fmap Just . restoreM)
