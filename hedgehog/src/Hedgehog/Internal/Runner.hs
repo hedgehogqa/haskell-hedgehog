@@ -11,8 +11,7 @@
 
 module Hedgehog.Internal.Runner (
   -- * Running Individual Properties
-    check
-  , recheck
+    recheck
   , recheckAt
 
   -- * Running Groups of Properties
@@ -23,8 +22,6 @@ module Hedgehog.Internal.Runner (
 
   -- * Internal
   , checkReport
-  , checkRegion
-  , checkNamed
   ) where
 
 import           Control.Concurrent.STM (TVar, atomically)
@@ -419,14 +416,6 @@ checkNamed ::
 checkNamed region color name mseed prop = do
   seed <- resolveSeed mseed
   checkRegion region color name 0 seed prop
-
--- | Check a property.
---
-check :: MonadIO m => Property -> m Bool
-check prop = do
-  color <- detectColor
-  liftIO . displayRegion $ \region ->
-    (== OK) . reportStatus <$> checkNamed region color Nothing Nothing prop
 
 -- | Check a property using a specific size and seed.
 --
