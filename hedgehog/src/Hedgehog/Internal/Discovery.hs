@@ -164,12 +164,35 @@ classified =
     ko =
       Classified Comment
 
+    -- A string gap is a backslash, a run of whitespace, and a closing
+    -- backslash; the whole run is elided and the string continues. We must
+    -- consume it as a unit so the closing backslash is not paired with a
+    -- following character as an ordinary escape, which would otherwise leave
+    -- the string open (e.g. the @"@ after @"abc\\\n\\@ is the closing quote).
+    stringGap = \case
+      x@(Pos _ c) : xs | Char.isSpace c ->
+        case stringGap xs of
+          Nothing ->
+            Nothing
+          Just (ys, rest) ->
+            Just (ok x : ys, rest)
+
+      x@(Pos _ '\\') : xs ->
+        Just ([ok x], xs)
+
+      _ ->
+        Nothing
+
     -- Consume a string literal body after the opening quote, up to and
     -- including the closing quote, honouring backslash escapes. Characters
     -- inside a string are code, so a "{-" within it must not open a comment.
     string k = \case
       [] ->
         []
+
+      x@(Pos _ '\\') : xs
+        | Just (ys, rest) <- stringGap xs ->
+        ok x : ys ++ string k rest
 
       x@(Pos _ '\\') : y : xs ->
         ok x : ok y : string k xs
@@ -187,6 +210,10 @@ classified =
     multiline k = \case
       [] ->
         []
+
+      x@(Pos _ '\\') : xs
+        | Just (ys, rest) <- stringGap xs ->
+        ok x : ys ++ multiline k rest
 
       x@(Pos _ '\\') : y : xs ->
         ok x : ok y : multiline k xs

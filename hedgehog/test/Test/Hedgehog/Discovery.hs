@@ -109,6 +109,43 @@ prop_block_comment_token_in_multiline_string_is_code =
       , "prop_after = ()"
       ] === ["prop_after"]
 
+-- | A string gap (a backslash, whitespace, then a backslash) is elided and
+--   the string continues. The closing backslash must not be paired with the
+--   following character as an escape, which would leave the string open and
+--   swallow the block comment that follows.
+--
+prop_string_gap_before_closing_quote_does_not_leave_string_open :: Property
+prop_string_gap_before_closing_quote_does_not_leave_string_open =
+  withTests 1 . property $
+    discovered
+      [ "module Test where"
+      , ""
+      , "s = \"abc\\"
+      , "\\\""
+      , ""
+      , "{-"
+      , "prop_hidden = ()"
+      , "-}"
+      ] === []
+
+-- | The multiline string code path handles string gaps independently, so it
+--   needs its own regression test.
+--
+prop_string_gap_in_multiline_string_does_not_leave_string_open :: Property
+prop_string_gap_in_multiline_string_does_not_leave_string_open =
+  withTests 1 . property $
+    discovered
+      [ "module Test where"
+      , ""
+      , "s ="
+      , "  \"\"\"abc\\"
+      , "\\\"\"\""
+      , ""
+      , "{-"
+      , "prop_hidden = ()"
+      , "-}"
+      ] === []
+
 discovered :: [String] -> [String]
 discovered =
   fmap unPropertyName . Map.keys . findProperties "prop_" "Test.hs" . unlines
