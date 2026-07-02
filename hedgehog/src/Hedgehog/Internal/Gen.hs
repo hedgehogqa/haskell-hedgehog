@@ -1288,7 +1288,7 @@ frequency l = withFrozenCallStack $ case l of
 --       Var '<$>' genName
 --     ] [
 --       -- recursive generators
---       Gen.'subtermM' genExpr (\x -> Lam '<$>' genName '<*>' pure x)
+--       Gen.'subtermM' genExpr (\\x -> Lam '<$>' genName '<*>' pure x)
 --     , Gen.'subterm2' genExpr genExpr App
 --     ]
 -- @
