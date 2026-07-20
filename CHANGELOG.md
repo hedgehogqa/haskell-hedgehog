@@ -1,3 +1,7 @@
+## Unreleased
+
+* Add `Hedgehog.withShrinkTimeoutMicros` ([#488][488], [@tbidne][tbidne])
+
 ## Version 1.7 (2025-09-22)
 
 * Fix eta-reduction issues for GHC 9.0; add CI and cabal support for GHC 9.0.2 ([#557][557], [@tomjaguarpaw][tomjaguarpaw])
@@ -329,6 +333,8 @@
   https://github.com/jchia
 [Vekhir]:
   https://github.com/Vekhir
+[tbidne]:
+  https://github.com/tbidne
 [tmcgilchrist]:
   https://github.com/tmcgilchrist
 
@@ -384,6 +390,8 @@
   https://github.com/hedgehogqa/haskell-hedgehog/pull/491
 [489]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/489
+[488]:
+  https://github.com/hedgehogqa/haskell-hedgehog/pull/488
 [486]:
   https://github.com/hedgehogqa/haskell-hedgehog/pull/486
 [485]:

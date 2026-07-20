@@ -53,6 +53,7 @@ library
     , Test.Example.Registry
     , Test.Example.Resource
     , Test.Example.Roundtrip
+    , Test.Example.Shrink
     , Test.Example.STLC
 
   build-depends:

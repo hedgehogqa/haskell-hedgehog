@@ -33,6 +33,7 @@ module Hedgehog.Internal.Property (
   , DiscardLimit(..)
   , DiscardCount(..)
   , ShrinkLimit(..)
+  , ShrinkTimeoutMicros (..)
   , ShrinkCount(..)
   , Skip(..)
   , ShrinkPath(..)
@@ -40,6 +41,7 @@ module Hedgehog.Internal.Property (
   , withTests
   , withDiscards
   , withShrinks
+  , withShrinkTimeoutMicros
   , withRetries
   , withSkip
   , property
@@ -281,6 +283,7 @@ data PropertyConfig =
   PropertyConfig {
       propertyDiscardLimit :: !DiscardLimit
     , propertyShrinkLimit :: !ShrinkLimit
+    , propertyShrinkTimeoutMicros :: !(Maybe ShrinkTimeoutMicros)
     , propertyShrinkRetries :: !ShrinkRetries
     , propertyTerminationCriteria :: !TerminationCriteria
 
@@ -341,6 +344,20 @@ newtype DiscardLimit =
 --
 newtype ShrinkLimit =
   ShrinkLimit Int
+  deriving (Eq, Ord, Show, Num, Enum, Real, Integral, Lift)
+
+-- | The time limit before giving up on shrinking, in microseconds.
+--
+--   Can be constructed using numeric literals:
+--
+-- @
+--   -- 1_000_000 microseconds == 1 second
+--   1_000_000 :: ShrinkTimeoutMicros
+-- @
+--
+-- @since 1.8
+newtype ShrinkTimeoutMicros =
+  ShrinkTimeoutMicros Int
   deriving (Eq, Ord, Show, Num, Enum, Real, Integral, Lift)
 
 -- | The numbers of times a property was able to shrink after a failing test.
@@ -1183,6 +1200,8 @@ defaultConfig =
         100
     , propertyShrinkLimit =
         1000
+    , propertyShrinkTimeoutMicros =
+        Nothing
     , propertyShrinkRetries =
         0
     , propertyTerminationCriteria =
@@ -1266,6 +1285,26 @@ withDiscards n =
 withShrinks :: ShrinkLimit -> Property -> Property
 withShrinks n =
   mapConfig $ \config -> config { propertyShrinkLimit = n }
+
+-- | Set the timeout — in microseconds — after which the test runner gives up
+--   on shrinking and reports the best counterexample found so far.
+--
+--   The timeout covers only the shrinking phase, not the search for the
+--   original failure. Shrinking may also stop earlier if the 'ShrinkLimit'
+--   is reached, see 'withShrinks'.
+--
+--   The timeout is enforced with 'System.Timeout.timeout', so it is
+--   best-effort: it relies on an asynchronous exception and cannot interrupt
+--   blocking foreign calls or non-allocating loops, and handlers that catch
+--   asynchronous exceptions may delay it.
+--
+--   A timeout of @0@ disables shrinking entirely; negative values disable
+--   the timeout.
+--
+-- @since 1.8
+withShrinkTimeoutMicros :: ShrinkTimeoutMicros -> Property -> Property
+withShrinkTimeoutMicros n =
+  mapConfig $ \config -> config { propertyShrinkTimeoutMicros = Just n }
 
 -- | Set the number of times a property will be executed for each shrink before
 --   the test runner gives up and tries a different shrink. See 'ShrinkRetries'
