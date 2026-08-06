@@ -11,6 +11,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-} -- MonadBase
+{-# LANGUAGE DeriveFunctor #-}
 #if __GLASGOW_HASKELL__ < 802
 {-# OPTIONS_GHC -fno-warn-incomplete-patterns #-}
 #endif
@@ -105,6 +106,9 @@ newtype TreeT m a =
   TreeT {
       runTreeT :: m (NodeT m a)
     }
+  deriving
+    ( Functor
+    )
 
 instance MonadBaseControl b m => MonadBaseControl b (TreeT m) where
   type StM (TreeT m) a = StM m (NodeT m a)
@@ -134,7 +138,11 @@ data NodeT m a =
 
       -- | The children of this 'NodeT'.
     , nodeChildren :: [TreeT m a]
-    } deriving (Eq)
+    }
+  deriving
+    ( Eq
+    , Functor
+    )
 
 -- | Extracts the 'Node' from a 'Tree'.
 --
@@ -417,14 +425,6 @@ instance (Eq1 m, Eq a) => Eq (TreeT m a) where
   TreeT m0 == TreeT m1 =
     liftEq (==) m0 m1
 
-instance Functor m => Functor (NodeT m) where
-  fmap f (NodeT x xs) =
-    NodeT (f x) (fmap (fmap f) xs)
-
-instance Functor m => Functor (TreeT m) where
-  fmap f =
-    TreeT . fmap (fmap f) . runTreeT
-
 instance Applicative m => Applicative (NodeT m) where
   pure x =
     NodeT x []
@@ -440,9 +440,6 @@ instance Applicative m => Applicative (TreeT m) where
       liftA2 (<*>) mab ma
 
 instance Monad m => Monad (NodeT m) where
-  return =
-    pure
-
   (>>=) (NodeT x xs) k =
     case k x of
       NodeT y ys ->
@@ -450,9 +447,6 @@ instance Monad m => Monad (NodeT m) where
           fmap (TreeT . fmap (>>= k) . runTreeT) xs ++ ys
 
 instance Monad m => Monad (TreeT m) where
-  return =
-    pure
-
   (>>=) m k =
     TreeT $ do
       NodeT x xs <- runTreeT m

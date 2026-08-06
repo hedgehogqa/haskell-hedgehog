@@ -247,6 +247,7 @@ newtype TestT m a =
     } deriving (
       Functor
     , Applicative
+    , Monad
     , MonadIO
     , MonadBase b
     , MonadThrow
@@ -706,15 +707,6 @@ newtype Coverage a =
 
 ------------------------------------------------------------------------
 -- TestT
-
-instance Monad m => Monad (TestT m) where
-  return =
-    pure
-
-  (>>=) m k =
-    TestT $
-      unTest m >>=
-      unTest . k
 
 instance Monad m => MonadFail (TestT m) where
   fail err =
