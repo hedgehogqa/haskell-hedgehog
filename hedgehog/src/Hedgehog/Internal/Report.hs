@@ -38,6 +38,7 @@ module Hedgehog.Internal.Report (
   , ppResult
   , ppResultWith
   , ppSummary
+  , ppDiff
 
   , fromResult
   , mkFailure

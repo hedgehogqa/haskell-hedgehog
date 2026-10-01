@@ -124,6 +124,7 @@ module Hedgehog.Internal.Property (
   , defaultConfig
   , mapConfig
   , failDiff
+  , diffValues
   , failException
   , failWith
   , writeLog
@@ -895,10 +896,21 @@ footnoteShow =
 -- | Fails with an error that shows the difference between two values.
 failDiff :: (MonadTest m, Show a, Show b, HasCallStack) => a -> b -> m ()
 failDiff x y =
+  withFrozenCallStack $
+    case diffValues x y of
+      Left message ->
+          failWith Nothing message
+
+      Right diff' ->
+        failWith (Just diff') ""
+
+-- | Try to construct a 'Diff' showing the difference between two values, or if
+-- that wasn't possible, return a message showing both values pretty-printed. 
+diffValues :: (Show a, Show b) => a -> b -> Either String Diff
+diffValues x y =
   case valueDiff <$> mkValue x <*> mkValue y of
     Nothing ->
-      withFrozenCallStack $
-        failWith Nothing $
+      Left $
         unlines $ [
             "Failed"
           , "━━ lhs ━━"
@@ -908,14 +920,10 @@ failDiff x y =
           ]
 
     Just vdiff@(ValueSame _) ->
-      withFrozenCallStack $
-        failWith (Just $
-          Diff "━━━ Failed ("  "" "no differences" "" ") ━━━" vdiff) ""
+      Right $ Diff "━━━ Failed ("  "" "no differences" "" ") ━━━" vdiff
 
     Just vdiff ->
-      withFrozenCallStack $
-        failWith (Just $
-          Diff "━━━ Failed (" "- lhs" ") (" "+ rhs" ") ━━━" vdiff) ""
+      Right $ Diff "━━━ Failed (" "- lhs" ") (" "+ rhs" ") ━━━" vdiff
 
 -- | Fails with an error which renders the type of an exception and its error
 --   message.
