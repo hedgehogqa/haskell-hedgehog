@@ -32,6 +32,7 @@ module Hedgehog.Internal.Report (
   , renderResult
   , renderResultWith
   , renderSummary
+  , renderDiff
   , renderDoc
 
   , ppProgress
@@ -1342,3 +1343,7 @@ renderResultWith config color name x =
 renderSummary :: MonadIO m => UseColor -> Summary -> m String
 renderSummary color x =
   renderDoc color =<< ppSummary x
+
+renderDiff :: MonadIO m => UseColor -> Diff -> m String
+renderDiff color x =
+  renderDoc color =<< ppDiff x

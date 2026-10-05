@@ -904,8 +904,10 @@ failDiff x y =
       Right diff' ->
         failWith (Just diff') ""
 
--- | Try to construct a 'Diff' showing the difference between two values, or if
--- that wasn't possible, return a message showing both values pretty-printed. 
+-- | Try to construct a 'Diff' showing the difference between two values. If
+-- it wasn't possible to construct a 'Diff', this function returns a 'Left'
+-- value containing a message showing both values pretty-printed, which can
+-- be used in user-facing error messages.
 diffValues :: (Show a, Show b) => a -> b -> Either String Diff
 diffValues x y =
   case valueDiff <$> mkValue x <*> mkValue y of
