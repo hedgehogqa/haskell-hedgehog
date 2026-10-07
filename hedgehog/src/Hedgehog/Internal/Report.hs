@@ -1346,4 +1346,4 @@ renderSummary color x =
 
 renderDiff :: MonadIO m => UseColor -> Diff -> m String
 renderDiff color x =
-  renderDoc color =<< ppDiff x
+  renderDoc color (WL.vsep (ppDiff x))
