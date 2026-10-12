@@ -907,9 +907,9 @@ failDiff x y =
 -- | Try to construct a 'Diff' showing the difference between two values.
 --
 -- If both values are parseable by `pretty-show`, this function returns a
--- 'Right' 'Diff'. Note that diffs do not necessarily imply that there are
--- differences; if the values' 'Show' output is identical, this function
--- returns @Right (ValueSame _)@.
+-- 'Right' 'Diff'. Note that this does not necessarily imply that there are
+-- visible differences; if the values' 'Show' output is identical, this
+-- function returns @Right (ValueSame _)@.
 --
 -- Otherwise, this function returns a 'Left' containing a message showing both
 -- values pretty-printed, which can be used in user-facing error messages. This
