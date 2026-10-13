@@ -909,7 +909,8 @@ failDiff x y =
 -- If both values are parseable by `pretty-show`, this function returns a
 -- 'Right' 'Diff'. Note that this does not necessarily imply that there are
 -- visible differences; if the values' 'Show' output is identical, this
--- function returns @Right (ValueSame _)@.
+-- function returns a 'Right' containing a 'Diff'
+-- whose 'diffValue' is 'ValueSame'.
 --
 -- Otherwise, this function returns a 'Left' containing a message showing both
 -- values pretty-printed, which can be used in user-facing error messages. This
